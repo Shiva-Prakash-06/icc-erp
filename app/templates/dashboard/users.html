@@ -3,6 +3,27 @@
 {% block title %}User Management & Approvals - OIA Project Intelligence{% endblock %}
 
 {% block content %}
+{% macro assignment_fields(user) %}
+<select name="role" class="form-select form-select-sm" aria-label="Role for {{ user.username }}" required>
+  {% if user.role and user.role not in role_options and user.role != 'Pending' %}<option value="{{ user.role }}" selected>{{ user.role }} (legacy label)</option>{% endif %}
+  {% if user.role == 'Pending' and user.preferred_role and user.preferred_role not in role_options %}<option value="{{ user.preferred_role }}" selected>{{ user.preferred_role }} (requested legacy label)</option>{% endif %}
+  {% for role in role_options %}<option value="{{ role }}"{% if user.role == role or user.preferred_role == role %} selected{% endif %}>{{ role }}</option>{% endfor %}
+</select>
+<select name="campus_public_id" class="form-select form-select-sm" aria-label="Campus scope for {{ user.username }}">
+  <option value="">Home campus</option>{% for campus in campuses %}<option value="{{ campus.public_id }}"{% if user.campus_id == campus.id %} selected{% endif %}>{{ campus.name }}</option>{% endfor %}
+</select>
+<select name="academic_year_public_id" class="form-select form-select-sm" aria-label="Academic year scope for {{ user.username }}">
+  <option value="">No year scope</option>{% for year in academic_years %}<option value="{{ year.public_id }}">{{ year.name }}</option>{% endfor %}
+</select>
+<select name="wing_public_id" class="form-select form-select-sm" aria-label="Wing scope for {{ user.username }}">
+  <option value="">No wing</option>{% for wing in wings %}<option value="{{ wing.public_id }}">{{ wing.name }}</option>{% endfor %}
+</select>
+<select name="project_public_id" class="form-select form-select-sm" aria-label="Project scope for {{ user.username }}">
+  <option value="">No project scope</option>{% for project in scope_projects %}<option value="{{ project.public_id }}">{{ project.code }} · {{ project.title }}</option>{% endfor %}
+</select>
+<div class="form-check"><input class="form-check-input" type="checkbox" name="platform_scope" id="platform-{{ user.public_id }}"><label class="form-check-label small" for="platform-{{ user.public_id }}">Platform scope</label></div>
+<div class="form-check"><input class="form-check-input" type="checkbox" name="can_view_sensitive_links" id="sensitive-{{ user.public_id }}"><label class="form-check-label small" for="sensitive-{{ user.public_id }}">Restricted references</label></div>
+{% endmacro %}
 <div class="page-header animate-fade-in">
     <h1 class="page-title">User Approvals & Role Assignments</h1>
     <p class="page-subtitle">Faculty and ICC Core Committee dashboard to verify registrations and grant system clearance.</p>
@@ -46,14 +67,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-flex align-items-center gap-2">
-                                            <select name="role" class="form-input-oia py-1 fs-6" style="min-width: 150px;" required>
-                                                <option value="Volunteer" {% if u.preferred_role == 'Volunteer' %}selected{% endif %}>Volunteer</option>
-                                                <option value="Buddy" {% if u.preferred_role == 'Buddy' %}selected{% endif %}>Buddy</option>
-                                                <option value="Exchange Student" {% if u.preferred_role == 'Exchange Student' %}selected{% endif %}>Exchange Student</option>
-                                                <option value="ICC Core Committee" {% if u.preferred_role == 'ICC Core Committee' %}selected{% endif %}>ICC Core Committee</option>
-                                                <option value="Faculty" {% if u.preferred_role == 'Faculty' %}selected{% endif %}>Faculty</option>
-                                            </select>
+                                        <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2" style="min-width: 230px;">
+                                            {{ assignment_fields(u) }}
                                             <button type="submit" class="btn btn-success btn-sm py-1 px-3 fw-bold rounded-pill"><i class="bi bi-check-lg"></i> Grant</button>
                                         </form>
                                     </td>
@@ -107,14 +122,8 @@
                                     <td>{{ u.campus.name if u.campus else "N/A" }}</td>
                                     <td class="small text-muted">{{ u.approved_at.strftime('%Y-%m-%d %H:%M') if u.approved_at else "N/A" }}</td>
                                     <td>
-                                        <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-flex align-items-center gap-2">
-                                            <select name="role" class="form-input-oia py-1 fs-6" style="min-width: 150px;" required>
-                                                <option value="Volunteer" {% if u.role == 'Volunteer' %}selected{% endif %}>Volunteer</option>
-                                                <option value="Buddy" {% if u.role == 'Buddy' %}selected{% endif %}>Buddy</option>
-                                                <option value="Exchange Student" {% if u.role == 'Exchange Student' %}selected{% endif %}>Exchange Student</option>
-                                                <option value="ICC Core Committee" {% if u.role == 'ICC Core Committee' %}selected{% endif %}>ICC Core Committee</option>
-                                                <option value="Faculty" {% if u.role == 'Faculty' %}selected{% endif %}>Faculty</option>
-                                            </select>
+                                        <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2" style="min-width: 230px;">
+                                            {{ assignment_fields(u) }}
                                             <button type="submit" class="btn btn-outline-info btn-sm py-1 px-3 rounded-pill">Update</button>
                                         </form>
                                     </td>

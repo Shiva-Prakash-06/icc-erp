@@ -10,16 +10,19 @@ from app.models.erp import RoleAssignment
 
 
 ROLE_PERMISSIONS = {
-    "SYSTEM_ADMINISTRATOR": {"platform_admin", "manage_users", "manage_projects", "approve", "report", "audit"},
-    "OIA_FACULTY_ADMINISTRATOR": {"manage_users", "manage_projects", "approve", "report", "audit", "sensitive_links"},
-    "FACULTY_COORDINATOR": {"manage_projects", "approve", "report"},
-    "ICC_SECRETARY_USC": {"manage_projects", "approve", "report"},
-    "ICC_EVENTS_HEAD": {"manage_projects", "approve", "report"},
-    "ICC_MEDIA_HEAD": {"manage_projects", "approve", "report"},
-    "ICC_CULTURALS_HEAD": {"manage_projects", "approve", "report"},
+    "SYSTEM_ADMINISTRATOR": {
+        "platform_admin", "manage_users", "manage_governance", "manage_projects",
+        "manage_people", "manage_imports", "approve", "waive", "report", "audit",
+    },
+    "OIA_FACULTY_ADMINISTRATOR": {"manage_users", "manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "waive", "report", "audit", "sensitive_links"},
+    "FACULTY_COORDINATOR": {"manage_projects", "manage_people", "manage_imports", "approve", "waive", "report"},
+    "ICC_SECRETARY_USC": {"manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "report"},
+    "ICC_EVENTS_HEAD": {"manage_projects", "manage_people", "approve", "report"},
+    "ICC_MEDIA_HEAD": {"manage_projects", "manage_people", "approve", "report"},
+    "ICC_CULTURALS_HEAD": {"manage_projects", "manage_people", "approve", "report"},
     "ICC_ASSOCIATE": {"contribute", "view_assigned"},
-    "IGP_HEAD": {"manage_projects", "approve", "report", "sensitive_links"},
-    "IGP_PROGRAM_LEAD": {"manage_projects", "approve", "report"},
+    "IGP_HEAD": {"manage_projects", "manage_people", "manage_imports", "approve", "waive", "report", "sensitive_links"},
+    "IGP_PROGRAM_LEAD": {"manage_projects", "manage_people", "approve", "report"},
     "VOLUNTEER": {"contribute", "view_assigned"},
     "BUDDY": {"contribute", "view_assigned"},
     "PARTICIPANT": {"view_personal"},
@@ -27,15 +30,27 @@ ROLE_PERMISSIONS = {
 }
 
 LEGACY_ROLE_MAP = {
+    "System Administrator": "SYSTEM_ADMINISTRATOR",
+    "OIA Faculty Administrator": "OIA_FACULTY_ADMINISTRATOR",
+    "Faculty Coordinator": "FACULTY_COORDINATOR",
     "Faculty": "OIA_FACULTY_ADMINISTRATOR",
+    "ICC Secretary / USC": "ICC_SECRETARY_USC",
     "ICC Core Committee": "ICC_SECRETARY_USC",
+    "ICC Events Head": "ICC_EVENTS_HEAD",
     "ICC Events Core": "ICC_EVENTS_HEAD",
+    "ICC Culturals Head": "ICC_CULTURALS_HEAD",
     "ICC Cultural Core": "ICC_CULTURALS_HEAD",
+    "ICC Media Head": "ICC_MEDIA_HEAD",
     "ICC Media Core": "ICC_MEDIA_HEAD",
+    "ICC Associate": "ICC_ASSOCIATE",
+    "IGP Head": "IGP_HEAD",
     "IGP Core": "IGP_HEAD",
+    "IGP Program Lead": "IGP_PROGRAM_LEAD",
     "Volunteer": "VOLUNTEER",
     "Buddy": "BUDDY",
+    "Participant / Exchange Student": "PARTICIPANT",
     "Exchange Student": "PARTICIPANT",
+    "Auditor / Read-only": "AUDITOR",
 }
 
 
@@ -93,11 +108,21 @@ def has_permission(user, permission, project=None, sensitive=False):
 def can_view_project(user, project):
     if has_permission(user, "manage_projects", project) or has_permission(user, "report", project):
         return True
-    if not user or not user.person_id:
+    if not user:
         return False
     from app.models.erp import TeamAssignment
+    from app.models.project import ProjectParticipant
 
-    return TeamAssignment.query.filter_by(person_id=user.person_id, project_id=project.id).first() is not None
+    if user.person_id and TeamAssignment.query.filter_by(person_id=user.person_id, project_id=project.id).first() is not None:
+        return True
+    identity_filter = ProjectParticipant.user_id == user.id
+    if user.person_id:
+        identity_filter = or_(identity_filter, ProjectParticipant.person_id == user.person_id)
+    return ProjectParticipant.query.filter(
+        ProjectParticipant.project_id == project.id,
+        identity_filter,
+        ProjectParticipant.status == "Active",
+    ).first() is not None
 
 
 def permission_required(permission, project_loader=None):

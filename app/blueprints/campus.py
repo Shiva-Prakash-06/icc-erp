@@ -5,7 +5,7 @@ from app.models.project import Campus, ProgramType, Project, ProjectParticipant,
 from app.models.operational import AttendanceRecord, Contribution, Feedback, Document, Report
 from app.services.analytics import AnalyticsService
 from app.blueprints.auth import login_required, role_required
-from datetime import datetime
+from datetime import datetime, timezone
 
 campus_bp = Blueprint('campus', __name__)
 
@@ -243,7 +243,7 @@ def verify_contribution(campus_id, project_id, contrib_id):
     if action == 'approve':
         contrib.approval_status = 'Approved'
         contrib.approved_by_id = g.user.id
-        contrib.approved_at = datetime.utcnow()
+        contrib.approved_at = datetime.now(timezone.utc)
         flash("Contribution approved.", "success")
     elif action == 'reject':
         contrib.approval_status = 'Rejected'
@@ -338,7 +338,7 @@ def verify_buddy_log(campus_id, project_id, log_id):
     if action == 'approve':
         log.status = 'Approved'
         log.verified_by_id = g.user.id
-        log.verified_at = datetime.utcnow()
+        log.verified_at = datetime.now(timezone.utc)
         flash("Interaction log approved.", "success")
     elif action == 'reject':
         log.status = 'Rejected'

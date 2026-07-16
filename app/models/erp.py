@@ -1,9 +1,9 @@
-"""Production-shaped ERP domain models added to the v2 modular monolith.
+"""Core ERP domain models.
 
-Legacy v2 integer identifiers remain as internal keys for upgrade compatibility;
-all new public interfaces expose stable UUIDs and immutable human-readable codes.
-The production migration program may promote UUIDs to physical primary keys after
-the legacy screens have been retired.
+Database-local integer keys are retained for the half-built v2 schema while every
+service and public interface uses stable UUIDs.  This avoids a high-risk primary-key
+rewrite of the legacy tables and keeps authentication identities independent from
+operational identifiers.  Integer keys are never accepted by the production API.
 """
 
 from __future__ import annotations
@@ -67,6 +67,11 @@ class Person(PublicIdMixin, TimestampMixin, db.Model):
     interests = db.Column(db.Text, nullable=True)
     availability = db.Column(db.Text, nullable=True)
     consent_status = db.Column(db.String(30), nullable=False, default="Not Recorded")
+    consent_recorded_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    privacy_classification = db.Column(db.String(30), nullable=False, default="Internal")
+    emergency_contact_name = db.Column(db.String(150), nullable=True)
+    emergency_contact_phone = db.Column(db.String(40), nullable=True)
+    contact_visibility = db.Column(db.JSON, nullable=False, default=dict)
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
     campus = db.relationship("Campus", backref="people")
@@ -103,6 +108,9 @@ class RoleAssignment(PublicIdMixin, TimestampMixin, db.Model):
     starts_on = db.Column(db.Date, nullable=True)
     ends_on = db.Column(db.Date, nullable=True)
     delegated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    position_id = db.Column(db.Integer, db.ForeignKey("positions.id", ondelete="SET NULL"), nullable=True)
+    governance_term_id = db.Column(db.Integer, db.ForeignKey("governance_terms.id", ondelete="SET NULL"), nullable=True)
+    assignment_reason = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     can_view_sensitive_links = db.Column(db.Boolean, nullable=False, default=False)
 
@@ -165,6 +173,7 @@ class WorkTask(PublicIdMixin, TimestampMixin, db.Model):
     accountable_person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     external_contact = db.Column(db.String(255), nullable=True)
     due_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    reminder_at = db.Column(db.DateTime(timezone=True), nullable=True)
     priority = db.Column(db.String(20), nullable=False, default="Medium")
     status = db.Column(db.String(30), nullable=False, default="Not Started")
     dependency_task_id = db.Column(db.Integer, db.ForeignKey("work_tasks.id"), nullable=True)
@@ -174,6 +183,7 @@ class WorkTask(PublicIdMixin, TimestampMixin, db.Model):
     waived = db.Column(db.Boolean, nullable=False, default=False)
     waiver_reason = db.Column(db.Text, nullable=True)
     waived_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
 
     project = db.relationship("Project", backref=db.backref("work_tasks", cascade="all, delete-orphan"))
 
@@ -239,6 +249,8 @@ class ChecklistItemStatus(PublicIdMixin, TimestampMixin, db.Model):
     decision_comment = db.Column(db.Text, nullable=True)
     waived = db.Column(db.Boolean, nullable=False, default=False)
     waiver_reason = db.Column(db.Text, nullable=True)
+    waived_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
     source_file = db.Column(db.String(500), nullable=True)
     source_sheet = db.Column(db.String(200), nullable=True)
     source_row = db.Column(db.Integer, nullable=True)
@@ -263,6 +275,7 @@ class TeamAssignment(PublicIdMixin, TimestampMixin, db.Model):
     recruitment_status = db.Column(db.String(30), nullable=False, default="Selected")
     starts_on = db.Column(db.Date, nullable=True)
     ends_on = db.Column(db.Date, nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
 
     person = db.relationship("Person", backref="team_assignments")
     project = db.relationship("Project", backref=db.backref("team_assignments", cascade="all, delete-orphan"))
@@ -278,6 +291,7 @@ class SessionAttendance(PublicIdMixin, TimestampMixin, db.Model):
     verified_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     verified_at = db.Column(db.DateTime(timezone=True), nullable=True)
     source_import_row_id = db.Column(db.Integer, db.ForeignKey("import_rows.id"), nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
 
     __table_args__ = (db.UniqueConstraint("session_id", "person_id", name="uq_session_attendance_person"),)
 
@@ -295,6 +309,13 @@ class DocumentRecord(PublicIdMixin, TimestampMixin, db.Model):
     drive_file_id = db.Column(db.String(255), nullable=True)
     drive_url = db.Column(db.String(500), nullable=True)
     permission_classification = db.Column(db.String(40), nullable=False, default="Internal")
+    drive_name = db.Column(db.String(255), nullable=True)
+    drive_mime_type = db.Column(db.String(150), nullable=True)
+    drive_visibility = db.Column(db.String(40), nullable=True)
+    drive_permission_metadata = db.Column(db.JSON, nullable=False, default=list)
+    drive_modified_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    drive_validated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    drive_validation_status = db.Column(db.String(30), nullable=False, default="Unverified")
     owner_person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     approved_at = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -302,6 +323,10 @@ class DocumentRecord(PublicIdMixin, TimestampMixin, db.Model):
     supersedes_id = db.Column(db.Integer, db.ForeignKey("document_records.id"), nullable=True)
     mandatory_for_closure = db.Column(db.Boolean, nullable=False, default=False)
     waived = db.Column(db.Boolean, nullable=False, default=False)
+    waiver_reason = db.Column(db.Text, nullable=True)
+    waived_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
 
     project = db.relationship("Project", backref=db.backref("document_records", cascade="all, delete-orphan"))
 
@@ -319,6 +344,8 @@ class BudgetLine(PublicIdMixin, TimestampMixin, db.Model):
     actual_amount = db.Column(db.Numeric(12, 2), nullable=True)
     official_reference = db.Column(db.String(120), nullable=True)
     status = db.Column(db.String(30), nullable=False, default="Draft")
+    currency = db.Column(db.String(3), nullable=False, default="INR")
+    version = db.Column(db.Integer, nullable=False, default=1)
 
     __table_args__ = (
         db.CheckConstraint("estimated_amount >= 0", name="ck_budget_estimate_nonnegative"),
@@ -341,6 +368,9 @@ class OperationalRequest(PublicIdMixin, TimestampMixin, db.Model):
     owner_person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     approver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     official_reference = db.Column(db.String(120), nullable=True)
+    currency = db.Column(db.String(3), nullable=False, default="INR")
+    decision_comment = db.Column(db.Text, nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
 
 
 class FeedbackForm(PublicIdMixin, TimestampMixin, db.Model):
@@ -354,6 +384,9 @@ class FeedbackForm(PublicIdMixin, TimestampMixin, db.Model):
     is_anonymous = db.Column(db.Boolean, nullable=False, default=False)
     questions_json = db.Column(db.JSON, nullable=False, default=list)
     is_open = db.Column(db.Boolean, nullable=False, default=False)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    opens_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    closes_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 
 class FeedbackResponse(PublicIdMixin, TimestampMixin, db.Model):
@@ -365,6 +398,11 @@ class FeedbackResponse(PublicIdMixin, TimestampMixin, db.Model):
     answers_json = db.Column(db.JSON, nullable=False, default=dict)
     publication_consent = db.Column(db.Boolean, nullable=False, default=False)
     moderation_status = db.Column(db.String(30), nullable=False, default="Pending")
+    response_key_hash = db.Column(db.String(64), nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("form_id", "response_key_hash", name="uq_feedback_response_key"),
+    )
 
 
 class ImportBatch(PublicIdMixin, TimestampMixin, db.Model):
@@ -383,6 +421,8 @@ class ImportBatch(PublicIdMixin, TimestampMixin, db.Model):
     reconciliation_json = db.Column(db.JSON, nullable=False, default=dict)
     committed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     committed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    importer_version = db.Column(db.String(30), nullable=False, default="2")
+    mapping_version = db.Column(db.String(30), nullable=False, default="1")
 
 
 class ImportRow(PublicIdMixin, TimestampMixin, db.Model):
@@ -433,3 +473,5 @@ class ReportSnapshot(PublicIdMixin, TimestampMixin, db.Model):
     generated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     approved_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    publication_status = db.Column(db.String(30), nullable=False, default="Unpublished")
+    published_at = db.Column(db.DateTime(timezone=True), nullable=True)

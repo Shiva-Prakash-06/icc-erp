@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from app.models.user import User
+from app.database import db
 
 
 @dataclass(frozen=True)
@@ -21,7 +22,10 @@ class IdentityProvider(ABC):
 
 class InternalPasswordIdentityProvider(IdentityProvider):
     def authenticate(self, identifier, secret):
-        user = User.query.filter((User.username == identifier) | (User.email == identifier)).first()
+        if not identifier or not secret:
+            return None
+        normalized = identifier.strip().lower()
+        user = User.query.filter((db.func.lower(User.username) == normalized) | (db.func.lower(User.email) == normalized)).first()
         if not user or not user.check_password(secret):
             return None
         return IdentityResult(subject=str(user.id), email=user.email, display_name=user.username)

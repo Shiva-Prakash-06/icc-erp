@@ -41,6 +41,27 @@ class BaseConfig:
     REMEMBER_COOKIE_SAMESITE = "Lax"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     DRIVE_VALIDATION_MODE = os.getenv("DRIVE_VALIDATION_MODE", "mock")
+    GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
+    INTERNAL_JOB_AUDIENCE = os.getenv("INTERNAL_JOB_AUDIENCE")
+    SCHEDULER_SERVICE_ACCOUNT = os.getenv("SCHEDULER_SERVICE_ACCOUNT")
+    TASKS_SERVICE_ACCOUNT = os.getenv("TASKS_SERVICE_ACCOUNT")
+    GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+    GCP_REGION = os.getenv("GCP_REGION", "asia-south1")
+    CLOUD_TASKS_QUEUE = os.getenv("CLOUD_TASKS_QUEUE")
+    INTERNAL_JOB_BASE_URL = os.getenv("INTERNAL_JOB_BASE_URL")
+    SMTP_HOST = os.getenv("SMTP_HOST")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+    SMTP_FROM_ADDRESS = os.getenv("SMTP_FROM_ADDRESS")
+    SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    NOTIFICATION_EMAIL_MODE = os.getenv("NOTIFICATION_EMAIL_MODE", "disabled")
+    BREACHED_PASSWORD_CHECK_MODE = os.getenv("BREACHED_PASSWORD_CHECK_MODE", "disabled")
+    OPERATIONAL_RETENTION_DAYS = int(os.getenv("OPERATIONAL_RETENTION_DAYS", "2555"))
+    AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "2555"))
+    REJECTED_APPLICATION_RETENTION_DAYS = int(os.getenv("REJECTED_APPLICATION_RETENTION_DAYS", "365"))
+    OFFLINE_SNAPSHOT_TTL_SECONDS = int(os.getenv("OFFLINE_SNAPSHOT_TTL_SECONDS", "28800"))
     DEMONSTRATOR = os.getenv("DEMONSTRATOR", "true").lower() == "true"
     SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
 
@@ -52,7 +73,7 @@ class DevelopmentConfig(BaseConfig):
 class TestingConfig(BaseConfig):
     TESTING = True
     SECRET_KEY = "test-only-key"
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL") or "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
 
@@ -71,6 +92,24 @@ class ProductionConfig(BaseConfig):
             missing.append("SECRET_KEY")
         if not os.getenv("DATABASE_URL"):
             missing.append("DATABASE_URL")
+        if os.getenv("MIGRATION_ONLY", "false").lower() != "true":
+            if os.getenv("DRIVE_VALIDATION_MODE", "live") != "live":
+                missing.append("DRIVE_VALIDATION_MODE=live")
+            if not (os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")):
+                missing.append("GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_FILE")
+            if not os.getenv("INTERNAL_JOB_AUDIENCE"):
+                missing.append("INTERNAL_JOB_AUDIENCE")
+            if not os.getenv("SCHEDULER_SERVICE_ACCOUNT"):
+                missing.append("SCHEDULER_SERVICE_ACCOUNT")
+            for name in ("TASKS_SERVICE_ACCOUNT", "GCP_PROJECT_ID", "CLOUD_TASKS_QUEUE", "INTERNAL_JOB_BASE_URL"):
+                if not os.getenv(name):
+                    missing.append(name)
+            if os.getenv("BREACHED_PASSWORD_CHECK_MODE", "live") != "live":
+                missing.append("BREACHED_PASSWORD_CHECK_MODE=live")
+            if os.getenv("NOTIFICATION_EMAIL_MODE", "smtp") == "smtp":
+                for name in ("SMTP_HOST", "SMTP_FROM_ADDRESS", "SMTP_PASSWORD"):
+                    if not os.getenv(name):
+                        missing.append(name)
         if missing:
             raise RuntimeError(
                 "Production configuration is incomplete: " + ", ".join(missing)

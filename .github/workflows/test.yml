@@ -1,4 +1,4 @@
-name: test
+name: production-quality-gate
 
 on:
   push:
@@ -7,9 +7,10 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -25,15 +26,47 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/icc_erp_test
       APP_ENV: testing
       TESTING: "true"
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/icc_erp_test
+      BREACHED_PASSWORD_CHECK_MODE: disabled
+      DRIVE_VALIDATION_MODE: mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s tests -p '*test.py' -v
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: pip install -r requirements-dev.txt
+      - name: Validate production infrastructure
+        working-directory: terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+      - name: Migration smoke test
+        env:
+          TESTING: "false"
+          APP_ENV: development
+        run: |
+          flask --app run:app db upgrade
+          flask --app run:app db check
+      - name: Unit and integration tests with service coverage
+        run: coverage run --source=app/services -m unittest discover -s tests -p '*test.py' -v
+      - run: coverage report --fail-under=80
       - run: pip check
+      - run: bandit -q -r app -lll
+      - run: pip-audit --local
+      - name: Assert no committed environment or database files
+        run: test -z "$(git ls-files | grep -E '(^|/)(\.env$|instance/.*\.(db|sqlite)|__pycache__)' || true)"
+      - name: Build production container
+        run: docker build -t icc-erp:${{ github.sha }} .
+      - uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: icc-erp:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH

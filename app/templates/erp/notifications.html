@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h1 class="h3 mb-1">Notifications</h1><p class="text-muted mb-0">Assignments, decisions, deadlines, and operational alerts.</p></div>
+  </div>
+  <div class="card mb-4">
+    <div class="card-header"><strong>Delivery preference</strong></div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-end">
+        <div class="col-md-5"><label class="form-label" for="event_type">Event type</label><select class="form-select" id="event_type" name="event_type"><option value="task.deadline">Task deadlines</option><option value="checklist.deadline">Checklist deadlines</option><option value="task.status">Task decisions</option></select></div>
+        <div class="col-md-2 form-check"><input class="form-check-input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="form-check-label" for="email_enabled">Email</label></div>
+        <div class="col-md-2 form-check"><input class="form-check-input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="form-check-label" for="in_app_enabled">In app</label></div>
+        <div class="col-md-3"><button class="btn btn-primary w-100">Save preference</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="list-group">
+    {% for item in notifications %}
+    <article class="list-group-item {% if not item.read_at %}border-start border-primary border-4{% endif %}">
+      <div class="d-flex justify-content-between gap-3"><div><h2 class="h6 mb-1">{{ item.title }}</h2><p class="mb-1">{{ item.body }}</p><small class="text-muted">{{ item.created_at }}</small></div>{% if not item.read_at %}<form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}"><button class="btn btn-sm btn-outline-primary">Mark read</button></form>{% endif %}</div>
+    </article>
+    {% else %}<p class="text-muted">No notifications.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

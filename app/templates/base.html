@@ -63,6 +63,12 @@
                             <span>ERP Operations</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ url_for('erp.notifications') }}" class="nav-link-item {% if request.endpoint == 'erp.notifications' %}active{% endif %}">
+                            <i class="bi bi-bell"></i>
+                            <span>Notifications</span>
+                        </a>
+                    </li>
                     {% if g.user.role not in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
                     <li>
                         <a href="{{ url_for('campus.list_campuses') }}" class="nav-link-item {% if request.blueprint == 'campus' %}active{% endif %}">
@@ -389,8 +395,6 @@
             { name: "Compile Project Operations Report", url: "{{ url_for('dashboard.generate_report') }}", category: "Reporting" },
             { name: "Browse Saved Reports Directory", url: "{{ url_for('dashboard.list_reports') }}", category: "Reporting" },
             { name: "Manage Registered Users & Approvals", url: "{{ url_for('dashboard.admin_users') }}", category: "Administration" },
-            { name: "Summer School Exchange Program (IGP Project)", url: "/campuses/1/projects/2", category: "Projects" },
-            { name: "June Coffee Meet & Greet (ICC Project)", url: "/campuses/2/projects/1", category: "Projects" },
         ];
 
         const palette = document.getElementById('commandPalette');

@@ -1,0 +1,19 @@
+# Copy to an ignored production.tfvars file and replace every placeholder.
+# Supply secrets through TF_VAR_drive_credentials_json and TF_VAR_smtp_password
+# so they are never written to this repository.
+project_id            = "christ-oia-erp-production"
+region                = "asia-south1"
+environment           = "production"
+image                 = "asia-south1-docker.pkg.dev/christ-oia-erp-production/icc-erp/icc-erp:RELEASE_SHA"
+database_tier         = "db-custom-2-7680"
+database_name         = "icc_erp"
+database_user         = "icc_erp"
+smtp_host             = "smtp.example.org"
+smtp_port             = 587
+smtp_use_tls          = true
+smtp_username         = "erp-notifications@example.org"
+smtp_from_address     = "erp-notifications@example.org"
+notification_email_mode = "smtp"
+alert_email           = "oia-erp-operations@example.org"
+internal_job_base_url = "https://erp.example.org"
+min_instances         = 1

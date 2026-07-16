@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.database import db
-from app.models.erp import ChecklistItemStatus, DocumentRecord, WorkTask
+from app.models.erp import ChecklistItemStatus, DocumentRecord, OperationalRequest, WorkTask
+from app.models.production import ProjectRisk
 from app.services.audit import record_audit
 
 
@@ -47,6 +48,17 @@ def closure_blockers(project):
     for document in DocumentRecord.query.filter_by(project_id=project.id, mandatory_for_closure=True).all():
         if not document.waived and document.status != "Approved":
             blockers.append(ClosureBlocker("Document", document.public_id, document.title, document.status))
+
+    for risk in ProjectRisk.query.filter_by(project_id=project.id, status="Open", is_critical=True).all():
+        blockers.append(ClosureBlocker("Risk", risk.public_id, risk.title, "Open critical risk"))
+
+    for operational_request in OperationalRequest.query.filter(
+        OperationalRequest.project_id == project.id,
+        OperationalRequest.status.in_(["Draft", "Pending Approval", "Submitted"]),
+    ).all():
+        blockers.append(
+            ClosureBlocker("OperationalRequest", operational_request.public_id, operational_request.title, operational_request.status)
+        )
 
     if not (project.closure_summary or "").strip():
         blockers.append(ClosureBlocker("Report", project.public_id, "Closure summary", "Missing"))

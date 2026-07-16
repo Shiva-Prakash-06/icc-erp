@@ -1,4 +1,4 @@
-const CACHE_NAME = 'icc-erp-shell-v1';
+const CACHE_NAME = 'icc-erp-shell-v2';
 const SHELL_ASSETS = [
   '/static/css/theme.css',
   '/static/js/app.js',
@@ -22,7 +22,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  // Never cache authentication, API, ERP, IGP, or other operational responses.
+  // Operational snapshots are encrypted in IndexedDB by app.js; the service
+  // worker never caches authentication, API, ERP, IGP, or report responses.
   if (!url.pathname.startsWith('/static/')) return;
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });

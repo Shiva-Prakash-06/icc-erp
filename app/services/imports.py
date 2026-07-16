@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import csv
+import io
 import re
 from datetime import date, datetime, time
 from pathlib import Path
@@ -10,6 +12,8 @@ from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 from docx import Document as WordDocument
+from openpyxl import Workbook
+from werkzeug.utils import secure_filename
 
 from app.database import db
 from app.models.erp import (
@@ -24,11 +28,13 @@ from app.models.erp import (
     Person,
     ProjectSession,
     ReportSnapshot,
+    SessionAttendance,
     TeamAssignment,
     Wing,
     WorkTask,
 )
-from app.models.project import AcademicYear, Campus, ProgramType, Project
+from app.models.project import AcademicYear, Campus, ProgramType, Project, ProjectParticipant
+from app.models.production import ControlledVocabulary, Position, ReportDefinition
 from app.services.audit import record_audit
 from app.services.drive import validate_drive_link
 
@@ -41,6 +47,16 @@ SOURCE_PATHS = {
     "summer_school": ROOT / "_Summer School- Check List.xlsx",
 }
 IMPORT_SCHEMA_VERSION = 2
+
+STANDARD_IMPORTS = {
+    "people": (["registration_number", "first_name", "last_name", "email", "phone", "campus_code", "person_type", "nationality"], ["first_name"]),
+    "icc_roster": (["registration_number", "email", "wing_code", "role_label", "academic_year"], ["wing_code", "role_label", "academic_year"]),
+    "projects": (["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date", "project_type", "category", "unit_code", "wing_code"], ["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date"]),
+    "participants": (["project_code", "registration_number", "email", "participant_type"], ["project_code", "participant_type"]),
+    "attendance": (["project_code", "session_code", "registration_number", "email", "status"], ["project_code", "session_code", "status"]),
+    "checklists": (["project_code", "template_code", "item_code", "title", "category", "mandatory", "owner"], ["project_code", "template_code", "item_code", "title"]),
+    "documents": (["project_code", "title", "category", "status", "drive_url", "classification", "mandatory_for_closure"], ["project_code", "title", "category"]),
+}
 
 
 def _json_value(value):
@@ -119,6 +135,64 @@ def stage_supplied_source(import_type):
     else:
         _stage_summer_school(batch, source)
     record_audit("import.stage", batch, after={"type": import_type, "rows": batch.staged_count})
+    db.session.commit()
+    return batch
+
+
+def build_import_template(import_type):
+    if import_type not in STANDARD_IMPORTS:
+        raise ValueError("Unknown standard import type.")
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = import_type
+    columns, _ = STANDARD_IMPORTS[import_type]
+    sheet.append(columns)
+    sheet.freeze_panes = "A2"
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
+
+
+def stage_uploaded_source(import_type, uploaded_file, operator_key):
+    if import_type not in STANDARD_IMPORTS:
+        raise ValueError("Unknown standard import type.")
+    filename = secure_filename(uploaded_file.filename or "")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".xlsx", ".csv"}:
+        raise ValueError("Only .xlsx and .csv import files are accepted; macro-enabled files are rejected.")
+    content = uploaded_file.read()
+    digest = hashlib.sha256(content).hexdigest()
+    key = f"v{IMPORT_SCHEMA_VERSION}:{import_type}:{operator_key}:{digest}"
+    existing = ImportBatch.query.filter_by(idempotency_key=key).first()
+    if existing:
+        return existing
+    batch = ImportBatch(idempotency_key=key, import_type=import_type, source_file=filename, source_sha256=digest, status="Staged", importer_version=str(IMPORT_SCHEMA_VERSION), mapping_version="1")
+    db.session.add(batch)
+    db.session.flush()
+    columns, required = STANDARD_IMPORTS[import_type]
+    if suffix == ".xlsx":
+        workbook = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+        sheet = workbook.active
+        values = sheet.iter_rows(values_only=True)
+        headers = [str(value or "").strip().lower() for value in next(values)]
+        rows = ((sheet.title, number, dict(zip(headers, row))) for number, row in enumerate(values, start=2))
+    else:
+        reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+        rows = ((filename, number, {str(key).strip().lower(): value for key, value in row.items()}) for number, row in enumerate(reader, start=2))
+    available_headers = headers if suffix == ".xlsx" else [str(value or "").strip().lower() for value in (reader.fieldnames or [])]
+    missing_headers = [column for column in required if column not in available_headers]
+    if missing_headers:
+        raise ValueError("Missing required columns: " + ", ".join(missing_headers))
+    for sheet_name, row_number, source in rows:
+        if not any(value not in (None, "") for value in source.values()):
+            continue
+        normalized = {column: _json_value(source.get(column)) for column in columns}
+        messages = [f"{column} is required." for column in required if normalized.get(column) in (None, "")]
+        if import_type in {"people", "participants", "attendance", "icc_roster"} and not (normalized.get("registration_number") or normalized.get("email")):
+            messages.append("registration_number or email is required.")
+        _add_row(batch, sheet_name, row_number, source, normalized, import_type, messages)
+    record_audit("import.stage", batch, after={"type": import_type, "rows": batch.staged_count, "source_sha256": digest})
     db.session.commit()
     return batch
 
@@ -321,12 +395,38 @@ def _reference_data():
         igp = OperatingUnit(code="IGP", name="India Gateway Program")
         db.session.add(igp)
     db.session.flush()
-    events_wing = Wing.query.filter_by(operating_unit_id=icc.id, code="EVENTS").first()
-    if not events_wing:
-        events_wing = Wing(operating_unit_id=icc.id, code="EVENTS", name="Events")
-        db.session.add(events_wing)
+    wings = {}
+    for code, name in (("EVENTS", "Events"), ("MEDIA", "Media"), ("CULTURALS", "Culturals")):
+        wing = Wing.query.filter_by(operating_unit_id=icc.id, code=code).first()
+        if not wing:
+            wing = Wing(operating_unit_id=icc.id, code=code, name=name)
+            db.session.add(wing)
+        wings[code] = wing
     db.session.flush()
-    return year, campus, icc_type, igp_type, icc, igp, events_wing
+    for code, name, unit, wing in (
+        ("ICC_SECRETARY_USC", "ICC Secretary / USC", icc, None),
+        ("ICC_EVENTS_HEAD", "ICC Events Head", icc, wings["EVENTS"]),
+        ("ICC_MEDIA_HEAD", "ICC Media Head", icc, wings["MEDIA"]),
+        ("ICC_CULTURALS_HEAD", "ICC Culturals Head", icc, wings["CULTURALS"]),
+        ("IGP_HEAD", "IGP Head", igp, None),
+    ):
+        if not Position.query.filter_by(code=code).first():
+            db.session.add(Position(code=code, name=name, operating_unit_id=unit.id, wing_id=getattr(wing, "id", None)))
+    vocabulary = {
+        "project_status": ["Draft", "Pending Approval", "Planned", "Active", "Closing", "Completed", "Cancelled", "Archived"],
+        "task_status": ["Not Started", "In Progress", "Blocked", "Submitted", "Approved", "Rejected", "Waived", "Completed"],
+        "document_classification": ["Public", "Internal", "Restricted"],
+        "attendance_status": ["Present", "Absent", "Excused", "Late"],
+    }
+    for domain, values in vocabulary.items():
+        for sort_order, label in enumerate(values):
+            code = re.sub(r"[^A-Z0-9]+", "_", label.upper()).strip("_")
+            if not ControlledVocabulary.query.filter_by(domain=domain, code=code, version=1).first():
+                db.session.add(ControlledVocabulary(domain=domain, code=code, label=label, version=1, sort_order=sort_order))
+    if not ReportDefinition.query.filter_by(code="PROJECT_OPERATIONAL", version=1).first():
+        db.session.add(ReportDefinition(code="PROJECT_OPERATIONAL", name="Project Operational Report", report_type="Project Operational Report", version=1, schema_json={"required": ["project", "reach", "execution", "budget"]}))
+    db.session.flush()
+    return year, campus, icc_type, igp_type, icc, igp, wings["EVENTS"]
 
 
 def _parse_date(value):
@@ -361,6 +461,125 @@ def _code(prefix, sequence):
     return f"{prefix}-2026-CEN-{sequence:03d}"
 
 
+def _as_bool(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "required"}
+
+
+def _person_for_import(data):
+    registration = str(data.get("registration_number") or "").strip() or None
+    email = str(data.get("email") or "").strip().lower() or None
+    person = Person.query.filter_by(registration_number=registration).first() if registration else None
+    if not person and email:
+        person = Person.query.filter(db.func.lower(Person.primary_email) == email).first()
+    return person
+
+
+def _commit_standard_rows(batch, valid_rows, defaults):
+    year, campus, icc_type, igp_type, icc, igp, events_wing = defaults
+    committed = 0
+    for sequence, row in enumerate(valid_rows, start=1):
+        data = row.normalized_json
+        target = None
+        if batch.import_type == "people":
+            target = _person_for_import(data)
+            target_campus = Campus.query.filter_by(code=data.get("campus_code")).first() or campus
+            if not target:
+                target = Person(registration_number=data.get("registration_number") or None, first_name=data["first_name"], last_name=data.get("last_name") or None, primary_email=(data.get("email") or None), phone=data.get("phone") or None, campus_id=target_campus.id, person_type=data.get("person_type") or "Student", nationality_country=data.get("nationality") or None)
+                db.session.add(target)
+            else:
+                target.first_name = data.get("first_name") or target.first_name
+                target.last_name = data.get("last_name") or target.last_name
+                target.phone = data.get("phone") or target.phone
+        elif batch.import_type == "projects":
+            target = Project.query.filter_by(code=data["code"]).first()
+            target_campus = Campus.query.filter_by(code=data["campus_code"]).first()
+            target_type = ProgramType.query.filter_by(name=str(data["program_type"]).upper()).first()
+            target_year = AcademicYear.query.filter_by(name=data["academic_year"]).first()
+            unit = OperatingUnit.query.filter_by(code=data.get("unit_code") or str(data["program_type"]).upper()).first()
+            wing = Wing.query.filter_by(operating_unit_id=unit.id, code=data.get("wing_code")).first() if unit and data.get("wing_code") else None
+            if not all((target_campus, target_type, target_year, unit)):
+                raise ValueError(f"Project row {row.source_row} references unknown controlled data.")
+            if not target:
+                target = Project(code=data["code"], title=data["title"], campus_id=target_campus.id, program_type_id=target_type.id, academic_year_id=target_year.id, operating_unit_id=unit.id, wing_id=getattr(wing, "id", None), project_type=data.get("project_type") or "Operational", category=data.get("category") or "Operational", status="Draft", start_date=_parse_date(data["start_date"]), end_date=_parse_date(data["end_date"]))
+                db.session.add(target)
+        elif batch.import_type == "icc_roster":
+            person = _person_for_import(data)
+            target_year = AcademicYear.query.filter_by(name=data["academic_year"]).first()
+            wing = Wing.query.filter_by(operating_unit_id=icc.id, code=data["wing_code"]).first()
+            if not person or not target_year or not wing:
+                raise ValueError(f"Roster row {row.source_row} has unresolved person, year, or wing.")
+            target = TeamAssignment.query.filter_by(
+                person_id=person.id,
+                wing_id=wing.id,
+                academic_year_id=target_year.id,
+                project_id=None,
+            ).first()
+            if not target:
+                target = TeamAssignment(
+                    person_id=person.id,
+                    wing_id=wing.id,
+                    academic_year_id=target_year.id,
+                    assignment_type="ICC Annual Roster",
+                    role_label=data["role_label"],
+                    recruitment_status="Selected",
+                    starts_on=target_year.start_date,
+                    ends_on=target_year.end_date,
+                )
+                db.session.add(target)
+        else:
+            project = Project.query.filter_by(code=data.get("project_code")).first()
+            if not project:
+                raise ValueError(f"Row {row.source_row} references an unknown project_code.")
+            if batch.import_type == "participants":
+                person = _person_for_import(data)
+                if not person:
+                    raise ValueError(f"Participant row {row.source_row} has no resolved person.")
+                target = ProjectParticipant.query.filter_by(project_id=project.id, person_id=person.id).first()
+                if not target:
+                    target = ProjectParticipant(project_id=project.id, person_id=person.id, participant_type=data["participant_type"], status="Active")
+                    db.session.add(target)
+            elif batch.import_type == "attendance":
+                person = _person_for_import(data)
+                session = ProjectSession.query.filter_by(project_id=project.id, code=data["session_code"]).first()
+                if not person or not session:
+                    raise ValueError(f"Attendance row {row.source_row} has no resolved person or session.")
+                target = SessionAttendance.query.filter_by(session_id=session.id, person_id=person.id).first()
+                if not target:
+                    target = SessionAttendance(session_id=session.id, person_id=person.id, status=data["status"], source_import_row_id=row.id)
+                    db.session.add(target)
+            elif batch.import_type == "checklists":
+                template = ChecklistTemplate.query.filter_by(code=data["template_code"], is_active=True).order_by(ChecklistTemplate.version.desc()).first()
+                if not template:
+                    template = ChecklistTemplate(code=data["template_code"], name=data["template_code"], project_type=project.project_type or "Operational", version=1, source_reference=batch.source_file)
+                    db.session.add(template)
+                    db.session.flush()
+                template_item = ChecklistTemplateItem.query.filter_by(template_id=template.id, code=data["item_code"]).first()
+                if not template_item:
+                    template_item = ChecklistTemplateItem(template_id=template.id, code=data["item_code"], title=data["title"], category=data.get("category"), sequence=sequence, mandatory=_as_bool(data.get("mandatory")), default_owner_label=data.get("owner"))
+                    db.session.add(template_item)
+                    db.session.flush()
+                instance = ChecklistInstance.query.filter_by(project_id=project.id, template_id=template.id).first()
+                if not instance:
+                    instance = ChecklistInstance(project_id=project.id, template_id=template.id, name=f"{project.title} Checklist")
+                    db.session.add(instance)
+                    db.session.flush()
+                target = ChecklistItemStatus.query.filter_by(checklist_instance_id=instance.id, template_item_id=template_item.id).first()
+                if not target:
+                    target = ChecklistItemStatus(checklist_instance_id=instance.id, template_item_id=template_item.id, external_owner=data.get("owner"), source_file=batch.source_file, source_sheet=row.sheet_name, source_row=row.source_row)
+                    db.session.add(target)
+            elif batch.import_type == "documents":
+                target = DocumentRecord.query.filter_by(project_id=project.id, title=data["title"]).first()
+                if not target:
+                    classification = data.get("classification") or "Internal"
+                    validation = validate_drive_link(data.get("drive_url"), classification) if data.get("drive_url") else {}
+                    target = DocumentRecord(project_id=project.id, title=data["title"], category=data["category"], status=data.get("status") or "Missing", drive_url=data.get("drive_url") or None, drive_file_id=validation.get("file_id"), permission_classification=classification, mandatory_for_closure=_as_bool(data.get("mandatory_for_closure")))
+                    db.session.add(target)
+        db.session.flush()
+        row.target_public_id = target.public_id
+        committed += 1
+    return committed
+
+
 def commit_batch(batch, actor=None):
     if batch.status == "Committed":
         return batch
@@ -370,7 +589,10 @@ def commit_batch(batch, actor=None):
     committed = 0
     valid_rows = ImportRow.query.filter_by(batch_id=batch.id, validation_status="Valid").order_by(ImportRow.id).all()
 
-    if batch.import_type == "events_summary":
+    if batch.import_type in STANDARD_IMPORTS:
+        committed = _commit_standard_rows(batch, valid_rows, (year, campus, icc_type, igp_type, icc, igp, events_wing))
+
+    elif batch.import_type == "events_summary":
         for sequence, row in enumerate(valid_rows, start=1):
             data = row.normalized_json
             event_date = _parse_date(data.get("event_date"))

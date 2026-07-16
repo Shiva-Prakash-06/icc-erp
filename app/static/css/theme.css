@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
 :root {
     --bg-navy-dark: #070F19;
     --bg-navy-slate: #0E1A2B;
@@ -1271,4 +1269,3 @@ h1, h2, h3, h4, h5, h6, .page-title, .card-control-title {
         height: 320px; /* High-res desktop sizing */
     }
 }
-

@@ -12,7 +12,9 @@ This repository upgrades `icc-platform-2` into the modular Flask demonstrator de
 - Separate people and accounts; organization units, wings, scoped/effective role assignments, projects, components, sessions, teams, tasks, checklists, documents, budgets, feedback, imports, audits, and report snapshots.
 - Lifecycle rules with optimistic concurrency and closure blockers.
 - Staged, checksum-idempotent imports for the supplied event summary, Coffee Meet & Greet folder, and Summer School checklist.
-- `/api/v1` JSON resources with cursor pagination, RFC 7807 errors, project scoping, Drive-link validation, and public token feedback.
+- `/api/v1` JSON resources with cursor pagination, RFC 7807 errors, project scoping, workflow decisions, Drive-link validation, report exports, and moderated public token feedback.
+- Production completion domains for governance, recruitment, cohorts, risks, immutable decision histories, aggregate attendance, notifications, report jobs, and sensitive-access audit.
+- OIDC-protected Scheduler/Tasks endpoints, live Drive metadata mode, SMTP delivery attempts, account recovery, and encrypted read-only offline snapshots.
 - Local Bootstrap, icons, and Chart.js assets; CSRF, request limits, login throttling/lockout, security headers, and a safe static-only service worker.
 
 ## Local setup
@@ -57,9 +59,13 @@ The import sequence is intentionally fixed: events summary → Coffee Meet folde
 ## Verification
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -p '*test.py' -v
+.venv/bin/python -m pytest -q
 .venv/bin/pip check
+.venv/bin/coverage run --source=app/services -m unittest discover -s tests -p '*test.py' -v
+.venv/bin/coverage report --fail-under=80
 terraform fmt -check -recursive
+terraform -chdir=terraform init -backend=false
+terraform -chdir=terraform validate
 ```
 
 The production Terraform configuration requires Terraform 1.7 or newer.

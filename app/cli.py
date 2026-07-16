@@ -7,6 +7,7 @@ from flask import current_app
 
 from app.database import db
 from app.models.user import User
+from app.models.erp import ImportBatch
 from app.services.imports import _reference_data
 from app.services.imports import commit_batch, stage_supplied_source
 
@@ -57,3 +58,17 @@ def register_cli(app):
                 f"{import_type}: staged={batch.staged_count} valid={batch.valid_count} "
                 f"errors={batch.error_count} committed={batch.committed_count}"
             )
+
+    @app.cli.command("commit-import-batch")
+    @click.option("--public-id", envvar="IMPORT_BATCH_PUBLIC_ID", required=True)
+    def commit_import_batch(public_id):
+        """Commit a previously validated batch from a Cloud Run Job."""
+
+        batch = ImportBatch.query.filter_by(public_id=public_id).first()
+        if not batch:
+            raise click.ClickException("Import batch was not found.")
+        commit_batch(batch)
+        click.echo(
+            f"batch={batch.public_id} status={batch.status} committed={batch.committed_count} "
+            f"difference={batch.reconciliation_json.get('difference')}"
+        )

@@ -250,3 +250,91 @@ const OIACharts = {
         }
     }
 };
+
+// Explicit, read-only offline snapshots. The AES key lives only in
+// sessionStorage, so browser restart/logout makes persisted ciphertext unusable.
+window.ICCOffline = (() => {
+    const DB_NAME = 'icc-erp-offline-v1';
+    const STORE = 'encrypted-snapshots';
+    const KEY_NAME = 'icc-erp-offline-key';
+
+    const bytesToBase64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+    const base64ToBytes = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
+
+    async function key() {
+        let encoded = sessionStorage.getItem(KEY_NAME);
+        if (!encoded) {
+            const raw = crypto.getRandomValues(new Uint8Array(32));
+            encoded = bytesToBase64(raw);
+            sessionStorage.setItem(KEY_NAME, encoded);
+        }
+        return crypto.subtle.importKey('raw', base64ToBytes(encoded), 'AES-GCM', false, ['encrypt', 'decrypt']);
+    }
+
+    function database() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = () => request.result.createObjectStore(STORE);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function put(value) {
+        const db = await database();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE, 'readwrite');
+            tx.objectStore(STORE).put(value, 'current');
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function get() {
+        const db = await database();
+        return new Promise((resolve, reject) => {
+            const request = db.transaction(STORE).objectStore(STORE).get('current');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function refresh() {
+        const response = await fetch('/api/v1/offline-snapshot', {credentials: 'same-origin', cache: 'no-store'});
+        if (!response.ok) throw new Error('Offline snapshot could not be refreshed.');
+        const snapshot = await response.json();
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const plaintext = new TextEncoder().encode(JSON.stringify(snapshot.data));
+        const ciphertext = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, await key(), plaintext);
+        await put({iv: bytesToBase64(iv), ciphertext: bytesToBase64(ciphertext), expiresAt: snapshot.data.expires_at});
+        return snapshot.data;
+    }
+
+    async function read() {
+        const stored = await get();
+        if (!stored || !sessionStorage.getItem(KEY_NAME) || new Date(stored.expiresAt) <= new Date()) return null;
+        try {
+            const plaintext = await crypto.subtle.decrypt(
+                {name: 'AES-GCM', iv: base64ToBytes(stored.iv)},
+                await key(),
+                base64ToBytes(stored.ciphertext)
+            );
+            return JSON.parse(new TextDecoder().decode(plaintext));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function purge() {
+        sessionStorage.removeItem(KEY_NAME);
+        const db = await database();
+        return new Promise(resolve => {
+            const tx = db.transaction(STORE, 'readwrite');
+            tx.objectStore(STORE).clear();
+            tx.oncomplete = resolve;
+        });
+    }
+
+    document.querySelectorAll('a[href$="/logout"]').forEach(link => link.addEventListener('click', () => purge()));
+    return {refresh, read, purge};
+})();

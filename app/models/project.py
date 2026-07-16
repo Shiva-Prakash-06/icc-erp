@@ -96,12 +96,21 @@ class ProjectParticipant(db.Model):
     __tablename__ = 'project_participants'
 
     id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('people.id', ondelete='CASCADE'), nullable=True)
+    cohort_id = db.Column(db.Integer, db.ForeignKey('cohorts.id', ondelete='SET NULL'), nullable=True)
     participant_type = db.Column(db.String(50), nullable=False)  # 'Volunteer', 'Buddy', 'Exchange Student', 'Faculty', 'Core Committee', 'Attendee'
     nationality = db.Column(db.String(100), nullable=True)
     status = db.Column(db.String(20), default='Active', nullable=False)  # 'Active', 'Inactive'
     registration_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+    version = db.Column(db.Integer, default=1, nullable=False)
+
+    __table_args__ = (
+        db.CheckConstraint('user_id IS NOT NULL OR person_id IS NOT NULL', name='ck_participant_identity'),
+        db.UniqueConstraint('project_id', 'person_id', name='uq_project_person_participant'),
+    )
 
     # Relationships
     project = db.relationship('Project', back_populates='participants')
@@ -115,6 +124,7 @@ class BuddyAssignment(db.Model):
     __tablename__ = 'buddy_assignments'
 
     id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
     buddy_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     exchange_student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
@@ -124,6 +134,7 @@ class BuddyAssignment(db.Model):
     assignment_type = db.Column(db.String(30), default='One-to-one', nullable=False)
     overlap_override_reason = db.Column(db.Text, nullable=True)
     overlap_approved_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL', name='fk_buddy_overlap_approver'), nullable=True)
+    version = db.Column(db.Integer, default=1, nullable=False)
 
     __table_args__ = (
         db.CheckConstraint('end_date >= start_date', name='ck_buddy_assignment_dates'),
@@ -144,6 +155,7 @@ class BuddyLog(db.Model):
     __tablename__ = 'buddy_logs'
 
     id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     buddy_assignment_id = db.Column(db.Integer, db.ForeignKey('buddy_assignments.id', ondelete='CASCADE'), nullable=False)
     activity_date = db.Column(db.Date, nullable=False)
     description = db.Column(db.Text, nullable=False)
@@ -151,6 +163,11 @@ class BuddyLog(db.Model):
     status = db.Column(db.String(20), default='Pending', nullable=False)  # 'Pending', 'Approved', 'Rejected'
     verified_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     verified_at = db.Column(db.DateTime, nullable=True)
+    concern_level = db.Column(db.String(30), nullable=True)
+    escalation_owner_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    escalation_status = db.Column(db.String(30), nullable=True)
+    resolution = db.Column(db.Text, nullable=True)
+    version = db.Column(db.Integer, default=1, nullable=False)
 
     # Relationships
     assignment = db.relationship('BuddyAssignment', back_populates='logs')
