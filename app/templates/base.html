@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="OIA Project Intelligence Platform - Christ University. Centralized operational source of truth for ICC and IGP projects.">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <title>{% block title %}OIA Project Intelligence{% endblock %} | Christ University</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+    
+    <!-- Chart.js CDN -->
+    <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+    
+    <!-- Custom Theme CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+</head>
+<body>
+    {% if config.DEMONSTRATOR %}
+    <div class="alert alert-warning rounded-0 border-0 text-center fw-bold py-2 mb-0" role="status">
+        Demonstrator—Not Production · Sample data environment
+    </div>
+    {% endif %}
+
+    {% if g.user and not hide_sidebar %}
+    <!-- Logged In Application Shell -->
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation Rail -->
+        <aside class="sidebar d-none d-lg-flex">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-logo">O</div>
+                <div class="sidebar-brand-name">
+                    OIA Intelligence
+                    <span>Christ University</span>
+                </div>
+            </div>
+            
+            <nav class="flex-grow-1">
+                <ul class="sidebar-nav">
+                    <li class="nav-item-header">Command</li>
+                    <li>
+                        <a href="{{ url_for('dashboard.index') }}" class="nav-link-item {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.index' %}active{% endif %}">
+                            <i class="bi bi-speedometer2"></i>
+                            <span>Mission Control</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('dashboard.profile') }}" class="nav-link-item {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.profile' %}active{% endif %}">
+                            <i class="bi bi-person-circle"></i>
+                            <span>My Profile</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('erp.hub') }}" class="nav-link-item {% if request.blueprint == 'erp' %}active{% endif %}">
+                            <i class="bi bi-diagram-3"></i>
+                            <span>ERP Operations</span>
+                        </a>
+                    </li>
+                    {% if g.user.role not in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
+                    <li>
+                        <a href="{{ url_for('campus.list_campuses') }}" class="nav-link-item {% if request.blueprint == 'campus' %}active{% endif %}">
+                            <i class="bi bi-buildings"></i>
+                            <span>Campus Directory</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="nav-item-header">Reporting</li>
+                    <li>
+                        <a href="{{ url_for('dashboard.list_reports') }}" class="nav-link-item {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.list_reports' %}active{% endif %}">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Saved Reports</span>
+                        </a>
+                    </li>
+                    {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
+                    <li>
+                        <a href="{{ url_for('dashboard.generate_report') }}" class="nav-link-item {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.generate_report' %}active{% endif %}">
+                            <i class="bi bi-plus-square"></i>
+                            <span>Compile Report</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% if g.user.role == 'Faculty' %}
+                    <li class="nav-item-header">Administration</li>
+                    <li>
+                        <a href="{{ url_for('dashboard.admin_users') }}" class="nav-link-item {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.admin_users' %}active{% endif %}">
+                            <i class="bi bi-shield-check"></i>
+                            <span>Pending & Users</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            
+            <!-- Sidebar User Profile Footer -->
+            <div class="sidebar-user">
+                <div class="sidebar-user-avatar">
+                    {{ g.user.username[0].upper() }}
+                </div>
+                <div class="sidebar-user-info flex-grow-1">
+                    <div class="sidebar-user-name">{{ g.user.username }}</div>
+                    <div class="sidebar-user-role">{{ g.user.role }}</div>
+                </div>
+                <a href="{{ url_for('auth.logout') }}" class="text-danger ms-2" title="Log Out">
+                    <i class="bi bi-power fs-5"></i>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main Body Wrapper -->
+        <div class="main-wrapper">
+            
+            <!-- Mobile Header Topbar -->
+            <div class="mobile-header d-flex d-lg-none">
+                <div class="mobile-header-left">
+                    {% if request.endpoint == 'dashboard.index' %}
+                        <button class="mobile-header-back-btn border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNavDrawer" aria-controls="mobileNavDrawer">
+                            <i class="bi bi-list fs-4"></i>
+                        </button>
+                    {% else %}
+                        {% set back_url = url_for('dashboard.index') %}
+                        {% if request.endpoint == 'dashboard.profile' %}
+                            {% set back_url = url_for('dashboard.index') %}
+                        {% elif request.endpoint == 'campus.list_campuses' %}
+                            {% set back_url = url_for('dashboard.index') %}
+                        {% elif request.endpoint == 'campus.campus_detail' %}
+                            {% set back_url = url_for('campus.list_campuses') %}
+                        {% elif request.endpoint == 'campus.program_detail' %}
+                            {% set back_url = url_for('campus.campus_detail', campus_id=campus.id if campus else 1) %}
+                        {% elif request.endpoint == 'campus.project_detail' %}
+                            {% if g.user.role in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
+                                {% set back_url = url_for('dashboard.index') %}
+                            {% else %}
+                                {% set back_url = url_for('campus.program_detail', campus_id=project.campus_id if project else 1, program_name=project.program_type.name if project else 'ICC') %}
+                            {% endif %}
+                        {% elif request.endpoint == 'dashboard.list_reports' %}
+                            {% set back_url = url_for('dashboard.index') %}
+                        {% elif request.endpoint == 'dashboard.view_report' or request.endpoint == 'dashboard.generate_report' %}
+                            {% set back_url = url_for('dashboard.list_reports') %}
+                        {% endif %}
+                        <a href="{{ back_url }}" class="mobile-header-back-btn">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    {% endif %}
+                    
+                    <div class="ms-2">
+                        <h2 class="mobile-header-title">
+                            {% if request.endpoint == 'dashboard.index' %}
+                                Mission Control
+                            {% elif request.endpoint == 'dashboard.profile' %}
+                                My Profile
+                            {% elif request.endpoint == 'campus.list_campuses' %}
+                                Campuses
+                            {% elif request.endpoint == 'campus.campus_detail' %}
+                                {{ campus.name if campus else 'Campus Detail' }}
+                            {% elif request.endpoint == 'campus.program_detail' %}
+                                {{ program_name if program_name else 'Program Detail' }}
+                            {% elif request.endpoint == 'campus.project_detail' %}
+                                {{ project.title if project else 'Project Detail' }}
+                            {% elif request.endpoint == 'dashboard.list_reports' %}
+                                Saved Reports
+                            {% elif request.endpoint == 'dashboard.view_report' %}
+                                Report Details
+                            {% elif request.endpoint == 'dashboard.generate_report' %}
+                                Compile Report
+                            {% else %}
+                                OIA Command
+                            {% endif %}
+                        </h2>
+                        <span class="mobile-header-subtitle">Christ University</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <button class="btn btn-link text-white p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNavDrawer" aria-controls="mobileNavDrawer">
+                        <i class="bi bi-grid-3x3-gap-fill fs-5 text-info"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Top Header Bar -->
+            <header class="topbar d-none d-lg-flex">
+                <h2 class="topbar-title">OIA Operations Command</h2>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Command Palette Shortcut Clicker -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 px-3 py-2 rounded-pill" onclick="document.getElementById('commandPalette').classList.remove('d-none'); document.getElementById('commandPaletteSearch').focus(); renderResults('');">
+                        <i class="bi bi-search text-info"></i>
+                        <span class="small text-muted d-none d-md-inline">Command Palette</span>
+                        <kbd class="bg-dark text-white border border-secondary font-monospace small px-2 py-0.5 ms-1 d-none d-lg-inline" style="font-size: 0.65rem; border-color: var(--border-color) !important;">⌘ K</kbd>
+                    </button>
+
+                    <!-- Display active Academic Year -->
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small">Academic Year:</span>
+                        <span class="badge bg-secondary px-3 py-2 rounded-pill font-monospace">2026-2027</span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Viewport Main Content -->
+            <main class="main-content">
+                
+                <!-- Feedback / Toast / Alert notifications -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="container-fluid px-0 mb-4">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+        
+        <!-- Mobile Bottom Navigation Bar -->
+        <nav class="mobile-bottom-nav d-flex d-lg-none">
+            <a href="{{ url_for('dashboard.index') }}" class="mobile-nav-link {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.index' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{{ url_for('dashboard.profile') }}" class="mobile-nav-link {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.profile' %}active{% endif %}">
+                <i class="bi bi-person-circle"></i>
+                <span>Profile</span>
+            </a>
+
+            {% if g.user.role not in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
+            <a href="{{ url_for('campus.list_campuses') }}" class="mobile-nav-link {% if request.blueprint == 'campus' %}active{% endif %}">
+                <i class="bi bi-buildings"></i>
+                <span>Campuses</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('dashboard.list_reports') }}" class="mobile-nav-link {% if request.blueprint == 'dashboard' and request.endpoint == 'dashboard.list_reports' %}active{% endif %}">
+                <i class="bi bi-file-earmark-bar-graph"></i>
+                <span>Reports</span>
+            </a>
+            {% endif %}
+
+            <a href="#" class="mobile-nav-link" data-bs-toggle="offcanvas" data-bs-target="#mobileNavDrawer" aria-controls="mobileNavDrawer">
+                <i class="bi bi-list"></i>
+                <span>Menu</span>
+            </a>
+        </nav>
+
+        <!-- Mobile Navigation Offcanvas Drawer -->
+        <div class="offcanvas offcanvas-end mobile-offcanvas-drawer" tabindex="-1" id="mobileNavDrawer" aria-labelledby="mobileNavDrawerLabel">
+            <div class="offcanvas-header mobile-offcanvas-header justify-content-between">
+                <h5 class="offcanvas-title text-white fw-bold" id="mobileNavDrawerLabel"><i class="bi bi-grid-fill text-info me-2"></i>OIA Navigation</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body mobile-offcanvas-body">
+                <div class="mb-4">
+                    <small class="text-muted d-block uppercase tracking-wider mb-2" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 1px;">COMMAND RAIL</small>
+                    <div class="list-group list-group-flush bg-transparent">
+                        <a href="{{ url_for('dashboard.index') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-speedometer2 text-info fs-5"></i>
+                            <span>Mission Control</span>
+                        </a>
+                        <a href="{{ url_for('dashboard.profile') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-person-circle text-info fs-5"></i>
+                            <span>My Profile</span>
+                        </a>
+                        {% if g.user.role not in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
+                        <a href="{{ url_for('campus.list_campuses') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-buildings text-info fs-5"></i>
+                            <span>Campus Directory</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <small class="text-muted d-block uppercase tracking-wider mb-2" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 1px;">REPORTING PORTAL</small>
+                    <div class="list-group list-group-flush bg-transparent">
+                        <a href="{{ url_for('dashboard.list_reports') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-file-earmark-bar-graph text-info fs-5"></i>
+                            <span>Saved Reports</span>
+                        </a>
+                        {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
+                        <a href="{{ url_for('dashboard.generate_report') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-plus-square text-info fs-5"></i>
+                            <span>Compile New Report</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if g.user.role == 'Faculty' %}
+                <div class="mb-4">
+                    <small class="text-muted d-block uppercase tracking-wider mb-2" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 1px;">ADMINISTRATION</small>
+                    <div class="list-group list-group-flush bg-transparent">
+                        <a href="{{ url_for('dashboard.admin_users') }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2.5 ps-0 d-flex align-items-center gap-3" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {}">
+                            <i class="bi bi-shield-check text-info fs-5"></i>
+                            <span>Pending & User Roles</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Mobile Quick Actions -->
+                <div class="mb-4">
+                    <small class="text-muted d-block uppercase tracking-wider mb-2" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 1px;">UTILITIES</small>
+                    <button type="button" class="btn btn-outline-secondary w-100 py-2.5 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px; font-size: 0.9rem;" onclick="try { bootstrap.Offcanvas.getInstance(document.getElementById('mobileNavDrawer')).hide(); } catch(e) {} document.getElementById('commandPalette').classList.remove('d-none'); document.getElementById('commandPaletteSearch').focus(); renderResults('');">
+                        <i class="bi bi-search text-info"></i>
+                        <span>Command Palette</span>
+                    </button>
+                </div>
+
+                <!-- Profile Info & Log Out at bottom -->
+                <div class="mobile-offcanvas-footer mt-auto">
+                    <div class="d-flex align-items-center justify-content-between p-3 rounded bg-dark bg-opacity-50" style="border: 1px solid var(--border-color);">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="sidebar-user-avatar">
+                                {{ g.user.username[0].upper() }}
+                            </div>
+                            <div>
+                                <div class="fw-bold text-white small" style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ g.user.username }}</div>
+                                <div class="text-info" style="font-size: 0.7rem;">{{ g.user.role }}</div>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger px-3 py-1.5" style="border-radius: 6px;">
+                            <i class="bi bi-power"></i> Log Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Standalone Viewport (for auth pages) -->
+    <div class="auth-wrapper">
+        <div class="w-100">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mx-auto mb-4" style="max-width: 460px;">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            {% block auth_content %}{% endblock %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Command Palette Overlay -->
+    <div id="commandPalette" class="command-palette-overlay d-none">
+        <div class="command-palette-container animate-fade-in">
+            <div class="command-palette-search-box">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" id="commandPaletteSearch" placeholder="Search project, volunteer, report or commands... (Esc to close)" autocomplete="off">
+            </div>
+            <div class="command-palette-results" id="commandPaletteResults"></div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+    
+    <!-- Custom Theme JS -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- Command Palette JS Logic -->
+    <script>
+        const paletteItems = [
+            { name: "Go to Mission Control / Dashboard", url: "{{ url_for('dashboard.index') }}", category: "Navigation" },
+            { name: "Open ERP Operations", url: "{{ url_for('erp.hub') }}", category: "Navigation" },
+            { name: "Browse Campuses Directory", url: "{{ url_for('campus.list_campuses') }}", category: "Navigation" },
+            { name: "Compile Project Operations Report", url: "{{ url_for('dashboard.generate_report') }}", category: "Reporting" },
+            { name: "Browse Saved Reports Directory", url: "{{ url_for('dashboard.list_reports') }}", category: "Reporting" },
+            { name: "Manage Registered Users & Approvals", url: "{{ url_for('dashboard.admin_users') }}", category: "Administration" },
+            { name: "Summer School Exchange Program (IGP Project)", url: "/campuses/1/projects/2", category: "Projects" },
+            { name: "June Coffee Meet & Greet (ICC Project)", url: "/campuses/2/projects/1", category: "Projects" },
+        ];
+
+        const palette = document.getElementById('commandPalette');
+        const searchInput = document.getElementById('commandPaletteSearch');
+        const resultsContainer = document.getElementById('commandPaletteResults');
+
+        function renderResults(query) {
+            resultsContainer.innerHTML = '';
+            const filtered = paletteItems.filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase()) || 
+                item.category.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            if (filtered.length === 0) {
+                resultsContainer.innerHTML = '<div class="text-center py-4 text-muted small">No commands or links found.</div>';
+                return;
+            }
+            
+            filtered.forEach(item => {
+                const a = document.createElement('a');
+                a.href = item.url;
+                a.className = 'command-result-item text-decoration-none';
+                a.innerHTML = `
+                    <span class="fw-bold text-white">${item.name}</span>
+                    <span class="command-result-category">${item.category}</span>
+                `;
+                resultsContainer.appendChild(a);
+            });
+        }
+
+        searchInput.addEventListener('input', function() {
+            renderResults(this.value);
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                palette.classList.toggle('d-none');
+                if (!palette.classList.contains('d-none')) {
+                    searchInput.value = '';
+                    searchInput.focus();
+                    renderResults('');
+                }
+            }
+            if (e.key === 'Escape') {
+                palette.classList.add('d-none');
+            }
+        });
+
+        palette.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('d-none');
+            }
+        });
+    </script>
+</body>
+</html>

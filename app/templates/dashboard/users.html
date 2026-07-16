@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}User Management & Approvals - OIA Project Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">User Approvals & Role Assignments</h1>
+    <p class="page-subtitle">Faculty and ICC Core Committee dashboard to verify registrations and grant system clearance.</p>
+</div>
+
+<!-- Pending Registrations Panel -->
+<div class="row mb-4 animate-fade-in">
+    <div class="col-12">
+        <div class="card-control">
+            <h5 class="card-control-title mb-4"><i class="bi bi-clock-history text-warning"></i> Pending Registrations ({{ pending_users | length }})</h5>
+            
+            {% if pending_users %}
+                <div class="table-responsive">
+                    <table class="table-oia">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Requested Role</th>
+                                <th>Home Campus</th>
+                                <th>Volunteer Profile (Skills / Motivation)</th>
+                                <th>Grant Role & Approve</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in pending_users %}
+                                <tr>
+                                    <td class="fw-bold">{{ u.username }}</td>
+                                    <td>{{ u.email }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary font-monospace">{{ u.preferred_role }}</span>
+                                    </td>
+                                    <td>{{ u.campus.name if u.campus else "N/A" }}</td>
+                                    <td style="max-width: 300px; font-size: 0.85rem;">
+                                        {% if u.volunteer_profile %}
+                                            <strong>Skills:</strong> {{ u.volunteer_profile.skills or 'None' }}<br>
+                                            <strong>Interests:</strong> {{ u.volunteer_profile.interests or 'None' }}
+                                        {% else %}
+                                            <span class="text-muted">No volunteer profile.</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-flex align-items-center gap-2">
+                                            <select name="role" class="form-input-oia py-1 fs-6" style="min-width: 150px;" required>
+                                                <option value="Volunteer" {% if u.preferred_role == 'Volunteer' %}selected{% endif %}>Volunteer</option>
+                                                <option value="Buddy" {% if u.preferred_role == 'Buddy' %}selected{% endif %}>Buddy</option>
+                                                <option value="Exchange Student" {% if u.preferred_role == 'Exchange Student' %}selected{% endif %}>Exchange Student</option>
+                                                <option value="ICC Core Committee" {% if u.preferred_role == 'ICC Core Committee' %}selected{% endif %}>ICC Core Committee</option>
+                                                <option value="Faculty" {% if u.preferred_role == 'Faculty' %}selected{% endif %}>Faculty</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-success btn-sm py-1 px-3 fw-bold rounded-pill"><i class="bi bi-check-lg"></i> Grant</button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" onsubmit="return confirm('Reject registration for {{ u.username }}?');">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill"><i class="bi bi-x-circle"></i> Reject</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-check2-circle fs-1 text-success"></i>
+                    <p class="text-muted mt-2">All registration requests have been cleared. No pending approvals.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Active Users Directory -->
+<div class="row animate-fade-in">
+    <div class="col-12">
+        <div class="card-control">
+            <h5 class="card-control-title mb-4"><i class="bi bi-people-fill text-primary"></i> Active User Directory ({{ approved_users | length }})</h5>
+            
+            {% if approved_users %}
+                <div class="table-responsive">
+                    <table class="table-oia">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Active Role</th>
+                                <th>Home Campus</th>
+                                <th>Approved On</th>
+                                <th>Modify Role Permission</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in approved_users %}
+                                <tr>
+                                    <td class="fw-bold">{{ u.username }}</td>
+                                    <td>{{ u.email }}</td>
+                                    <td>
+                                        <span class="badge badge-oia badge-role">{{ u.role }}</span>
+                                    </td>
+                                    <td>{{ u.campus.name if u.campus else "N/A" }}</td>
+                                    <td class="small text-muted">{{ u.approved_at.strftime('%Y-%m-%d %H:%M') if u.approved_at else "N/A" }}</td>
+                                    <td>
+                                        <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-flex align-items-center gap-2">
+                                            <select name="role" class="form-input-oia py-1 fs-6" style="min-width: 150px;" required>
+                                                <option value="Volunteer" {% if u.role == 'Volunteer' %}selected{% endif %}>Volunteer</option>
+                                                <option value="Buddy" {% if u.role == 'Buddy' %}selected{% endif %}>Buddy</option>
+                                                <option value="Exchange Student" {% if u.role == 'Exchange Student' %}selected{% endif %}>Exchange Student</option>
+                                                <option value="ICC Core Committee" {% if u.role == 'ICC Core Committee' %}selected{% endif %}>ICC Core Committee</option>
+                                                <option value="Faculty" {% if u.role == 'Faculty' %}selected{% endif %}>Faculty</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-outline-info btn-sm py-1 px-3 rounded-pill">Update</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <p class="text-muted">No other approved users in database.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

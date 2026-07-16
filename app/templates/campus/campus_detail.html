@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ campus.name }} Dashboard - OIA Project Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <a href="{{ url_for('campus.list_campuses') }}" class="text-info text-decoration-none small"><i class="bi bi-arrow-left"></i> Back to Campuses</a>
+    </div>
+    <h1 class="page-title"><i class="bi bi-building text-info"></i> {{ campus.name }} Dashboard</h1>
+    <p class="page-subtitle">Inspect campus activities and launch program type workspaces.</p>
+</div>
+
+<!-- Campus Stats Row -->
+<div class="row g-4 mb-4 animate-fade-in">
+    <div class="col-md-3">
+        <div class="card-control text-center">
+            <span class="text-muted d-block small mb-1">Total Projects</span>
+            <div class="fs-1 fw-bold text-white mb-2">{{ summary.total_projects }}</div>
+            <span class="badge bg-secondary font-monospace">{{ summary.program_distribution.get('ICC', 0) }} ICC / {{ summary.program_distribution.get('IGP', 0) }} IGP</span>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card-control text-center">
+            <span class="text-muted d-block small mb-1">Active Participants</span>
+            <div class="fs-1 fw-bold text-white mb-2">{{ summary.active_participants }}</div>
+            <span class="badge bg-secondary font-monospace">Registered Users</span>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card-control text-center">
+            <span class="text-muted d-block small mb-1">Overall Attendance</span>
+            <div class="fs-1 fw-bold text-white mb-2">{{ summary.attendance_rate }}%</div>
+            <span class="badge bg-secondary font-monospace">Verified Check-ins</span>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card-control text-center">
+            <span class="text-muted d-block small mb-1">Contribution Hours</span>
+            <div class="fs-1 fw-bold text-white mb-2">{{ summary.contribution_hours }}</div>
+            <span class="badge bg-secondary font-monospace">Approved Logs</span>
+        </div>
+    </div>
+</div>
+
+<!-- Hierarchy Selection (Select ICC or IGP) -->
+<div class="row g-4 mb-4 animate-fade-in">
+    <div class="col-md-6">
+        <div class="card-control d-flex flex-column justify-content-between h-100">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h4 class="text-white fw-bold mb-0"><i class="bi bi-people-fill text-info"></i> ICC Workspace</h4>
+                    <span class="badge bg-info rounded-pill px-3">{{ summary.program_distribution.get('ICC', 0) }} active events</span>
+                </div>
+                <p class="text-muted small">
+                    Explore the **International Christite Community** (ICC) workspace. Contains localized cultural meetups, Bhasha Utsav, student integration events, and peer networking.
+                </p>
+            </div>
+            <a href="{{ url_for('campus.program_detail', campus_id=campus.id, program_name='ICC') }}" class="btn-oia-primary w-100 mt-4 py-2.5">Open ICC Directory</a>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card-control d-flex flex-column justify-content-between h-100">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h4 class="text-white fw-bold mb-0"><i class="bi bi-globe-americas text-info"></i> IGP Workspace</h4>
+                    <span class="badge bg-info rounded-pill px-3">{{ summary.program_distribution.get('IGP', 0) }} exchange programs</span>
+                </div>
+                <p class="text-muted small">
+                    Explore the **India Gateway Program** (IGP) workspace. Tracks international summer schools, university exchange visits, buddy pairings, and incoming/outgoing cohorts.
+                </p>
+            </div>
+            <a href="{{ url_for('campus.program_detail', campus_id=campus.id, program_name='IGP') }}" class="btn-oia-primary w-100 mt-4 py-2.5">Open IGP Directory</a>
+        </div>
+    </div>
+</div>
+
+<!-- Project Status Breakdowns and Metrics -->
+<div class="row animate-fade-in">
+    <div class="col-12">
+        <div class="card-control">
+            <h5 class="card-control-title mb-4"><i class="bi bi-pie-chart-fill text-primary"></i> Campus Project Distribution</h5>
+            <div class="row text-center">
+                {% for status in ['Draft', 'Planned', 'Active', 'Completed', 'Archived'] %}
+                    <div class="col-md-2 col-6 mb-3">
+                        <span class="text-muted d-block small mb-1">{{ status }}</span>
+                        <span class="fs-4 fw-bold text-white">
+                            {{ summary.projects_by_status.get(status, 0) }}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

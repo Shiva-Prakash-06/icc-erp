@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - OIA Project Intelligence{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card mx-auto animate-fade-in">
+    <div class="auth-header">
+        <div class="auth-logo">O</div>
+        <h3 class="auth-title">OIA Project Intelligence</h3>
+        <p class="auth-subtitle">Command Portal | Office of International Affairs</p>
+    </div>
+    
+    <form action="{{ url_for('auth.login') }}" method="POST">
+        <div class="form-group-oia">
+            <label for="username" class="form-label-oia">Username or Email</label>
+            <input type="text" id="username" name="username" class="form-input-oia" placeholder="Enter username/email" required autocomplete="username">
+        </div>
+        
+        <div class="form-group-oia">
+            <label for="password" class="form-label-oia">Password</label>
+            <input type="password" id="password" name="password" class="form-input-oia" placeholder="Enter password" required autocomplete="current-password">
+        </div>
+        
+        <button type="submit" class="btn-oia-primary w-100 mt-2 py-2.5">Access Platform</button>
+    </form>
+    
+    <div class="text-center mt-4">
+        <span class="text-muted small">Need an account?</span>
+        <a href="{{ url_for('auth.register') }}" class="text-info small fw-bold text-decoration-none ms-1">Register Now</a>
+    </div>
+</div>
+{% endblock %}

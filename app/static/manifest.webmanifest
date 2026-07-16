@@ -1,0 +1,9 @@
+{
+  "name": "ICC/OIA ERP",
+  "short_name": "ICC ERP",
+  "start_url": "/erp",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0f172a",
+  "description": "OIA operations suite for ICC and IGP delivery"
+}

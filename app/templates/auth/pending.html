@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set hide_sidebar = True %}
+
+{% block title %}Pending Approval - OIA Project Intelligence{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card mx-auto text-center animate-fade-in">
+    <div class="text-warning mb-4">
+        <i class="bi bi-clock-history" style="font-size: 4rem;"></i>
+    </div>
+    
+    <h3 class="auth-title">Registration Pending</h3>
+    <p class="text-light mt-3">
+        Thank you for registering, <strong>{{ g.user.username }}</strong>!
+    </p>
+    <p class="text-muted small">
+        Your account is currently undergoing evaluation. A Faculty or ICC Core Committee administrator must approve your account and assign your official platform role before you can access dashboards.
+    </p>
+    
+    <hr class="my-4" style="border-color: var(--border-color);">
+    
+    <div class="d-flex flex-column gap-2">
+        <a href="{{ url_for('auth.login') }}" class="btn-oia-primary">Check Status (Refresh)</a>
+        <a href="{{ url_for('auth.logout') }}" class="btn-oia-secondary">Log Out</a>
+    </div>
+</div>
+{% endblock %}

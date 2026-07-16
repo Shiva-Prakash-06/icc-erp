@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: icc_erp
+      POSTGRES_USER: icc_erp
+      POSTGRES_PASSWORD: local-development-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icc_erp -d icc_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:8080"
+    command: gunicorn --bind 0.0.0.0:8080 --reload --workers 2 --threads 4 run:app
+
+volumes:
+  postgres-data:

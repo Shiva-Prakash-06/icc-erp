@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}ERP Projects{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h2 mb-1">Projects and programs</h1><p class="text-muted mb-0">Lifecycle-controlled records for ICC and IGP operations.</p></div>{% if can_create %}<button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#newProject">New project</button>{% endif %}</div>
+{% if can_create %}
+<div id="newProject" class="collapse mb-4"><div class="card"><div class="card-header"><strong>Create draft</strong></div><div class="card-body">
+<form method="POST" class="row g-3">
+  <div class="col-md-8"><label class="form-label" for="title">Title</label><input class="form-control" id="title" name="title" required></div>
+  <div class="col-md-4"><label class="form-label" for="project_type">Type</label><select class="form-select" id="project_type" name="project_type"><option>ICC event</option><option>ICC internal activity</option><option>IGP inbound program</option><option>Immersion</option><option>Exchange cohort</option><option>Visitor program</option></select></div>
+  <div class="col-md-4"><label class="form-label" for="campus_id">Campus</label><select class="form-select" id="campus_id" name="campus_id" required>{% for item in campuses %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><label class="form-label" for="program_type_id">Operating unit</label><select class="form-select" id="program_type_id" name="program_type_id" required>{% for item in program_types %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><label class="form-label" for="academic_year_id">Academic year</label><select class="form-select" id="academic_year_id" name="academic_year_id" required>{% for item in academic_years %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label" for="start_date">Start</label><input class="form-control" type="date" id="start_date" name="start_date" required></div>
+  <div class="col-md-3"><label class="form-label" for="end_date">End</label><input class="form-control" type="date" id="end_date" name="end_date" required></div>
+  <div class="col-md-6"><label class="form-label" for="venue">Venue</label><input class="form-control" id="venue" name="venue"></div>
+  <div class="col-md-6"><label class="form-label" for="target_audience">Target audience</label><input class="form-control" id="target_audience" name="target_audience"></div>
+  <div class="col-md-6"><label class="form-label" for="category">Category</label><input class="form-control" id="category" name="category" value="Operational"></div>
+  <div class="col-12"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="2"></textarea></div>
+  <div class="col-12"><button class="btn btn-primary">Create draft</button></div>
+</form></div></div></div>
+{% endif %}
+<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Code</th><th>Title</th><th>Campus</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead><tbody>
+{% for project in projects %}<tr><td class="font-monospace">{{ project.code or '—' }}</td><td><a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}" class="fw-semibold">{{ project.title }}</a></td><td>{{ project.campus.name }}</td><td>{{ project.program_type.name }}</td><td>{{ project.start_date }} – {{ project.end_date }}</td><td><span class="badge text-bg-info">{{ project.status }}</span></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-5">No projects in scope.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

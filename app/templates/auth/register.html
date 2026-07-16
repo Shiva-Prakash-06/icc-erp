@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Register - OIA Project Intelligence{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card mx-auto animate-fade-in" style="max-width: 550px;">
+    <div class="auth-header">
+        <div class="auth-logo">O</div>
+        <h3 class="auth-title">Create Command Account</h3>
+        <p class="auth-subtitle">Register for project tracking access</p>
+    </div>
+    
+    <form action="{{ url_for('auth.register') }}" method="POST">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="username" class="form-label-oia">Username</label>
+                    <input type="text" id="username" name="username" class="form-input-oia" placeholder="username" required>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="email" class="form-label-oia">Email</label>
+                    <input type="email" id="email" name="email" class="form-input-oia" placeholder="email@christuniversity.in" required>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="password" class="form-label-oia">Password</label>
+                    <input type="password" id="password" name="password" class="form-input-oia" placeholder="At least 12 characters" minlength="12" required autocomplete="new-password">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="confirm_password" class="form-label-oia">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input-oia" placeholder="Repeat password" required autocomplete="new-password">
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="campus_id" class="form-label-oia">Home Campus</label>
+                    <select id="campus_id" name="campus_id" class="form-input-oia" required>
+                        <option value="" disabled selected>Select Campus</option>
+                        {% for campus in campuses %}
+                            <option value="{{ campus.id }}">{{ campus.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group-oia">
+                    <label for="preferred_role" class="form-label-oia">Requested Role</label>
+                    <select id="preferred_role" name="preferred_role" class="form-input-oia" required onchange="toggleVolunteerFields(this.value)">
+                        <option value="" disabled selected>Select Role</option>
+                        <option value="Faculty">Faculty</option>
+                        <option value="ICC Core Committee">ICC Core Committee</option>
+                        <option value="Volunteer">Volunteer</option>
+                        <option value="Buddy">Buddy</option>
+                        <option value="Exchange Student">Exchange Student</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optional Volunteer Fields (Toggled Dynamically) -->
+        <div id="volunteer_fields" style="display: none;" class="p-3 border border-secondary rounded mb-3 bg-dark bg-opacity-25">
+            <div class="form-group-oia">
+                <label for="skills" class="form-label-oia">Skills (e.g. Photography, Graphic Design, Social Media, Logistics)</label>
+                <input type="text" id="skills" name="skills" class="form-input-oia" placeholder="Enter skills (comma separated)">
+            </div>
+            <div class="form-group-oia mb-0">
+                <label for="interests" class="form-label-oia">Interests / Motivation</label>
+                <textarea id="interests" name="interests" class="form-input-oia" rows="2" placeholder="Tell us why you want to join..."></textarea>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn-oia-primary w-100 mt-2 py-2.5">Submit Registration</button>
+    </form>
+    
+    <div class="text-center mt-4">
+        <span class="text-muted small">Already registered?</span>
+        <a href="{{ url_for('auth.login') }}" class="text-info small fw-bold text-decoration-none ms-1">Sign In</a>
+    </div>
+</div>
+
+<script>
+    function toggleVolunteerFields(role) {
+        const fields = document.getElementById('volunteer_fields');
+        if (role === 'Volunteer' || role === 'Buddy') {
+            fields.style.display = 'block';
+        } else {
+            fields.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

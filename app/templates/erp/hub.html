@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}ERP Operations{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <p class="text-info text-uppercase small fw-bold mb-1">OIA Operations Suite</p>
+    <h1 class="h2 mb-1">Authoritative operational record</h1>
+    <p class="text-muted mb-0">ICC governance and IGP program delivery remain separately scoped in one institutional system.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary" href="{{ url_for('erp.imports') }}"><i class="bi bi-database-up me-1"></i> Imports</a>
+    <a class="btn btn-primary" href="{{ url_for('erp.projects') }}"><i class="bi bi-kanban me-1"></i> Projects</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Visible projects</div><div class="display-6 fw-semibold">{{ stats.projects }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">In delivery</div><div class="display-6 fw-semibold">{{ stats.active }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">People records</div><div class="display-6 fw-semibold">{{ stats.people if stats.people is not none else 'Scoped' }}</div></div></div></div>
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Import batches</div><div class="display-6 fw-semibold">{{ stats.imports if stats.imports is not none else 'Scoped' }}</div></div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center"><strong>Recent projects</strong><a href="{{ url_for('erp.projects') }}">View all</a></div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Code</th><th>Project / program</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for project in projects %}
+        <tr>
+          <td class="font-monospace">{{ project.code or 'Uncoded' }}</td>
+          <td><a class="fw-semibold" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.title }}</a></td>
+          <td>{{ project.program_type.name }}</td>
+          <td>{{ project.start_date }} – {{ project.end_date }}</td>
+          <td><span class="badge text-bg-info">{{ project.status }}</span></td>
+        </tr>
+      {% else %}<tr><td colspan="5" class="text-center py-5 text-muted">No projects are visible in your assigned scope.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

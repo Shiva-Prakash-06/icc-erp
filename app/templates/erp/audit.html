@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Audit History{% endblock %}
+{% block content %}
+<div class="mb-4"><h1 class="h2 mb-1">Audit history</h1><p class="text-muted mb-0">Append-only record of permissions, imports, lifecycle decisions, and operational changes.</p></div>
+<div class="card"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Request</th></tr></thead><tbody>{% for event in events %}<tr><td>{{ event.occurred_at }}</td><td>{{ event.actor_user_id or 'System' }}</td><td class="font-monospace">{{ event.action }}</td><td>{{ event.entity_type }}<div class="small text-muted font-monospace">{{ event.entity_public_id or '—' }}</div></td><td class="small font-monospace">{{ event.request_id or '—' }}</td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted py-5">No audit events recorded.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}
