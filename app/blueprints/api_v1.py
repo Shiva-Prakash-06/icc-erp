@@ -50,8 +50,7 @@ from app.models.production import (
     ReportJob,
 )
 from app.models.project import AcademicYear, Campus, Project
-from app.models.project import BuddyAssignment, BuddyLog, ProjectParticipant
-from app.models.operational import Contribution
+from app.models.project import BuddyAssignment, BuddyLog
 from app.services.authorization import can_view_project, has_permission
 from app.services.audit import record_audit, record_sensitive_access
 from app.services.buddy import validate_buddy_assignment
@@ -92,7 +91,6 @@ RESOURCE_MODELS = {
     "checklist-template-items": ChecklistTemplateItem,
     "people": Person,
     "teams": TeamAssignment,
-    "participants": ProjectParticipant,
     "attendance": SessionAttendance,
     "contributions": ContributionRecord,
     "buddy-assignments": BuddyAssignment,

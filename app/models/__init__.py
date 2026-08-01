@@ -1,6 +1,5 @@
-from app.models.user import User, Volunteer
-from app.models.project import AcademicYear, Campus, ProgramType, Project, ProjectParticipant, BuddyAssignment, BuddyLog
-from app.models.operational import AttendanceRecord, Contribution, Feedback, Document, Report
+from app.models.user import User
+from app.models.project import AcademicYear, Campus, ProgramType, Project, BuddyAssignment, BuddyLog
 from app.models.erp import (
     AuditEvent,
     BudgetLine,

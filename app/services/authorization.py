@@ -82,16 +82,12 @@ def role_codes(user):
 def has_permission(user, permission, project=None, sensitive=False):
     if not user or user.status != "Approved":
         return False
+    # Authorization is decided entirely by scoped RoleAssignment rows -- the
+    # legacy free-text User.role string is informational only (see
+    # user.py), never read here. Every approved user is guaranteed to have
+    # an active RoleAssignment (assigned at approval time, or via the
+    # backfill-role-assignments CLI command for any pre-existing account).
     assignments = _active_assignments(user)
-    legacy_code = LEGACY_ROLE_MAP.get(user.role)
-    if legacy_code and permission in ROLE_PERMISSIONS.get(legacy_code, set()):
-        # Legacy faculty retains broad access only during demonstrator migration,
-        # but is still bounded to the caller's own campus once a project is given
-        # (never an unconditional cross-campus grant).
-        if legacy_code == "OIA_FACULTY_ADMINISTRATOR" and (not sensitive or permission == "sensitive_links"):
-            if project is None or user.campus_id is None or user.campus_id == project.campus_id:
-                return True
-
     for assignment in assignments:
         if permission not in ROLE_PERMISSIONS.get(assignment.role_code, set()):
             continue
@@ -129,20 +125,12 @@ def has_permission(user, permission, project=None, sensitive=False):
 def can_view_project(user, project):
     if has_permission(user, "manage_projects", project) or has_permission(user, "report", project):
         return True
-    if not user:
+    if not user or not user.person_id:
         return False
     from app.models.erp import TeamAssignment
-    from app.models.project import ProjectParticipant
 
-    if user.person_id and TeamAssignment.query.filter_by(person_id=user.person_id, project_id=project.id).first() is not None:
-        return True
-    identity_filter = ProjectParticipant.user_id == user.id
-    if user.person_id:
-        identity_filter = or_(identity_filter, ProjectParticipant.person_id == user.person_id)
-    return ProjectParticipant.query.filter(
-        ProjectParticipant.project_id == project.id,
-        identity_filter,
-        ProjectParticipant.status == "Active",
+    return TeamAssignment.query.filter_by(
+        person_id=user.person_id, project_id=project.id, status="Active",
     ).first() is not None
 
 

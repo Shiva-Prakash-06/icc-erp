@@ -50,15 +50,9 @@
           {% if has_permission(g.user, 'approve') %}
           <li><a href="{{ url_for('erp.oversight') }}" class="app-nav-link" {% if request.endpoint == 'erp.oversight' %}aria-current="page"{% endif %}><i class="ph ph-shield-check" aria-hidden="true"></i><span>Oversight</span></a></li>
           {% endif %}
-          {% if has_permission(g.user, 'manage_projects') or has_permission(g.user, 'report') %}
-          <li><a href="{{ url_for('campus.list_campuses') }}" class="app-nav-link" {% if request.blueprint == 'campus' %}aria-current="page"{% endif %}><i class="ph ph-buildings" aria-hidden="true"></i><span>Campus directory</span></a></li>
-          {% endif %}
 
           <li class="nav-group-label">Reporting</li>
-          <li><a href="{{ url_for('dashboard.list_reports') }}" class="app-nav-link" {% if request.endpoint == 'dashboard.list_reports' or request.endpoint == 'dashboard.view_report' %}aria-current="page"{% endif %}><i class="ph ph-chart-bar" aria-hidden="true"></i><span>Saved reports</span></a></li>
-          {% if has_permission(g.user, 'report') %}
-          <li><a href="{{ url_for('dashboard.generate_report') }}" class="app-nav-link" {% if request.endpoint == 'dashboard.generate_report' %}aria-current="page"{% endif %}><i class="ph ph-file-plus" aria-hidden="true"></i><span>Compile report</span></a></li>
-          {% endif %}
+          <li><a href="{{ url_for('public.reports') }}" class="app-nav-link" {% if request.endpoint == 'public.reports' %}aria-current="page"{% endif %}><i class="ph ph-chart-bar" aria-hidden="true"></i><span>Published reports</span></a></li>
 
           {% if has_permission(g.user, 'manage_users') %}
           <li class="nav-group-label">Administration</li>
@@ -88,9 +82,6 @@
           <button class="mobile-header-back-btn" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false" aria-label="Open navigation"><i class="ph ph-list" aria-hidden="true"></i></button>
           {% else %}
           {% set back_url = url_for('dashboard.index') %}
-          {% if request.endpoint == 'campus.campus_detail' %}{% set back_url = url_for('campus.list_campuses') %}{% endif %}
-          {% if request.endpoint == 'campus.program_detail' %}{% set back_url = url_for('campus.campus_detail', campus_id=campus.id) %}{% endif %}
-          {% if request.endpoint == 'dashboard.view_report' or request.endpoint == 'dashboard.generate_report' %}{% set back_url = url_for('dashboard.list_reports') %}{% endif %}
           <a class="mobile-header-back-btn" href="{{ back_url }}" aria-label="Back"><i class="ph ph-caret-left" aria-hidden="true"></i></a>
           {% endif %}
           <div class="ms-2"><h2 class="mobile-header-title">{% block mobile_title %}OIA command{% endblock %}</h2><span class="mobile-header-subtitle">Christ University</span></div>
@@ -151,8 +142,7 @@
           <a href="{{ url_for('erp.hub') }}" class="app-nav-link"><i class="ph ph-tree-structure" aria-hidden="true"></i>ERP operations</a>
           <a href="{{ url_for('erp.notifications') }}" class="app-nav-link"><i class="ph ph-bell" aria-hidden="true"></i>Notifications</a>
           {% if has_permission(g.user, 'approve') %}<a href="{{ url_for('erp.oversight') }}" class="app-nav-link"><i class="ph ph-shield-check" aria-hidden="true"></i>Oversight</a>{% endif %}
-          {% if has_permission(g.user, 'manage_projects') or has_permission(g.user, 'report') %}<a href="{{ url_for('campus.list_campuses') }}" class="app-nav-link"><i class="ph ph-buildings" aria-hidden="true"></i>Campus directory</a>{% endif %}
-          <a href="{{ url_for('dashboard.list_reports') }}" class="app-nav-link"><i class="ph ph-chart-bar" aria-hidden="true"></i>Saved reports</a>
+          <a href="{{ url_for('public.reports') }}" class="app-nav-link"><i class="ph ph-chart-bar" aria-hidden="true"></i>Published reports</a>
           {% if has_permission(g.user, 'manage_users') %}<a href="{{ url_for('dashboard.admin_users') }}" class="app-nav-link"><i class="ph ph-shield-check" aria-hidden="true"></i>Users and approvals</a>{% endif %}
         </div>
       </nav>
@@ -204,9 +194,7 @@
     {"name":"My profile","url":{{ url_for('dashboard.profile')|tojson }},"category":"Command","keywords":"performance portfolio"},
     {"name":"Notifications","url":{{ url_for('erp.notifications')|tojson }},"category":"Command","keywords":"alerts preferences"}
     {% if has_permission(g.user, 'approve') %},{"name":"Oversight","url":{{ url_for('erp.oversight')|tojson }},"category":"Command","keywords":"approvals pending faculty"}{% endif %}
-    {% if has_permission(g.user, 'manage_projects') or has_permission(g.user, 'report') %},{"name":"Campus directory","url":{{ url_for('campus.list_campuses')|tojson }},"category":"Directory","keywords":"campus programs"}{% endif %}
-    ,{"name":"Saved reports","url":{{ url_for('dashboard.list_reports')|tojson }},"category":"Reporting","keywords":"exports history"}
-    {% if has_permission(g.user, 'report') %},{"name":"Compile report","url":{{ url_for('dashboard.generate_report')|tojson }},"category":"Reporting","keywords":"generate export"}{% endif %}
+    ,{"name":"Published reports","url":{{ url_for('public.reports')|tojson }},"category":"Reporting","keywords":"exports history"}
     {% if has_permission(g.user, 'manage_users') %},{"name":"Users and approvals","url":{{ url_for('dashboard.admin_users')|tojson }},"category":"Administration","keywords":"roles accounts"}{% endif %}
   ]</script>
   {% endif %}

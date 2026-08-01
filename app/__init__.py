@@ -35,12 +35,10 @@ def create_app(config_object=None):
         return db.session.get(User, int(user_id)) if user_id else None
 
     from app.blueprints.auth import auth_bp
-    from app.blueprints.campus import campus_bp
     from app.blueprints.dashboard import dashboard_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
-    app.register_blueprint(campus_bp)
 
     # New modular ERP interfaces are isolated behind their own blueprints.
     from app.blueprints.erp import erp_bp
@@ -139,11 +137,6 @@ def create_app(config_object=None):
             return redirect(url_for("auth.pending_approval"))
         if g.user.status == "Approved" and request.endpoint == "auth.pending_approval":
             return redirect(url_for("dashboard.index"))
-        if app.config.get("APP_ENV") == "production" and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-            if request.blueprint == "campus" or request.endpoint == "dashboard.generate_report":
-                if request.path.startswith("/api/"):
-                    return _problem(410, "Legacy mutation retired")
-                return ("This legacy workflow is read-only in production. Use ERP Operations or /api/v1.", 410)
         return None
 
     @app.after_request

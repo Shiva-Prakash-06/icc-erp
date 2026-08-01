@@ -11,7 +11,6 @@ from app.models.erp import ImportBatch, Person, RoleAssignment
 from app.services.imports import _reference_data
 from app.services.imports import backfill_summer_school_sample_content, commit_batch, seed_icc_checklist_template, stage_supplied_source
 from app.services.roles import replace_scoped_assignment
-from app.services import legacy_migration
 
 
 def register_cli(app):
@@ -179,22 +178,6 @@ def register_cli(app):
         Greet (the supplied source file is a checklist only)."""
         result = backfill_summer_school_sample_content()
         click.echo(", ".join(f"{key}={value}" for key, value in result.items()))
-
-    @app.cli.command("migrate-legacy-data")
-    def migrate_legacy_data():
-        """Run every legacy-to-production data migration in dependency
-        order, ahead of deleting the legacy tables. Idempotent: safe to
-        re-run (each step is a no-op the second time)."""
-        steps = (
-            ("participants -> teams", legacy_migration.migrate_participants_to_teams),
-            ("attendance -> sessions", legacy_migration.migrate_attendance_to_sessions),
-            ("contributions -> records", legacy_migration.migrate_contributions_to_records),
-            ("documents -> records", legacy_migration.migrate_documents_to_records),
-            ("feedback -> responses", legacy_migration.migrate_feedback_to_responses),
-        )
-        for label, step in steps:
-            result = step()
-            click.echo(f"{label}: " + ", ".join(f"{key}={value}" for key, value in result.items()))
 
     @app.cli.command("commit-import-batch")
     @click.option("--public-id", envvar="IMPORT_BATCH_PUBLIC_ID", required=True)

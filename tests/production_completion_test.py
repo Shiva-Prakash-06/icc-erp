@@ -21,7 +21,7 @@ from app.models.production import (
     SensitiveAccessEvent,
     TaskStatusEvent,
 )
-from app.models.project import AcademicYear, Campus, ProgramType, Project, ProjectParticipant
+from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.user import User
 from app.services.drive import refresh_document_metadata, validate_drive_link
 from app.services.authorization import can_view_project
@@ -64,6 +64,10 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.user = User(username="faculty", email="faculty@example.com", role="Faculty", preferred_role="Faculty", status="Approved", needs_password_reset=False)
         self.user.set_password("A-secure-test-password-2026")
         db.session.add_all([self.project, self.user])
+        db.session.flush()
+        # A platform-wide (unscoped) assignment, matching what a real
+        # OIA Faculty Administrator approval creates.
+        db.session.add(RoleAssignment(user_id=self.user.id, role_code="OIA_FACULTY_ADMINISTRATOR", is_active=True, can_view_sensitive_links=True))
         db.session.commit()
 
     def tearDown(self):
@@ -770,7 +774,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
         participant.set_password("A-secure-exchange-password-2026")
         db.session.add_all([person, participant])
         db.session.flush()
-        db.session.add(ProjectParticipant(project_id=self.project.id, user_id=participant.id, person_id=person.id, participant_type="Exchange Student"))
+        db.session.add(TeamAssignment(project_id=self.project.id, person_id=person.id, assignment_type="Exchange Program", role_label="Exchange Student"))
         db.session.commit()
         self.assertTrue(can_view_project(participant, self.project))
         with self.client.session_transaction() as session:
@@ -813,6 +817,8 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         self.user = User(username="faculty2", email="faculty2@example.com", role="Faculty", status="Approved", needs_password_reset=False)
         self.user.set_password("A-secure-test-password-2026")
         db.session.add(self.user)
+        db.session.flush()
+        db.session.add(RoleAssignment(user_id=self.user.id, role_code="OIA_FACULTY_ADMINISTRATOR", is_active=True, can_view_sensitive_links=True))
         db.session.commit()
         with self.client.session_transaction() as session:
             session["user_id"] = self.user.id

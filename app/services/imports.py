@@ -33,7 +33,7 @@ from app.models.erp import (
     Wing,
     WorkTask,
 )
-from app.models.project import AcademicYear, Campus, ProgramType, Project, ProjectParticipant
+from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.production import ControlledVocabulary, Position, ReportDefinition
 from app.services.audit import record_audit
 from app.services.drive import validate_drive_link
@@ -534,9 +534,9 @@ def _commit_standard_rows(batch, valid_rows, defaults):
                 person = _person_for_import(data)
                 if not person:
                     raise ValueError(f"Participant row {row.source_row} has no resolved person.")
-                target = ProjectParticipant.query.filter_by(project_id=project.id, person_id=person.id).first()
+                target = TeamAssignment.query.filter_by(project_id=project.id, person_id=person.id).first()
                 if not target:
-                    target = ProjectParticipant(project_id=project.id, person_id=person.id, participant_type=data["participant_type"], status="Active")
+                    target = TeamAssignment(project_id=project.id, person_id=person.id, assignment_type=data["participant_type"], status="Active")
                     db.session.add(target)
             elif batch.import_type == "attendance":
                 person = _person_for_import(data)

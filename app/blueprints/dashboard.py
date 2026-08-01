@@ -2,7 +2,8 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from app.database import db
 from app.models.user import User
 from app.models.project import AcademicYear, Campus, Project
-from app.models.erp import ContributionRecord, Person, ProjectSession, RoleAssignment, SessionAttendance, TeamAssignment, Wing
+from app.models.erp import Person, ProjectSession, RoleAssignment, SessionAttendance, TeamAssignment, Wing
+from app.models.production import ContributionRecord
 from app.services.audit import record_audit
 from app.services.authorization import has_permission
 from app.services.roles import replace_scoped_assignment

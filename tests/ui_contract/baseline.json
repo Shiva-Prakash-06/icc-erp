@@ -3,8 +3,8 @@
   "captured_at": "2026-07-17",
   "contract": "presentation-only Aurora migration",
   "url_map": {
-    "route_count": 116,
-    "sha256": "9333baffe77a473e9c1b0b3806b63173fd4314306315a65d158452941c1d02e2",
+    "route_count": 98,
+    "sha256": "e10484ece05a44e37694c3051d2f26b2744b304a2ff0b599692a794572686fb5",
     "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
     "includes_parameter_converters": true
   },
@@ -47,19 +47,6 @@
       "names": [
         "new_password",
         "confirm_password"
-      ]
-    },
-    "/reports/generate": {
-      "method": "POST",
-      "names": [
-        "report_type",
-        "title",
-        "description",
-        "campus_id",
-        "program_type_id",
-        "project_id",
-        "start_date",
-        "end_date"
       ]
     },
     "/erp/projects": {

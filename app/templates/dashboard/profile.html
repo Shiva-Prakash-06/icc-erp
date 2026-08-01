@@ -23,12 +23,12 @@
                 <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-xl">
                     <i class="ph ph-user-circle"></i>
                 </div>
-                <h4 class="text-white fw-bold mb-1">{{ g.user.username }}</h4>
+                <h4 class="fw-bold mb-1">{{ g.user.username }}</h4>
                 <p class="text-muted small mb-2"><i class="ph ph-envelope"></i> {{ g.user.email }}</p>
                 <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3">{{ g.user.role }}</span>
                 <div class="border-top border-secondary pt-3 mt-2 text-start px-3">
                     <small class="text-muted d-block">Campus Assignment</small>
-                    <span class="text-white fw-bold"><i class="ph ph-building-office"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
+                    <span class="fw-bold"><i class="ph ph-building-office"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
                 </div>
             </div>
 
@@ -74,7 +74,7 @@
                         {% for skill, hours in skills_hours.items() %}
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold text-white text-ui">{{ skill }}</span>
+                                    <span class="fw-bold text-ui">{{ skill }}</span>
                                     <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success">{{ hours }} hours logged</span>
                                 </div>
                                 <div class="progress-container-custom">
@@ -113,7 +113,7 @@
                             <tbody>
                                 {% for p in contributed_projects %}
                                 <tr>
-                                    <td class="fw-bold text-white">{{ p.title }}</td>
+                                    <td class="fw-bold">{{ p.title }}</td>
                                     <td>{{ p.campus.name.replace(" Campus", "") }}</td>
                                     <td><span class="aurora-badge bg-primary font-monospace text-caption">{{ p.program_type.name }}</span></td>
                                     <td class="small">{{ p.start_date.strftime('%b %d, %Y') }}</td>
@@ -123,7 +123,7 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="aurora-button--outline-info aurora-button--small rounded-pill px-3 py-1">Open Workspace</a>
+                                        <a href="{{ url_for('erp.project_detail', public_id=p.public_id) }}" class="aurora-button--outline-info aurora-button--small rounded-pill px-3 py-1">Open Workspace</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -147,13 +147,13 @@
         <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-lg">
             <i class="ph ph-user-circle"></i>
         </div>
-        <h4 class="text-white fw-bold mb-1 text-xl">{{ g.user.username }}</h4>
+        <h4 class="fw-bold mb-1 text-xl">{{ g.user.username }}</h4>
         <p class="text-muted small mb-2">{{ g.user.email }}</p>
         <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3 text-xs">{{ g.user.role }}</span>
         
         <div class="border-top border-secondary pt-3 mt-2 text-start px-2">
             <span class="text-muted small d-block text-caption">Campus Assignment</span>
-            <span class="text-white fw-bold small"><i class="ph ph-building-office me-1 text-info"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
+            <span class="fw-bold small"><i class="ph ph-building-office me-1 text-info"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
         </div>
     </div>
 
@@ -198,7 +198,7 @@
                 {% for skill, hours in skills_hours.items() %}
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-white small">{{ skill }}</span>
+                            <span class="fw-bold small">{{ skill }}</span>
                             <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success text-2xs">{{ hours }} hrs</span>
                         </div>
                         <div class="progress-container-custom">
@@ -222,16 +222,16 @@
         {% if contributed_projects %}
             <div class="d-flex flex-column gap-3">
                 {% for p in contributed_projects %}
-                    <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
+                    <div class="aurora-card--padded">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="aurora-badge bg-primary font-monospace text-2xs">{{ p.program_type.name }}</span>
                             <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% elif p.status == 'Completed' %}aurora-badge--status-completed{% else %}aurora-badge--status-pending{% endif %} text-2xs">
                                 {{ p.status }}
                             </span>
                         </div>
-                        <h6 class="text-white mb-2 fw-bold text-ui-lg">{{ p.title }}</h6>
+                        <h6 class="mb-2 fw-bold text-ui-lg">{{ p.title }}</h6>
                         <div class="text-muted small mb-3"><i class="ph ph-building-office"></i> {{ p.campus.name }}</div>
-                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="aurora-button--outline-info w-100 py-2 small">Open Workspace</a>
+                        <a href="{{ url_for('erp.project_detail', public_id=p.public_id) }}" class="aurora-button--outline-info w-100 py-2 small">Open Workspace</a>
                     </div>
                 {% endfor %}
             </div>

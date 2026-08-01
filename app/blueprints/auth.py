@@ -26,20 +26,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def role_required(*roles):
-    from functools import wraps
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if g.user is None:
-                flash("You must be logged in to access this page.", "warning")
-                return redirect(url_for('auth.login'))
-            if g.user.role not in roles:
-                flash("You do not have permission to access this page.", "danger")
-                return redirect(url_for('dashboard.index'))
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute", methods=["POST"])
