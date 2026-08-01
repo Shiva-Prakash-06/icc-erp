@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .venv/
+node_modules/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -8,6 +9,7 @@ __pycache__/
 htmlcov/
 instance/*.db
 instance/*.sqlite*
+instance/dev_secret_key
 !instance/.gitkeep
 .terraform/
 *.tfstate

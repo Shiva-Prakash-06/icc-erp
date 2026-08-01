@@ -16,6 +16,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INSTANCE_DIR = BASE_DIR / "instance"
 
 
+def _persisted_dev_secret_key() -> str:
+    """Return a SECRET_KEY that stays stable across process restarts/workers
+    when no SECRET_KEY env var is set (dev/staging only -- production always
+    requires an explicit env var via ProductionConfig.validate()). Without
+    this, every gunicorn worker would mint its own random key at import time,
+    breaking session/CSRF validation whenever a request is served by a
+    different worker than the one that issued it."""
+    INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+    key_path = INSTANCE_DIR / "dev_secret_key"
+    try:
+        existing = key_path.read_text().strip()
+        if existing:
+            return existing
+    except FileNotFoundError:
+        pass
+    generated = secrets.token_urlsafe(32)
+    key_path.write_text(generated)
+    return generated
+
+
 def _database_url(default_name: str) -> str:
     value = os.getenv("DATABASE_URL")
     if value:
@@ -27,7 +47,7 @@ def _database_url(default_name: str) -> str:
 
 class BaseConfig:
     APP_ENV = os.getenv("APP_ENV", "development")
-    SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_urlsafe(32)
+    SECRET_KEY = os.getenv("SECRET_KEY") or _persisted_dev_secret_key()
     SQLALCHEMY_DATABASE_URI = _database_url("erp_development.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}

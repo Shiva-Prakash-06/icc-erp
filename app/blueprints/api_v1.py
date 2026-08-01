@@ -246,6 +246,11 @@ PROTECTED_MUTATION_FIELDS = {
     "generated_by_id", "published_at", "password_hash", "password_reset_token_hash",
     "delivery_status", "drive_permission_metadata", "drive_validated_at", "drive_validation_status",
     "status", "decision", "approval_status", "publication_status", "cancellation_reason", "archived_at",
+    # Waiver/closure fields must only change through the dedicated workflow
+    # endpoints (change_task_status/change_checklist_status), which enforce the
+    # "waive" permission and a mandatory justification comment. A raw PATCH must
+    # never be able to silently waive a closure requirement.
+    "waived", "waiver_reason", "mandatory_for_closure",
 }
 
 
@@ -386,6 +391,14 @@ def list_resource(resource):
         query = query.filter(model.project_id.in_(visible_project_ids or [-1]))
     elif model is BuddyLog:
         query = query.join(BuddyAssignment).filter(BuddyAssignment.project_id.in_(visible_project_ids or [-1]))
+    elif model is SessionAttendance:
+        query = query.join(ProjectSession, SessionAttendance.session_id == ProjectSession.id).filter(
+            ProjectSession.project_id.in_(visible_project_ids or [-1])
+        )
+    elif model is ChecklistItemStatus:
+        query = query.join(ChecklistInstance, ChecklistItemStatus.checklist_instance_id == ChecklistInstance.id).filter(
+            ChecklistInstance.project_id.in_(visible_project_ids or [-1])
+        )
     query = query.order_by(model.id.asc())
     if model is Project:
         items = [item for item in query.limit(limit + 1).all() if can_view_project(g.user, item)]
@@ -486,7 +499,9 @@ def patch_resource(resource, public_id):
     model = RESOURCE_MODELS.get(resource)
     if not model:
         return _problem(404, "Unknown resource")
-    if resource in READ_ONLY_RESOURCES or model in {FeedbackResponse, DocumentRecord, RecruitmentApplication, SessionAttendance}:
+    if resource in READ_ONLY_RESOURCES or model in {
+        FeedbackResponse, DocumentRecord, RecruitmentApplication, SessionAttendance,
+    }:
         return _problem(405, "Use the resource-specific workflow endpoint")
     item = model.query.filter_by(public_id=public_id).first() if hasattr(model, "public_id") else None
     if not item:
@@ -497,16 +512,10 @@ def patch_resource(resource, public_id):
     payload = request.get_json(silent=True) or {}
     before = _serialize(item)
     try:
-        if isinstance(item, Project):
-            if payload.get("version") != item.version:
-                raise RuntimeError("Concurrent update conflict")
-            editable = {"title", "description", "objectives", "target_audience", "venue", "capacity", "expected_reach", "actual_reach", "closure_summary", "start_date", "end_date", "owner_person_public_id", "partner_institution_public_id"}
-            unsupported = set(payload) - editable - {"version"}
-            if unsupported:
-                raise ValueError("Unsupported fields: " + ", ".join(sorted(unsupported)))
-            _apply_payload(item, payload)
-        else:
-            _apply_payload(item, payload)
+        # Project has its own dedicated PATCH route (update_project) which
+        # Flask/Werkzeug always prefers over this generic one, so `item` is
+        # never a Project here.
+        _apply_payload(item, payload)
         record_audit(f"{resource}.update", item, before=before, after=_serialize(item), actor=g.user)
         db.session.commit()
     except RuntimeError as error:
@@ -557,13 +566,25 @@ def update_project(public_id):
     if not has_permission(g.user, "manage_projects", project):
         return _problem(403, "Access denied")
     payload = request.get_json(silent=True) or {}
-    if payload.get("version") != project.version:
-        return _problem(409, "Concurrent update conflict", "Refresh the project and retry with its current version.")
-    editable = {"title", "description", "objectives", "target_audience", "venue", "capacity", "expected_reach", "actual_reach", "closure_summary"}
-    for key in editable:
-        if key in payload:
-            setattr(project, key, payload[key])
-    project.version += 1
+    editable = {
+        "title", "description", "objectives", "target_audience", "venue",
+        "capacity", "expected_reach", "actual_reach", "closure_summary",
+        "start_date", "end_date", "owner_person_public_id", "partner_institution_public_id",
+    }
+    unsupported = set(payload) - editable - {"version"}
+    if unsupported:
+        return _problem(422, "Validation failed", "Unsupported fields: " + ", ".join(sorted(unsupported)))
+    restricted_payload = {key: payload[key] for key in payload if key in editable}
+    restricted_payload["version"] = payload.get("version")
+    try:
+        _apply_payload(project, restricted_payload)
+    except RuntimeError as error:
+        db.session.rollback()
+        return _problem(409, "Concurrent update conflict", str(error))
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
+        return _problem(422, "Validation failed", str(error))
+    record_audit("projects.update", project, after=_serialize(project), actor=g.user)
     db.session.commit()
     return {"data": _serialize(project)}
 

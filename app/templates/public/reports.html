@@ -1,0 +1,24 @@
+{% extends "public/base.html" %}
+{% block title %}Published reports{% endblock %}
+{% block content %}
+<header class="page-header"><div><div class="page-eyebrow">Institutional memory</div><h1 class="page-title">Published reports</h1><p class="page-subtitle">Approved, published reports summarizing ICC and IGP activity.</p></div></header>
+<div class="aurora-card">
+  <div class="aurora-table-scroll">
+    <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+      <thead><tr><th>Report</th><th>Project</th><th>Version</th><th>Reach</th></tr></thead>
+      <tbody>
+        {% for report in reports %}
+        <tr>
+          <td data-label="Report">{{ report.title }}</td>
+          <td data-label="Project">{% if report.project_code %}<a href="{{ url_for('public.event_detail', code=report.project_code) }}">{{ report.project_title }}</a>{% else %}{{ report.project_title }}{% endif %}</td>
+          <td data-label="Version">v{{ report.version }}</td>
+          <td data-label="Reach">{{ report.actual_reach or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-5">No reports have been published yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

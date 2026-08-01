@@ -1,11 +1,14 @@
+import secrets
 import smtplib
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session, g
 from app.database import db
 from app.database import limiter
-from app.models.user import User, Volunteer
+from app.models.user import User
+from app.models.erp import Person
 from app.models.project import Campus
 from app.services.audit import record_audit
 from app.services.identity import InternalPasswordIdentityProvider
@@ -139,12 +142,20 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        # If they registered as a Volunteer, we can create their Volunteer profile
-        if preferred_role == 'Volunteer' or preferred_role == 'Buddy':
+        # Volunteers/buddies capture skills/interests on their Person record
+        # (rather than a separate profile table) so the same data is visible
+        # to the production scoped-role system once they're approved.
+        if preferred_role in ('Volunteer', 'Buddy'):
             skills = request.form.get('skills', '')
             interests = request.form.get('interests', '')
-            vol_profile = Volunteer(user_id=new_user.id, skills=skills, interests=interests)
-            db.session.add(vol_profile)
+            person = Person.query.filter(db.func.lower(Person.primary_email) == email).first()
+            if not person:
+                person = Person(first_name=username, primary_email=email, campus_id=new_user.campus_id, person_type="Platform User")
+                db.session.add(person)
+                db.session.flush()
+            person.skills = skills
+            person.interests = interests
+            new_user.person_id = person.id
             db.session.commit()
 
         session['user_id'] = new_user.id
@@ -205,17 +216,28 @@ def forgot_password():
     if request.method == "POST":
         identifier = (request.form.get("identifier") or "").strip().lower()
         user = User.query.filter((db.func.lower(User.username) == identifier) | (db.func.lower(User.email) == identifier)).first()
-        if user and user.status == "Approved" and not user.is_archived and user.identity_provider == "internal":
+        eligible = bool(user and user.status == "Approved" and not user.is_archived and user.identity_provider == "internal")
+        # Both branches below must do equivalent-cost work (token generation, a
+        # DB round-trip, and an email-send attempt) so the response timing
+        # can't be used to enumerate which identifiers have an eligible
+        # account -- only the ineligible branch's work is a no-op discard.
+        if eligible:
             token = issue_reset_token(user)
             record_audit("account.password_reset_requested", user, actor=user)
             db.session.commit()
-            try:
+        else:
+            secrets.token_urlsafe(32)
+            db.session.commit()
+        try:
+            if eligible:
                 send_reset_email(
                     user,
                     url_for("auth.recover_password", token=token, _external=True, _scheme="https" if request.is_secure else "http"),
                 )
-            except (OSError, smtplib.SMTPException):
-                pass
+            else:
+                time.sleep(0.05)
+        except (OSError, smtplib.SMTPException):
+            pass
         flash("If an eligible account exists, a reset link has been sent.", "info")
         return redirect(url_for("auth.login"))
     return render_template("auth/forgot_password.html")

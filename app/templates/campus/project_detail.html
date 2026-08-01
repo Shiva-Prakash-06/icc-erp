@@ -3,15 +3,15 @@
 {% block title %}{{ project.title }} - Project Workspace{% endblock %}
 
 {% block content %}
-<div class="page-header animate-fade-in mb-4">
+<div class="page-header mb-4">
     <!-- Breadcrumb Hierarchy Trail -->
     <div class="d-flex align-items-center gap-2 mb-3 small text-muted">
         <a href="{{ url_for('campus.list_campuses') }}" class="text-info text-decoration-none">Campuses</a>
-        <i class="bi bi-chevron-right"></i>
+        <i class="ph ph-caret-right"></i>
         <a href="{{ url_for('campus.campus_detail', campus_id=project.campus_id) }}" class="text-info text-decoration-none">{{ campus.name }}</a>
-        <i class="bi bi-chevron-right"></i>
+        <i class="ph ph-caret-right"></i>
         <a href="{{ url_for('campus.program_detail', campus_id=project.campus_id, program_name=project.program_type.name) }}" class="text-info text-decoration-none">{{ project.program_type.name }} Projects</a>
-        <i class="bi bi-chevron-right"></i>
+        <i class="ph ph-caret-right"></i>
         <span class="text-white">{{ project.title }}</span>
     </div>
     
@@ -22,18 +22,18 @@
         </div>
         
         <div class="d-flex gap-3">
-            <span class="badge badge-oia badge-role fs-6 py-2 px-3">{{ project.category }}</span>
-            <span class="badge badge-oia badge-status-{{ project.status.lower() }} fs-6 py-2 px-3">{{ project.status }}</span>
+            <span class="aurora-badge aurora-badge--role fs-6 py-2 px-3">{{ project.category }}</span>
+            <span class="aurora-badge aurora-badge--status-{{ project.status.lower() }} fs-6 py-2 px-3">{{ project.status }}</span>
         </div>
     </div>
 </div>
 
 <!-- Progressive Disclosure Top Stats Summary Bar -->
-<div class="project-stats-bar animate-fade-in mb-5">
+<div class="project-stats-bar mb-5">
     <div class="project-stat-item">
         <span class="project-stat-label">Project Status</span>
         <span class="project-stat-value text-capitalize">
-            <span class="badge badge-oia badge-status-{{ project.status.lower() }}">{{ project.status }}</span>
+            <span class="aurora-badge aurora-badge--status-{{ project.status.lower() }}">{{ project.status }}</span>
         </span>
     </div>
     <div class="project-stat-item">
@@ -52,40 +52,40 @@
 
 <!-- Progressive Tab Disclosure: Hide tab list on the landing page, expose on sub-pages -->
 <!-- Desktop Tab Controller -->
-<div class="tabs-control d-none d-lg-flex animate-fade-in mb-5">
+<div class="aurora-tabs d-none d-lg-flex mb-5">
     {% if active_tab == 'overview' %}
-        <a href="?tab=overview" class="tab-link active">Overview</a>
-        <a href="?tab=people" class="tab-link">People</a>
-        <a href="?tab=operations" class="tab-link">Operations</a>
-        <a href="?tab=insights" class="tab-link">Insights</a>
-        <a href="?tab=resources" class="tab-link">Resources</a>
+        <a href="?tab=overview" class="aurora-tab active">Overview</a>
+        <a href="?tab=people" class="aurora-tab">People</a>
+        <a href="?tab=operations" class="aurora-tab">Operations</a>
+        <a href="?tab=insights" class="aurora-tab">Insights</a>
+        <a href="?tab=resources" class="aurora-tab">Resources</a>
     {% else %}
-        <a href="?tab=overview" class="tab-link"><i class="bi bi-arrow-left-short me-1"></i> Back to Landing Page</a>
-        <a href="?tab=people" class="tab-link {% if active_tab == 'people' %}active{% endif %}">People</a>
-        <a href="?tab=operations" class="tab-link {% if active_tab == 'operations' %}active{% endif %}">Operations</a>
-        <a href="?tab=insights" class="tab-link {% if active_tab == 'insights' %}active{% endif %}">Insights</a>
-        <a href="?tab=resources" class="tab-link {% if active_tab == 'resources' %}active{% endif %}">Resources</a>
+        <a href="?tab=overview" class="aurora-tab"><i class="ph ph-arrow-left me-1"></i> Back to Landing Page</a>
+        <a href="?tab=people" class="aurora-tab {% if active_tab == 'people' %}active{% endif %}">People</a>
+        <a href="?tab=operations" class="aurora-tab {% if active_tab == 'operations' %}active{% endif %}">Operations</a>
+        <a href="?tab=insights" class="aurora-tab {% if active_tab == 'insights' %}active{% endif %}">Insights</a>
+        <a href="?tab=resources" class="aurora-tab {% if active_tab == 'resources' %}active{% endif %}">Resources</a>
     {% endif %}
 </div>
 
 <!-- Mobile/Tablet Tab Ribbon (Always Visible, scrollable, contains: Overview, Attendance, People, Resources, Insights) -->
-<div class="mobile-tab-ribbon d-flex d-lg-none animate-fade-in mb-4">
-    <a href="?tab=overview" class="mobile-tab-link {% if active_tab == 'overview' %}active{% endif %}">Overview</a>
-    <a href="?tab=attendance" class="mobile-tab-link {% if active_tab == 'attendance' %}active{% endif %}">Attendance</a>
-    <a href="?tab=people" class="mobile-tab-link {% if active_tab == 'people' %}active{% endif %}">People</a>
-    <a href="?tab=resources" class="mobile-tab-link {% if active_tab == 'resources' %}active{% endif %}">Resources</a>
-    <a href="?tab=insights" class="mobile-tab-link {% if active_tab == 'insights' %}active{% endif %}">Insights</a>
+<div class="mobile-tab-ribbon d-flex d-lg-none mb-4">
+    <a href="?tab=overview" class="mobile-aurora-tab {% if active_tab == 'overview' %}active{% endif %}">Overview</a>
+    <a href="?tab=attendance" class="mobile-aurora-tab {% if active_tab == 'attendance' %}active{% endif %}">Attendance</a>
+    <a href="?tab=people" class="mobile-aurora-tab {% if active_tab == 'people' %}active{% endif %}">People</a>
+    <a href="?tab=resources" class="mobile-aurora-tab {% if active_tab == 'resources' %}active{% endif %}">Resources</a>
+    <a href="?tab=insights" class="mobile-aurora-tab {% if active_tab == 'insights' %}active{% endif %}">Insights</a>
 </div>
 
 <!-- Tab Content Blocks -->
-<div class="tab-content animate-fade-in mt-4">
+<div class="tab-content mt-4">
 
     <!-- 1. OVERVIEW WORKSPACE (Project Landing Page Layout) -->
     {% if active_tab == 'overview' %}
     <div class="row g-4 mb-5">
         <div class="col-md-8">
-            <div class="card-control h-100">
-                <h5 class="card-control-title mb-4"><i class="bi bi-info-circle text-primary"></i> Project Overview</h5>
+            <div class="aurora-card--padded h-100">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-info text-primary"></i> Project Overview</h5>
                 <p class="text-light fs-6 lh-lg">{{ project.description or 'No details written.' }}</p>
                 
                 <h6 class="text-muted fw-bold mt-5 mb-3">Operational Dates</h6>
@@ -94,7 +94,7 @@
                         <span class="text-muted small d-block">Start Date</span>
                         <strong class="text-white">{{ project.start_date.strftime('%B %d, %Y') }}</strong>
                     </div>
-                    <i class="bi bi-arrow-right text-muted"></i>
+                    <i class="ph ph-arrow-right text-muted"></i>
                     <div>
                         <span class="text-muted small d-block">End Date</span>
                         <strong class="text-white">{{ project.end_date.strftime('%B %d, %Y') }}</strong>
@@ -105,8 +105,8 @@
         
         <div class="col-md-4">
             <!-- Latest Session Attendance Status widget -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-4"><i class="bi bi-check2-circle text-primary"></i> Attendance Status</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-check-circle text-primary"></i> Attendance Status</h5>
                 {% if attendance_records %}
                     {% set latest_date = attendance_records[0].date %}
                     {% set latest_records = attendance_records | selectattr('date', 'equalto', latest_date) | list %}
@@ -117,15 +117,15 @@
                         <span class="text-muted small d-block mb-2">Last marked session ({{ latest_date.strftime('%b %d, %Y') }}):</span>
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="text-white fw-bold">{{ present_count }} / {{ total_count }} Present</span>
-                            <span class="badge bg-success">{{ pct }}%</span>
+                            <span class="aurora-badge bg-success">{{ pct }}%</span>
                         </div>
                         <div class="progress-container-custom mt-2">
-                            <div class="progress-bar-custom" style="width: {{ pct }}%;"></div>
+                            <div class="progress-bar-custom" data-progress="{{ pct }}"></div>
                         </div>
                     </div>
                 {% else %}
                     <div class="p-4 border border-secondary rounded bg-dark bg-opacity-25 text-center">
-                        <i class="bi bi-calendar-x text-muted fs-3 mb-2 d-block"></i>
+                        <i class="ph ph-calendar-x text-muted fs-3 mb-2 d-block"></i>
                         <span class="text-muted small">No attendance marked yet.</span>
                     </div>
                 {% endif %}
@@ -150,8 +150,8 @@
             {% endfor %}
             {% set sorted_activities = project_activities | sort(attribute='id', reverse=true) %}
 
-            <div class="card-control h-100">
-                <h5 class="card-control-title mb-4"><i class="bi bi-activity text-primary me-2"></i>Recent Activity Track</h5>
+            <div class="aurora-card--padded h-100">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-activity text-primary me-2"></i>Recent Activity Track</h5>
                 <div class="timeline-stream">
                     {% for act in sorted_activities[:5] %}
                         <div class="timeline-event {% if act.status == 'Approved' %}event-success{% elif act.status == 'Pending' %}event-warning{% endif %}">
@@ -159,13 +159,13 @@
                             <div class="timeline-event-desc">
                                 {{ act.desc }}
                                 {% if act.status == 'Pending' %}
-                                    <span class="badge bg-warning text-dark font-monospace ms-1" style="font-size: 0.65rem;">Pending</span>
+                                    <span class="aurora-badge bg-warning text-dark font-monospace ms-1 text-2xs">Pending</span>
                                 {% endif %}
                             </div>
                         </div>
                     {% else %}
                         <div class="text-center py-4">
-                            <i class="bi bi-calendar-x text-muted fs-3 mb-2 d-block"></i>
+                            <i class="ph ph-calendar-x text-muted fs-3 mb-2 d-block"></i>
                             <span class="text-muted small">No activity logged for this project yet.</span>
                         </div>
                     {% endfor %}
@@ -175,13 +175,13 @@
 
         <div class="col-md-4">
             <!-- Dynamic Upcoming Tasks / Milestone checklist widget -->
-            <div class="card-control">
-                <h5 class="card-control-title mb-4"><i class="bi bi-card-checklist text-primary"></i> Workspace Milestones</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-list-checks text-primary"></i> Workspace Milestones</h5>
                 <div class="checklist-wrapper">
                     <!-- Milestone 1 -->
                     <div class="checklist-item {% if summary.total_participants > 0 %}completed{% endif %}">
                         <span class="checklist-item-check text-{% if summary.total_participants > 0 %}success{% else %}muted{% endif %}">
-                            <i class="bi {% if summary.total_participants > 0 %}bi-check-square-fill{% else %}bi-square{% endif %}"></i>
+                            <i class="ph {% if summary.total_participants > 0 %}ph-check-square{% else %}ph-square{% endif %}"></i>
                         </span>
                         <span class="checklist-item-text">Enroll initial participants</span>
                     </div>
@@ -189,7 +189,7 @@
                     <!-- Milestone 2 -->
                     <div class="checklist-item {% if summary.document_count > 0 %}completed{% endif %}">
                         <span class="checklist-item-check text-{% if summary.document_count > 0 %}success{% else %}muted{% endif %}">
-                            <i class="bi {% if summary.document_count > 0 %}bi-check-square-fill{% else %}bi-square{% endif %}"></i>
+                            <i class="ph {% if summary.document_count > 0 %}ph-check-square{% else %}ph-square{% endif %}"></i>
                         </span>
                         <span class="checklist-item-text">Setup drive resources</span>
                     </div>
@@ -198,7 +198,7 @@
                     {% if project.program_type.name == 'IGP' %}
                     <div class="checklist-item {% if summary.buddy_count > 0 %}completed{% endif %}">
                         <span class="checklist-item-check text-{% if summary.buddy_count > 0 %}success{% else %}muted{% endif %}">
-                            <i class="bi {% if summary.buddy_count > 0 %}bi-check-square-fill{% else %}bi-square{% endif %}"></i>
+                            <i class="ph {% if summary.buddy_count > 0 %}ph-check-square{% else %}ph-square{% endif %}"></i>
                         </span>
                         <span class="checklist-item-text">Establish buddy pairings</span>
                     </div>
@@ -207,7 +207,7 @@
                     <!-- Milestone 4 -->
                     <div class="checklist-item {% if attendance_records %}completed{% endif %}">
                         <span class="checklist-item-check text-{% if attendance_records %}success{% else %}muted{% endif %}">
-                            <i class="bi {% if attendance_records %}bi-check-square-fill{% else %}bi-square{% endif %}"></i>
+                            <i class="ph {% if attendance_records %}ph-check-square{% else %}ph-square{% endif %}"></i>
                         </span>
                         <span class="checklist-item-text">Log daily attendance</span>
                     </div>
@@ -215,7 +215,7 @@
                     <!-- Milestone 5 -->
                     <div class="checklist-item {% if feedback_analytics.total_feedback > 0 %}completed{% endif %}">
                         <span class="checklist-item-check text-{% if feedback_analytics.total_feedback > 0 %}success{% else %}muted{% endif %}">
-                            <i class="bi {% if feedback_analytics.total_feedback > 0 %}bi-check-square-fill{% else %}bi-square{% endif %}"></i>
+                            <i class="ph {% if feedback_analytics.total_feedback > 0 %}ph-check-square{% else %}ph-square{% endif %}"></i>
                         </span>
                         <span class="checklist-item-text">Collect feedback reviews</span>
                     </div>
@@ -225,10 +225,10 @@
     </div>
 
     <!-- Progressive Disclosure Explorer Button -->
-    <div class="text-center my-5 animate-fade-in d-none d-lg-block">
-        <a href="?tab=people" class="btn btn-lg btn-primary px-5 py-3 rounded-pill shadow-lg d-inline-flex align-items-center gap-3">
+    <div class="text-center my-5 d-none d-lg-block">
+        <a href="?tab=people" class="aurora-button--large aurora-button--primary px-5 py-3 rounded-pill shadow-lg d-inline-flex align-items-center gap-3">
             <span class="fw-bold">Explore Project Workspaces</span>
-            <i class="bi bi-arrow-right fs-4"></i>
+            <i class="ph ph-arrow-right fs-4"></i>
         </a>
     </div>
     {% endif %}
@@ -241,24 +241,24 @@
         <!-- Faculty/Core: Pending Contributions Verification -->
         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
             <!-- Pending Contributions -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-clock-fill text-warning me-2"></i>Verify Contribution Hours</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-clock text-warning me-2"></i>Verify Contribution Hours</h5>
                 {% set campus_pending_contribs = contributions | selectattr('status', 'equalto', 'Pending') | list %}
                 {% if campus_pending_contribs %}
                     <div class="d-flex flex-column gap-3">
                         {% for c in campus_pending_contribs %}
-                            <div class="p-3 rounded border border-warning" style="background: rgba(234, 179, 8, 0.05);">
+                            <div class="p-3 rounded border border-warning surface-warning">
                                 <div class="fw-bold text-white mb-1">{{ c.user.username }}</div>
                                 <div class="text-muted small mb-2">{{ c.activity_type }} ({{ c.division }}) &bull; <strong>{{ c.duration_hours }} hrs</strong></div>
-                                <div class="text-muted small mb-3" style="font-style: italic;">"{{ c.description or '-' }}"</div>
+                                <div class="text-muted small mb-3 text-italic">"{{ c.description or '-' }}"</div>
                                 <div class="d-flex gap-2">
                                     <form action="{{ url_for('campus.verify_contribution', campus_id=project.campus_id, project_id=project.id, contrib_id=c.id) }}" method="POST" class="flex-grow-1">
                                         <input type="hidden" name="action" value="approve">
-                                        <button type="submit" class="btn btn-success w-100 py-1.5 small"><i class="bi bi-check"></i> Approve</button>
+                                        <button type="submit" class="aurora-button--success w-100 py-1.5 small"><i class="ph ph-check"></i> Approve</button>
                                     </form>
                                     <form action="{{ url_for('campus.verify_contribution', campus_id=project.campus_id, project_id=project.id, contrib_id=c.id) }}" method="POST" class="flex-grow-1">
                                         <input type="hidden" name="action" value="reject">
-                                        <button type="submit" class="btn btn-outline-danger w-100 py-1.5 small"><i class="bi bi-x"></i> Reject</button>
+                                        <button type="submit" class="aurora-button--outline-danger w-100 py-1.5 small"><i class="ph ph-x"></i> Reject</button>
                                     </form>
                                 </div>
                             </div>
@@ -271,26 +271,26 @@
 
             <!-- IGP: Pending Buddy Logs Verification -->
             {% if project.program_type.name == 'IGP' %}
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-chat-heart-fill text-warning me-2"></i>Verify Buddy Logs</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-chat-heart-fill text-warning me-2"></i>Verify Buddy Logs</h5>
                 {% set campus_pending_buddies = buddy_logs | selectattr('status', 'equalto', 'Pending') | list %}
                 {% if campus_pending_buddies %}
                     <div class="d-flex flex-column gap-3">
                         {% for b in campus_pending_buddies %}
-                            <div class="p-3 rounded border border-warning" style="background: rgba(234, 179, 8, 0.05);">
+                            <div class="p-3 rounded border border-warning surface-warning">
                                 <div class="fw-bold text-white mb-1">
                                     {{ b.assignment.buddy.username }} &harr; {{ b.assignment.exchange_student.username }}
                                 </div>
-                                <div class="text-muted small mb-2"><i class="bi bi-calendar"></i> {{ b.activity_date.strftime('%b %d') }} &bull; <strong>{{ b.duration_hours }} hrs</strong></div>
-                                <div class="text-muted small mb-3" style="font-style: italic;">"{{ b.description }}"</div>
+                                <div class="text-muted small mb-2"><i class="ph ph-calendar"></i> {{ b.activity_date.strftime('%b %d') }} &bull; <strong>{{ b.duration_hours }} hrs</strong></div>
+                                <div class="text-muted small mb-3 text-italic">"{{ b.description }}"</div>
                                 <div class="d-flex gap-2">
                                     <form action="{{ url_for('campus.verify_buddy_log', campus_id=project.campus_id, project_id=project.id, log_id=b.id) }}" method="POST" class="flex-grow-1">
                                         <input type="hidden" name="action" value="approve">
-                                        <button type="submit" class="btn btn-success w-100 py-1.5 small"><i class="bi bi-check"></i> Approve</button>
+                                        <button type="submit" class="aurora-button--success w-100 py-1.5 small"><i class="ph ph-check"></i> Approve</button>
                                     </form>
                                     <form action="{{ url_for('campus.verify_buddy_log', campus_id=project.campus_id, project_id=project.id, log_id=b.id) }}" method="POST" class="flex-grow-1">
                                         <input type="hidden" name="action" value="reject">
-                                        <button type="submit" class="btn btn-outline-danger w-100 py-1.5 small"><i class="bi bi-x"></i> Reject</button>
+                                        <button type="submit" class="aurora-button--outline-danger w-100 py-1.5 small"><i class="ph ph-x"></i> Reject</button>
                                     </form>
                                 </div>
                             </div>
@@ -305,12 +305,12 @@
 
         <!-- Volunteer/Buddy: Log Hours Form -->
         {% if g.user.role in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy', 'Faculty'] %}
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Log Work Hours</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-pencil-simple text-primary me-2"></i>Log Work Hours</h5>
                 <form action="{{ url_for('campus.log_contribution', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="act_type_mob" class="form-label-oia">Activity Type</label>
-                        <select id="act_type_mob" name="activity_type" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="act_type_mob" class="aurora-label">Activity Type</label>
+                        <select id="act_type_mob" name="activity_type" class="aurora-input" required>
                             <option value="Event support">Event support</option>
                             <option value="Media support">Media support</option>
                             <option value="Logistics support">Logistics support</option>
@@ -319,9 +319,9 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="division_mob" class="form-label-oia">Division</label>
-                        <select id="division_mob" name="division" class="form-input-oia">
+                    <div class="aurora-field">
+                        <label for="division_mob" class="aurora-label">Division</label>
+                        <select id="division_mob" name="division" class="aurora-input">
                             <option value="Graphic design">Graphic design</option>
                             <option value="Photography">Photography</option>
                             <option value="Operations">Operations</option>
@@ -330,17 +330,17 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="hours_mob" class="form-label-oia">Duration (Hours)</label>
-                        <input type="number" step="0.5" min="0.5" max="24" id="hours_mob" name="duration_hours" class="form-input-oia" required placeholder="e.g. 2.0">
+                    <div class="aurora-field">
+                        <label for="hours_mob" class="aurora-label">Duration (Hours)</label>
+                        <input type="number" step="0.5" min="0.5" max="24" id="hours_mob" name="duration_hours" class="aurora-input" required placeholder="e.g. 2.0">
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="desc_mob" class="form-label-oia">Description</label>
-                        <textarea id="desc_mob" name="description" class="form-input-oia" rows="2" required placeholder="Explain your contribution..."></textarea>
+                    <div class="aurora-field">
+                        <label for="desc_mob" class="aurora-label">Description</label>
+                        <textarea id="desc_mob" name="description" class="aurora-input" rows="2" required placeholder="Explain your contribution..."></textarea>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary w-100 py-2.5">Submit Log Entry</button>
+                    <button type="submit" class="aurora-button--primary w-100 py-2.5">Submit Log Entry</button>
                 </form>
             </div>
 
@@ -348,34 +348,34 @@
             {% if project.program_type.name == 'IGP' %}
                 {% set user_assignments_mob = buddy_assignments | selectattr('buddy_user_id', 'equalto', g.user.id) | list %}
                 {% if user_assignments_mob %}
-                <div class="card-control mb-4">
-                    <h5 class="card-control-title mb-3"><i class="bi bi-journal-plus text-info me-2"></i>Log Buddy Interaction</h5>
+                <div class="aurora-card--padded mb-4">
+                    <h5 class="aurora-card__title mb-3"><i class="ph ph-notebook text-info me-2"></i>Log Buddy Interaction</h5>
                     <form action="{{ url_for('campus.log_buddy_interaction', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                        <div class="form-group-oia">
-                            <label for="buddy_assignment_id_mob" class="form-label-oia">Select Paired Student</label>
-                            <select id="buddy_assignment_id_mob" name="buddy_assignment_id" class="form-input-oia" required>
+                        <div class="aurora-field">
+                            <label for="buddy_assignment_id_mob" class="aurora-label">Select Paired Student</label>
+                            <select id="buddy_assignment_id_mob" name="buddy_assignment_id" class="aurora-input" required>
                                 {% for ua in user_assignments_mob %}
                                     <option value="{{ ua.id }}">{{ ua.exchange_student.username }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         
-                        <div class="form-group-oia">
-                            <label for="act_date_buddy" class="form-label-oia">Activity Date</label>
-                            <input type="date" id="act_date_buddy" name="activity_date" class="form-input-oia" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
+                        <div class="aurora-field">
+                            <label for="act_date_buddy" class="aurora-label">Activity Date</label>
+                            <input type="date" id="act_date_buddy" name="activity_date" class="aurora-input" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                         </div>
 
-                        <div class="form-group-oia">
-                            <label for="duration_buddy" class="form-label-oia">Duration (Hours)</label>
-                            <input type="number" step="0.5" id="duration_buddy" name="duration_hours" class="form-input-oia" required placeholder="e.g. 1.5">
+                        <div class="aurora-field">
+                            <label for="duration_buddy" class="aurora-label">Duration (Hours)</label>
+                            <input type="number" step="0.5" id="duration_buddy" name="duration_hours" class="aurora-input" required placeholder="e.g. 1.5">
                         </div>
 
-                        <div class="form-group-oia">
-                            <label for="buddy_desc_mob" class="form-label-oia">Description</label>
-                            <textarea id="buddy_desc_mob" name="description" class="form-input-oia" rows="2" required placeholder="Describe your interaction..."></textarea>
+                        <div class="aurora-field">
+                            <label for="buddy_desc_mob" class="aurora-label">Description</label>
+                            <textarea id="buddy_desc_mob" name="description" class="aurora-input" rows="2" required placeholder="Describe your interaction..."></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-info text-dark w-100 py-2.5">Log Interaction</button>
+                        <button type="submit" class="aurora-button--info text-dark w-100 py-2.5">Log Interaction</button>
                     </form>
                 </div>
                 {% endif %}
@@ -386,20 +386,20 @@
     <!-- LEVEL 1: OVERVIEW -->
     <div class="row g-4 mb-5">
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Total Enrolled Registry</span>
                 <strong class="text-white fs-3 d-block mt-2">{{ participants | length }} Participants</strong>
             </div>
         </div>
         {% if project.program_type.name == 'IGP' %}
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Active Buddies</span>
                 <strong class="text-info fs-3 d-block mt-2">{{ project_buddies | length }} Buddies</strong>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Exchange Students</span>
                 <strong class="text-success fs-3 d-block mt-2">{{ project_exchange_students | length }} Students</strong>
             </div>
@@ -412,20 +412,20 @@
     <div class="row g-4 mb-5">
         <!-- Enroll Form (Primary Action) -->
         <div class="col-md-6">
-            <div class="card-control h-100">
+            <div class="aurora-card--padded h-100">
                 <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h5 class="card-control-title mb-0"><i class="bi bi-person-plus text-primary"></i> Enroll Participant</h5>
+                    <h5 class="aurora-card__title mb-0"><i class="ph ph-user-plus text-primary"></i> Enroll Participant</h5>
                     
                     <!-- Secondary Actions Dropdown -->
                     {% if project.program_type.name == 'IGP' %}
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="peopleActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-three-dots"></i> More
+                    <div class="aurora-menu">
+                        <button class="aurora-button--small aurora-button--secondary aurora-menu__trigger" type="button" id="peopleActionsDropdown" data-ui-toggle="aurora-menu" aria-expanded="false">
+                            <i class="ph ph-dots-three"></i> More
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="peopleActionsDropdown">
+                        <ul class="aurora-menu__popover aurora-menu__popover--dark" aria-labelledby="peopleActionsDropdown">
                             <li>
-                                <button class="dropdown-item" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyPairingForm" aria-expanded="false" aria-controls="collapseBuddyPairingForm">
-                                    <i class="bi bi-node-plus-fill me-2 text-info"></i> Setup Buddy Pairing
+                                <button class="aurora-menu__item" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyPairingForm" aria-expanded="false" aria-controls="collapseBuddyPairingForm">
+                                    <i class="ph ph-tree-structure me-2 text-info"></i> Setup Buddy Pairing
                                 </button>
                             </li>
                         </ul>
@@ -435,9 +435,9 @@
                 
                 {% if available_users %}
                     <form action="{{ url_for('campus.add_participant', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                        <div class="form-group-oia">
-                            <label for="user_id" class="form-label-oia">Select Registered User</label>
-                            <select id="user_id" name="user_id" class="form-input-oia" required>
+                        <div class="aurora-field">
+                            <label for="user_id" class="aurora-label">Select Registered User</label>
+                            <select id="user_id" name="user_id" class="aurora-input" required>
                                 <option value="" disabled selected>Select User</option>
                                 {% for u in available_users %}
                                     <option value="{{ u.id }}">{{ u.username }} (Requested: {{ u.preferred_role }})</option>
@@ -445,9 +445,9 @@
                             </select>
                         </div>
                         
-                        <div class="form-group-oia">
-                            <label for="part_role" class="form-label-oia">Project Assignment Role</label>
-                            <select id="part_role" name="participant_type" class="form-input-oia" required>
+                        <div class="aurora-field">
+                            <label for="part_role" class="aurora-label">Project Assignment Role</label>
+                            <select id="part_role" name="participant_type" class="aurora-input" required>
                                 <option value="Volunteer">Volunteer</option>
                                 {% if project.program_type.name == 'IGP' %}
                                 <option value="Buddy">Buddy</option>
@@ -459,12 +459,12 @@
                             </select>
                         </div>
 
-                        <div class="form-group-oia">
-                            <label for="nationality" class="form-label-oia">Nationality (For Exchange / Attendee)</label>
-                            <input type="text" id="nationality" name="nationality" class="form-input-oia" placeholder="Indian (Default)">
+                        <div class="aurora-field">
+                            <label for="nationality" class="aurora-label">Nationality (For Exchange / Attendee)</label>
+                            <input type="text" id="nationality" name="nationality" class="aurora-input" placeholder="Indian (Default)">
                         </div>
                         
-                        <button type="submit" class="btn-oia-primary w-100 mt-2">Enroll In Project</button>
+                        <button type="submit" class="aurora-button--primary w-100 mt-2">Enroll In Project</button>
                     </form>
                 {% else %}
                     <p class="text-muted small">All approved user accounts are already registered for this project.</p>
@@ -474,15 +474,15 @@
 
         <!-- Buddy Assignment Pairing Form (Secondary Action - Collapsed by default) -->
         {% if project.program_type.name == 'IGP' %}
-        <div class="col-md-6 collapse" id="collapseBuddyPairingForm">
-            <div class="card-control h-100 border border-info bg-dark bg-opacity-25">
-                <h5 class="card-control-title mb-4"><i class="bi bi-node-plus text-info"></i> Create Buddy Assignment Pairing</h5>
+        <div class="col-md-6 aurora-collapse" id="collapseBuddyPairingForm">
+            <div class="aurora-card--padded h-100 border border-info bg-dark bg-opacity-25">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-tree-structure text-info"></i> Create Buddy Assignment Pairing</h5>
                 
                 {% if project_buddies and project_exchange_students %}
                     <form action="{{ url_for('campus.assign_buddy', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                        <div class="form-group-oia">
-                            <label for="buddy_user_id" class="form-label-oia">Select Local Buddy</label>
-                            <select id="buddy_user_id" name="buddy_user_id" class="form-input-oia" required>
+                        <div class="aurora-field">
+                            <label for="buddy_user_id" class="aurora-label">Select Local Buddy</label>
+                            <select id="buddy_user_id" name="buddy_user_id" class="aurora-input" required>
                                 <option value="" disabled selected>Select Buddy</option>
                                 {% for b in project_buddies %}
                                     <option value="{{ b.id }}">{{ b.username }}</option>
@@ -490,9 +490,9 @@
                             </select>
                         </div>
                         
-                        <div class="form-group-oia">
-                            <label for="exchange_student_id" class="form-label-oia">Select Incoming Student</label>
-                            <select id="exchange_student_id" name="exchange_student_id" class="form-input-oia" required>
+                        <div class="aurora-field">
+                            <label for="exchange_student_id" class="aurora-label">Select Incoming Student</label>
+                            <select id="exchange_student_id" name="exchange_student_id" class="aurora-input" required>
                                 <option value="" disabled selected>Select Student</option>
                                 {% for s in project_exchange_students %}
                                     <option value="{{ s.id }}">{{ s.username }} ({{ s.campus.name if s.campus else 'International' }})</option>
@@ -502,20 +502,20 @@
 
                         <div class="row">
                             <div class="col-6">
-                                <div class="form-group-oia">
-                                    <label for="start_date" class="form-label-oia">Start Date</label>
-                                    <input type="date" id="start_date" name="start_date" class="form-input-oia" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
+                                <div class="aurora-field">
+                                    <label for="start_date" class="aurora-label">Start Date</label>
+                                    <input type="date" id="start_date" name="start_date" class="aurora-input" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="form-group-oia">
-                                    <label for="end_date" class="form-label-oia">End Date</label>
-                                    <input type="date" id="end_date" name="end_date" class="form-input-oia" required value="{{ project.end_date.strftime('%Y-%m-%d') }}">
+                                <div class="aurora-field">
+                                    <label for="end_date" class="aurora-label">End Date</label>
+                                    <input type="date" id="end_date" name="end_date" class="aurora-input" required value="{{ project.end_date.strftime('%Y-%m-%d') }}">
                                 </div>
                             </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-info text-dark w-100 mt-3 fw-bold py-2">Establish Pairing</button>
+                        <button type="submit" class="aurora-button--info text-dark w-100 mt-3 fw-bold py-2">Establish Pairing</button>
                     </form>
                 {% else %}
                     <p class="text-muted small">
@@ -531,22 +531,22 @@
     <!-- LEVEL 3: DETAILED RECORDS (Collapsible Tables) -->
     <div class="row g-4">
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-journal-text text-primary"></i> Detailed Registry Audit Logs</h5>
-                <p class="text-muted small mb-4">Detailed lists of student enrollments and buddy pairings are collapsed below to reduce visual clutter.</p>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-notebook text-primary"></i> Detailed Registry Audit Logs</h5>
+                <p class="text-muted small mb-4">Detailed lists of student enrollments and buddy pairings are is-collapsed below to reduce visual clutter.</p>
                 
                 <div class="d-flex flex-column gap-3">
                     <!-- Collapse Trigger 1: Registry -->
                     <div>
-                        <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRegistryTable" aria-expanded="false" aria-controls="collapseRegistryTable">
-                            <span><i class="bi bi-people-fill me-2"></i> View Participant Registry Table ({{ participants | length }} records)</span>
-                            <i class="bi bi-chevron-expand"></i>
+                        <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseRegistryTable" aria-expanded="false" aria-controls="collapseRegistryTable">
+                            <span><i class="ph ph-users-three me-2"></i> View Participant Registry Table ({{ participants | length }} records)</span>
+                            <i class="ph ph-caret-up-down"></i>
                         </button>
-                        <div class="collapse mt-3" id="collapseRegistryTable">
+                        <div class="aurora-collapse mt-3" id="collapseRegistryTable">
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                 {% if participants %}
-                                    <div class="table-responsive">
-                                        <table class="table-oia table-to-cards">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--cards">
                                             <thead>
                                                 <tr>
                                                     <th>Username</th>
@@ -560,10 +560,10 @@
                                                 {% for pt in participants %}
                                                     <tr>
                                                         <td data-label="Username" class="fw-bold text-white">{{ pt.user.username }}</td>
-                                                        <td data-label="Assigned Role"><span class="badge badge-oia badge-role">{{ pt.participant_type }}</span></td>
+                                                        <td data-label="Assigned Role"><span class="aurora-badge aurora-badge--role">{{ pt.participant_type }}</span></td>
                                                         <td data-label="Nationality">{{ pt.nationality or 'Indian' }}</td>
                                                         <td data-label="Enrolled Date" class="small text-muted">{{ pt.registration_date.strftime('%Y-%m-%d %H:%M') if pt.registration_date else 'N/A' }}</td>
-                                                        <td data-label="Status"><span class="badge badge-oia badge-status-{{ pt.status.lower() }}">{{ pt.status }}</span></td>
+                                                        <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ pt.status.lower() }}">{{ pt.status }}</span></td>
                                                     </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -579,15 +579,15 @@
                     <!-- Collapse Trigger 2: Buddy assignments (IGP only) -->
                     {% if project.program_type.name == 'IGP' %}
                     <div>
-                        <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyPairingsTable" aria-expanded="false" aria-controls="collapseBuddyPairingsTable">
-                            <span><i class="bi bi-person-hearts me-2"></i> View Buddy Assignment Registry ({{ buddy_assignments | length }} pairings)</span>
-                            <i class="bi bi-chevron-expand"></i>
+                        <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyPairingsTable" aria-expanded="false" aria-controls="collapseBuddyPairingsTable">
+                            <span><i class="ph ph-users-three me-2"></i> View Buddy Assignment Registry ({{ buddy_assignments | length }} pairings)</span>
+                            <i class="ph ph-caret-up-down"></i>
                         </button>
-                        <div class="collapse mt-3" id="collapseBuddyPairingsTable">
+                        <div class="aurora-collapse mt-3" id="collapseBuddyPairingsTable">
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                 {% if buddy_assignments %}
-                                    <div class="table-responsive">
-                                        <table class="table-oia table-to-cards">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--cards">
                                             <thead>
                                                 <tr>
                                                     <th>Local Buddy</th>
@@ -602,7 +602,7 @@
                                                         <td data-label="Local Buddy" class="fw-bold text-white">{{ ba.buddy.username }}</td>
                                                         <td data-label="International Student" class="text-info fw-bold">{{ ba.exchange_student.username }}</td>
                                                         <td data-label="Timeline" class="small">{{ ba.start_date.strftime('%Y-%m-%d') }} to {{ ba.end_date.strftime('%Y-%m-%d') }}</td>
-                                                        <td data-label="Status"><span class="badge badge-oia badge-status-{{ ba.status.lower() }}">{{ ba.status }}</span></td>
+                                                        <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ ba.status.lower() }}">{{ ba.status }}</span></td>
                                                     </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -626,7 +626,7 @@
     <div class="row g-4 mb-4">
         <!-- Attendance Stats KPI -->
         <div class="col-12">
-            <div class="card-control text-center py-3">
+            <div class="aurora-card--padded text-center py-3">
                 <span class="project-stat-label">Daily Attendance Rate</span>
                 <strong class="text-white fs-4 d-block mt-1">{{ summary.attendance_rate }}% ({{ attendance_records|length }} marks)</strong>
             </div>
@@ -635,35 +635,35 @@
         <!-- Faculty/Core: Mark Attendance Form -->
         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-check-square text-success me-2"></i>Record Attendance</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-check-square text-success me-2"></i>Record Attendance</h5>
                 {% if participants %}
                     <form action="{{ url_for('campus.mark_attendance', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                        <div class="form-group-oia">
-                            <label for="att_date_mob" class="form-label-oia">Select Date</label>
-                            <input type="date" id="att_date_mob" name="date" class="form-input-oia" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
+                        <div class="aurora-field">
+                            <label for="att_date_mob" class="aurora-label">Select Date</label>
+                            <input type="date" id="att_date_mob" name="date" class="aurora-input" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                         </div>
                         
                         <h6 class="text-muted small fw-bold mb-2">Roll Call</h6>
-                        <div class="d-flex flex-column gap-2 mb-3 shadow-sm p-1 rounded" style="max-height: 250px; overflow-y: auto; background: var(--bg-navy-dark);">
+                        <div class="d-flex flex-column gap-2 mb-3 shadow-sm p-1 rounded activity-scroll-pane">
                             {% for pt in participants %}
                                 <div class="d-flex align-items-center justify-content-between p-2 border border-secondary rounded bg-dark bg-opacity-25">
                                     <span class="text-white fw-bold small">{{ pt.user.username }}</span>
                                     <div class="d-flex gap-2">
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="status_{{ pt.user.id }}" id="pres_mob_{{ pt.user.id }}" value="Present" checked>
-                                            <label class="form-check-label text-success small" for="pres_mob_{{ pt.user.id }}">P</label>
+                                        <div class="aurora-choice aurora-choice--inline">
+                                            <input class="aurora-choice__input" type="radio" name="status_{{ pt.user.id }}" id="pres_mob_{{ pt.user.id }}" value="Present" checked>
+                                            <label class="aurora-choice__label text-success small" for="pres_mob_{{ pt.user.id }}">P</label>
                                         </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="status_{{ pt.user.id }}" id="abs_mob_{{ pt.user.id }}" value="Absent">
-                                            <label class="form-check-label text-danger small" for="abs_mob_{{ pt.user.id }}">A</label>
+                                        <div class="aurora-choice aurora-choice--inline">
+                                            <input class="aurora-choice__input" type="radio" name="status_{{ pt.user.id }}" id="abs_mob_{{ pt.user.id }}" value="Absent">
+                                            <label class="aurora-choice__label text-danger small" for="abs_mob_{{ pt.user.id }}">A</label>
                                         </div>
                                     </div>
                                 </div>
                             {% endfor %}
                         </div>
                         
-                        <button type="submit" class="btn btn-success w-100 py-2.5">Submit Attendance Logs</button>
+                        <button type="submit" class="aurora-button--success w-100 py-2.5">Submit Attendance Logs</button>
                     </form>
                 {% else %}
                     <p class="text-muted small">No participants enrolled yet.</p>
@@ -674,11 +674,11 @@
 
         <!-- Attendance Logs Table-to-Cards -->
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-card-checklist text-primary me-2"></i>Attendance Log History</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-list-checks text-primary me-2"></i>Attendance Log History</h5>
                 {% if attendance_records %}
-                    <div class="table-responsive">
-                        <table class="table-oia table-to-cards">
+                    <div class="aurora-table-scroll">
+                        <table class="aurora-table--cards">
                             <thead>
                                 <tr>
                                     <th>Date</th>
@@ -693,10 +693,10 @@
                                         <td data-label="Date" class="fw-bold text-white">{{ att.date.strftime('%Y-%m-%d') }}</td>
                                         <td data-label="Participant">
                                             {{ att.user.username }}
-                                            <span class="badge bg-dark text-muted font-monospace ms-1" style="font-size: 0.6rem;">{{ att.user.role }}</span>
+                                            <span class="aurora-badge bg-dark text-muted font-monospace ms-1 text-micro">{{ att.user.role }}</span>
                                         </td>
                                         <td data-label="Status">
-                                            <span class="badge badge-oia badge-status-{{ att.status.lower() }}">{{ att.status }}</span>
+                                            <span class="aurora-badge aurora-badge--status-{{ att.status.lower() }}">{{ att.status }}</span>
                                         </td>
                                         <td data-label="Verified By" class="small text-muted">{{ att.verifier.username if att.verifier else "System" }}</td>
                                     </tr>
@@ -718,20 +718,20 @@
     <!-- LEVEL 1: OVERVIEW -->
     <div class="row g-4 mb-5">
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Attendance Rate</span>
                 <strong class="text-white fs-3 d-block mt-2">{{ summary.attendance_rate }}% ({{ attendance_records|length }} marks)</strong>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Total Contribution Work Hours</span>
                 <strong class="text-primary fs-3 d-block mt-2">{{ summary.total_contribution_hours }} hrs Approved</strong>
             </div>
         </div>
         {% if project.program_type.name == 'IGP' %}
         <div class="col-md-4">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">Buddy Log Logs</span>
                 <strong class="text-success fs-3 d-block mt-2">{{ summary.buddy_count }} Logs Filed</strong>
             </div>
@@ -744,19 +744,19 @@
         <!-- Faculty / Core View: Record Daily Attendance is Primary -->
         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
         <div class="col-md-6 mx-auto">
-            <div class="card-control h-100">
+            <div class="aurora-card--padded h-100">
                 <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h5 class="card-control-title mb-0"><i class="bi bi-check-square-fill text-success"></i> Record Daily Attendance</h5>
+                    <h5 class="aurora-card__title mb-0"><i class="ph ph-check-square-fill text-success"></i> Record Daily Attendance</h5>
                     
                     <!-- Secondary actions for Faculty -->
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="opsFacultyDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-three-dots"></i> More
+                    <div class="aurora-menu">
+                        <button class="aurora-button--small aurora-button--secondary aurora-menu__trigger" type="button" id="opsFacultyDropdown" data-ui-toggle="aurora-menu" aria-expanded="false">
+                            <i class="ph ph-dots-three"></i> More
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="opsFacultyDropdown">
+                        <ul class="aurora-menu__popover aurora-menu__popover--dark" aria-labelledby="opsFacultyDropdown">
                             <li>
-                                <button class="dropdown-item" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFacultyContribForm" aria-expanded="false" aria-controls="collapseFacultyContribForm">
-                                    <i class="bi bi-pencil-square me-2 text-primary"></i> Log Personal Contribution
+                                <button class="aurora-menu__item" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseFacultyContribForm" aria-expanded="false" aria-controls="collapseFacultyContribForm">
+                                    <i class="ph ph-pencil-simple me-2 text-primary"></i> Log Personal Contribution
                                 </button>
                             </li>
                         </ul>
@@ -765,13 +765,13 @@
                 
                 {% if participants %}
                     <form action="{{ url_for('campus.mark_attendance', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                        <div class="form-group-oia">
-                            <label for="att_date" class="form-label-oia">Select Date</label>
-                            <input type="date" id="att_date" name="date" class="form-input-oia" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
+                        <div class="aurora-field">
+                            <label for="att_date" class="aurora-label">Select Date</label>
+                            <input type="date" id="att_date" name="date" class="aurora-input" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                         </div>
                         
                         <h6 class="text-muted small fw-bold mb-3">Participant Roll Call</h6>
-                        <div class="d-flex flex-column gap-3 mb-4 shadow-sm p-2 rounded" style="max-height: 250px; overflow-y: auto; background: var(--bg-navy-dark);">
+                        <div class="d-flex flex-column gap-3 mb-4 shadow-sm p-2 rounded activity-scroll-pane">
                             {% for pt in participants %}
                                 <div class="d-flex align-items-center justify-content-between p-2 border border-secondary rounded bg-dark bg-opacity-25">
                                     <div class="d-flex align-items-center gap-2">
@@ -779,20 +779,20 @@
                                         <span class="text-white fw-bold small">{{ pt.user.username }}</span>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="status_{{ pt.user.id }}" id="pres_{{ pt.user.id }}" value="Present" checked>
-                                            <label class="form-check-label text-success small" for="pres_{{ pt.user.id }}">P</label>
+                                        <div class="aurora-choice aurora-choice--inline">
+                                            <input class="aurora-choice__input" type="radio" name="status_{{ pt.user.id }}" id="pres_{{ pt.user.id }}" value="Present" checked>
+                                            <label class="aurora-choice__label text-success small" for="pres_{{ pt.user.id }}">P</label>
                                         </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="status_{{ pt.user.id }}" id="abs_{{ pt.user.id }}" value="Absent">
-                                            <label class="form-check-label text-danger small" for="abs_{{ pt.user.id }}">A</label>
+                                        <div class="aurora-choice aurora-choice--inline">
+                                            <input class="aurora-choice__input" type="radio" name="status_{{ pt.user.id }}" id="abs_{{ pt.user.id }}" value="Absent">
+                                            <label class="aurora-choice__label text-danger small" for="abs_{{ pt.user.id }}">A</label>
                                         </div>
                                     </div>
                                 </div>
                             {% endfor %}
                         </div>
                         
-                        <button type="submit" class="btn-oia-primary w-100">Submit Attendance Logs</button>
+                        <button type="submit" class="aurora-button--primary w-100">Submit Attendance Logs</button>
                     </form>
                 {% else %}
                     <p class="text-muted small">Please enroll participants to roll call.</p>
@@ -801,34 +801,34 @@
         </div>
 
         <!-- Collapsible personal contribution logger for faculty -->
-        <div class="col-md-6 collapse" id="collapseFacultyContribForm">
-            <div class="card-control h-100 border border-primary bg-dark bg-opacity-25">
-                <h5 class="card-control-title mb-4"><i class="bi bi-pencil-square text-primary"></i> Log Project Contribution</h5>
+        <div class="col-md-6 aurora-collapse" id="collapseFacultyContribForm">
+            <div class="aurora-card--padded h-100 border border-primary bg-dark bg-opacity-25">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-pencil-simple text-primary"></i> Log Project Contribution</h5>
                 <form action="{{ url_for('campus.log_contribution', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="fac_act_type" class="form-label-oia">Activity Type</label>
-                        <select id="fac_act_type" name="activity_type" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="fac_act_type" class="aurora-label">Activity Type</label>
+                        <select id="fac_act_type" name="activity_type" class="aurora-input" required>
                             <option value="Administrative">Administrative</option>
                             <option value="Event support">Event support</option>
                             <option value="Documentation">Documentation</option>
                         </select>
                     </div>
-                    <div class="form-group-oia">
-                        <label for="fac_division" class="form-label-oia">Division</label>
-                        <select id="fac_division" name="division" class="form-input-oia">
+                    <div class="aurora-field">
+                        <label for="fac_division" class="aurora-label">Division</label>
+                        <select id="fac_division" name="division" class="aurora-input">
                             <option value="Operations" selected>Operations</option>
                             <option value="General">General</option>
                         </select>
                     </div>
-                    <div class="form-group-oia">
-                        <label for="fac_hours" class="form-label-oia">Duration (Hours)</label>
-                        <input type="number" step="0.5" id="fac_hours" name="duration_hours" class="form-input-oia" required value="1.0">
+                    <div class="aurora-field">
+                        <label for="fac_hours" class="aurora-label">Duration (Hours)</label>
+                        <input type="number" step="0.5" id="fac_hours" name="duration_hours" class="aurora-input" required value="1.0">
                     </div>
-                    <div class="form-group-oia">
-                        <label for="fac_desc" class="form-label-oia">Description</label>
-                        <textarea id="fac_desc" name="description" class="form-input-oia" rows="2" required placeholder="Explain your contribution..."></textarea>
+                    <div class="aurora-field">
+                        <label for="fac_desc" class="aurora-label">Description</label>
+                        <textarea id="fac_desc" name="description" class="aurora-input" rows="2" required placeholder="Explain your contribution..."></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2">Log Hours</button>
+                    <button type="submit" class="aurora-button--primary w-100 fw-bold py-2 mt-2">Log Hours</button>
                 </form>
             </div>
         </div>
@@ -837,20 +837,20 @@
         <!-- Volunteer / Buddy View: Log Contribution is Primary -->
         {% if g.user.role in ['Volunteer', 'Buddy', 'ICC Event Volunteer', 'IGP Buddy'] %}
         <div class="col-md-6 mx-auto">
-            <div class="card-control h-100">
+            <div class="aurora-card--padded h-100">
                 <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h5 class="card-control-title mb-0"><i class="bi bi-pencil-square text-primary"></i> Log Project Contribution</h5>
+                    <h5 class="aurora-card__title mb-0"><i class="ph ph-pencil-simple text-primary"></i> Log Project Contribution</h5>
                     
                     <!-- Secondary action: submit buddy log (IGP only) -->
                     {% if project.program_type.name == 'IGP' %}
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="opsVolunteerDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-three-dots"></i> More
+                    <div class="aurora-menu">
+                        <button class="aurora-button--small aurora-button--secondary aurora-menu__trigger" type="button" id="opsVolunteerDropdown" data-ui-toggle="aurora-menu" aria-expanded="false">
+                            <i class="ph ph-dots-three"></i> More
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="opsVolunteerDropdown">
+                        <ul class="aurora-menu__popover aurora-menu__popover--dark" aria-labelledby="opsVolunteerDropdown">
                             <li>
-                                <button class="dropdown-item" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyLogForm" aria-expanded="false" aria-controls="collapseBuddyLogForm">
-                                    <i class="bi bi-journal-plus me-2 text-info"></i> Submit Buddy Interaction Log
+                                <button class="aurora-menu__item" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyLogForm" aria-expanded="false" aria-controls="collapseBuddyLogForm">
+                                    <i class="ph ph-notebook me-2 text-info"></i> Submit Buddy Interaction Log
                                 </button>
                             </li>
                         </ul>
@@ -859,9 +859,9 @@
                 </div>
                 
                 <form action="{{ url_for('campus.log_contribution', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="act_type" class="form-label-oia">Activity Type</label>
-                        <select id="act_type" name="activity_type" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="act_type" class="aurora-label">Activity Type</label>
+                        <select id="act_type" name="activity_type" class="aurora-input" required>
                             <option value="Event support">Event support</option>
                             <option value="Media support">Media support</option>
                             <option value="Logistics support">Logistics support</option>
@@ -870,9 +870,9 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="division" class="form-label-oia">Division</label>
-                        <select id="division" name="division" class="form-input-oia">
+                    <div class="aurora-field">
+                        <label for="division" class="aurora-label">Division</label>
+                        <select id="division" name="division" class="aurora-input">
                             <option value="Graphic design">Graphic design</option>
                             <option value="Photography">Photography</option>
                             <option value="Operations">Operations</option>
@@ -881,17 +881,17 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="hours" class="form-label-oia">Duration (Hours)</label>
-                        <input type="number" step="0.5" min="0.5" max="24" id="hours" name="duration_hours" class="form-input-oia" required placeholder="e.g. 2.5">
+                    <div class="aurora-field">
+                        <label for="hours" class="aurora-label">Duration (Hours)</label>
+                        <input type="number" step="0.5" min="0.5" max="24" id="hours" name="duration_hours" class="aurora-input" required placeholder="e.g. 2.5">
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="desc" class="form-label-oia">Detailed Description</label>
-                        <textarea id="desc" name="description" class="form-input-oia" rows="2" required placeholder="Explain your contribution..."></textarea>
+                    <div class="aurora-field">
+                        <label for="desc" class="aurora-label">Detailed Description</label>
+                        <textarea id="desc" name="description" class="aurora-input" rows="2" required placeholder="Explain your contribution..."></textarea>
                     </div>
                     
-                    <button type="submit" class="btn-oia-primary w-100">Log Hours</button>
+                    <button type="submit" class="aurora-button--primary w-100">Log Hours</button>
                 </form>
             </div>
         </div>
@@ -900,13 +900,13 @@
         {% if project.program_type.name == 'IGP' %}
         {% set user_assignments = buddy_assignments | selectattr('buddy_user_id', 'equalto', g.user.id) | list %}
         {% if user_assignments %}
-        <div class="col-md-6 collapse" id="collapseBuddyLogForm">
-            <div class="card-control h-100 border border-info bg-dark bg-opacity-25">
-                <h5 class="card-control-title mb-4"><i class="bi bi-journal-plus text-info"></i> Submit Buddy Interaction Log</h5>
+        <div class="col-md-6 aurora-collapse" id="collapseBuddyLogForm">
+            <div class="aurora-card--padded h-100 border border-info bg-dark bg-opacity-25">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-notebook text-info"></i> Submit Buddy Interaction Log</h5>
                 <form action="{{ url_for('campus.log_buddy_interaction', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="buddy_assignment_id" class="form-label-oia">Select Paired Student</label>
-                        <select id="buddy_assignment_id" name="buddy_assignment_id" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="buddy_assignment_id" class="aurora-label">Select Paired Student</label>
+                        <select id="buddy_assignment_id" name="buddy_assignment_id" class="aurora-input" required>
                             {% for ua in user_assignments %}
                                 <option value="{{ ua.id }}">{{ ua.exchange_student.username }}</option>
                             {% endfor %}
@@ -915,25 +915,25 @@
                     
                     <div class="row">
                         <div class="col-6">
-                            <div class="form-group-oia">
-                                <label for="act_date" class="form-label-oia">Activity Date</label>
-                                <input type="date" id="act_date" name="activity_date" class="form-input-oia" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
+                            <div class="aurora-field">
+                                <label for="act_date" class="aurora-label">Activity Date</label>
+                                <input type="date" id="act_date" name="activity_date" class="aurora-input" required value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="form-group-oia">
-                                <label for="duration" class="form-label-oia">Duration (Hours)</label>
-                                <input type="number" step="0.5" id="duration" name="duration_hours" class="form-input-oia" required placeholder="e.g. 1.5">
+                            <div class="aurora-field">
+                                <label for="duration" class="aurora-label">Duration (Hours)</label>
+                                <input type="number" step="0.5" id="duration" name="duration_hours" class="aurora-input" required placeholder="e.g. 1.5">
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group-oia">
-                        <label for="buddy_desc" class="form-label-oia">Activity Description</label>
-                        <textarea id="buddy_desc" name="description" class="form-input-oia" rows="2" required placeholder="Describe your interaction..."></textarea>
+                    <div class="aurora-field">
+                        <label for="buddy_desc" class="aurora-label">Activity Description</label>
+                        <textarea id="buddy_desc" name="description" class="aurora-input" rows="2" required placeholder="Describe your interaction..."></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-info text-dark w-100 mt-3 fw-bold py-2">Log Interaction</button>
+                    <button type="submit" class="aurora-button--info text-dark w-100 mt-3 fw-bold py-2">Log Interaction</button>
                 </form>
             </div>
         </div>
@@ -945,22 +945,22 @@
     <!-- LEVEL 3: DETAILED RECORDS -->
     <div class="row g-4">
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-clock-history text-primary"></i> Detailed Operational Logs</h5>
-                <p class="text-muted small mb-4">Detailed records of session attendance, volunteer timesheets, and buddy pairings are collapsed below.</p>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-clock-counter-clockwise text-primary"></i> Detailed Operational Logs</h5>
+                <p class="text-muted small mb-4">Detailed records of session attendance, volunteer timesheets, and buddy pairings are is-collapsed below.</p>
                 
                 <div class="d-flex flex-column gap-3">
-                    <!-- collapse 1: Attendance History -->
+                    <!-- aurora-collapse 1: Attendance History -->
                     <div>
-                        <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAttendanceTable" aria-expanded="false" aria-controls="collapseAttendanceTable">
-                            <span><i class="bi bi-card-checklist me-2"></i> View Attendance History Log ({{ attendance_records|length }} marks)</span>
-                            <i class="bi bi-chevron-expand"></i>
+                        <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseAttendanceTable" aria-expanded="false" aria-controls="collapseAttendanceTable">
+                            <span><i class="ph ph-list-checks me-2"></i> View Attendance History Log ({{ attendance_records|length }} marks)</span>
+                            <i class="ph ph-caret-up-down"></i>
                         </button>
-                        <div class="collapse mt-3" id="collapseAttendanceTable">
+                        <div class="aurora-collapse mt-3" id="collapseAttendanceTable">
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                 {% if attendance_records %}
-                                    <div class="table-responsive">
-                                        <table class="table-oia table-to-cards">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--cards">
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
@@ -976,10 +976,10 @@
                                                         <td data-label="Date" class="fw-bold text-white">{{ att.date.strftime('%Y-%m-%d') }}</td>
                                                         <td data-label="Participant">
                                                             {{ att.user.username }}
-                                                            <span class="badge bg-dark text-muted font-monospace ms-1" style="font-size: 0.65rem;">{{ att.user.role }}</span>
+                                                            <span class="aurora-badge bg-dark text-muted font-monospace ms-1 text-2xs">{{ att.user.role }}</span>
                                                         </td>
                                                         <td data-label="Status">
-                                                            <span class="badge badge-oia badge-status-{{ att.status.lower() }}">{{ att.status }}</span>
+                                                            <span class="aurora-badge aurora-badge--status-{{ att.status.lower() }}">{{ att.status }}</span>
                                                         </td>
                                                         <td data-label="Verified By" class="small text-muted">{{ att.verifier.username if att.verifier else "System" }}</td>
                                                         <td data-label="Timestamp" class="small text-muted">{{ att.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
@@ -995,17 +995,17 @@
                         </div>
                     </div>
 
-                    <!-- collapse 2: Volunteer Contributions -->
+                    <!-- aurora-collapse 2: Volunteer Contributions -->
                     <div>
-                        <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseContributionsTable" aria-expanded="false" aria-controls="collapseContributionsTable">
-                            <span><i class="bi bi-clock me-2"></i> View Volunteer Work Hours & Logs ({{ contributions|length }} entries)</span>
-                            <i class="bi bi-chevron-expand"></i>
+                        <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseContributionsTable" aria-expanded="false" aria-controls="collapseContributionsTable">
+                            <span><i class="ph ph-clock me-2"></i> View Volunteer Work Hours & Logs ({{ contributions|length }} entries)</span>
+                            <i class="ph ph-caret-up-down"></i>
                         </button>
-                        <div class="collapse mt-3" id="collapseContributionsTable">
+                        <div class="aurora-collapse mt-3" id="collapseContributionsTable">
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                 {% if contributions %}
-                                    <div class="table-responsive">
-                                        <table class="table-oia table-to-cards">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--cards">
                                             <thead>
                                                 <tr>
                                                     <th>Volunteer</th>
@@ -1025,21 +1025,21 @@
                                                             {{ c.user.username }}
                                                             <span class="d-block small text-muted font-monospace">{{ c.division }}</span>
                                                         </td>
-                                                        <td data-label="Activity"><span class="badge bg-secondary">{{ c.activity_type }}</span></td>
-                                                        <td data-label="Description" style="max-width: 250px; font-size: 0.85rem;">{{ c.description or 'N/A' }}</td>
+                                                        <td data-label="Activity"><span class="aurora-badge bg-secondary">{{ c.activity_type }}</span></td>
+                                                        <td data-label="Description" class="max-inline-250 text-compact">{{ c.description or 'N/A' }}</td>
                                                         <td data-label="Hours" class="fw-bold text-white">{{ c.duration_hours }} hrs</td>
-                                                        <td data-label="Status"><span class="badge badge-oia badge-status-{{ c.approval_status.lower() }}">{{ c.approval_status }}</span></td>
+                                                        <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ c.approval_status.lower() }}">{{ c.approval_status }}</span></td>
                                                         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
                                                             <td data-label="Admin">
                                                                 {% if c.approval_status == 'Pending' %}
                                                                     <div class="d-flex gap-1">
                                                                         <form action="{{ url_for('campus.verify_contribution', campus_id=project.campus_id, project_id=project.id, contrib_id=c.id) }}" method="POST">
                                                                             <input type="hidden" name="action" value="approve">
-                                                                            <button type="submit" class="btn btn-success btn-sm py-1"><i class="bi bi-check"></i></button>
+                                                                            <button type="submit" class="aurora-button--success aurora-button--small py-1"><i class="ph ph-check"></i></button>
                                                                         </form>
                                                                         <form action="{{ url_for('campus.verify_contribution', campus_id=project.campus_id, project_id=project.id, contrib_id=c.id) }}" method="POST">
                                                                             <input type="hidden" name="action" value="reject">
-                                                                            <button type="submit" class="btn btn-danger btn-sm py-1"><i class="bi bi-x"></i></button>
+                                                                            <button type="submit" class="aurora-button--danger aurora-button--small py-1"><i class="ph ph-x"></i></button>
                                                                         </form>
                                                                     </div>
                                                                 {% else %}
@@ -1059,18 +1059,18 @@
                         </div>
                     </div>
 
-                    <!-- collapse 3: Buddy interaction logs (IGP only) -->
+                    <!-- aurora-collapse 3: Buddy interaction logs (IGP only) -->
                     {% if project.program_type.name == 'IGP' %}
                     <div>
-                        <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyLogsTable" aria-expanded="false" aria-controls="collapseBuddyLogsTable">
-                            <span><i class="bi bi-journal-check me-2"></i> View Buddy Interaction Logs History</span>
-                            <i class="bi bi-chevron-expand"></i>
+                        <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyLogsTable" aria-expanded="false" aria-controls="collapseBuddyLogsTable">
+                            <span><i class="ph ph-notebook me-2"></i> View Buddy Interaction Logs History</span>
+                            <i class="ph ph-caret-up-down"></i>
                         </button>
-                        <div class="collapse mt-3" id="collapseBuddyLogsTable">
+                        <div class="aurora-collapse mt-3" id="collapseBuddyLogsTable">
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                 {% set has_logs = false %}
-                                <div class="table-responsive">
-                                    <table class="table-oia table-to-cards">
+                                <div class="aurora-table-scroll">
+                                    <table class="aurora-table--cards">
                                         <thead>
                                             <tr>
                                                 <th>Buddy Pair</th>
@@ -1090,24 +1090,24 @@
                                                     <tr>
                                                         <td data-label="Buddy Pair">
                                                             <span class="text-white fw-bold">{{ ba.buddy.username }}</span>
-                                                            <i class="bi bi-arrow-right text-muted small"></i>
+                                                            <i class="ph ph-arrow-right text-muted small"></i>
                                                             <span class="text-info">{{ ba.exchange_student.username }}</span>
                                                         </td>
                                                         <td data-label="Date" class="small">{{ log.activity_date.strftime('%Y-%m-%d') }}</td>
-                                                        <td data-label="Description" style="max-width: 250px; font-size: 0.85rem;">{{ log.description }}</td>
+                                                        <td data-label="Description" class="max-inline-250 text-compact">{{ log.description }}</td>
                                                         <td data-label="Hours" class="fw-bold text-white">{{ log.duration_hours }} hrs</td>
-                                                        <td data-label="Status"><span class="badge badge-oia badge-status-{{ log.status.lower() }}">{{ log.status }}</span></td>
+                                                        <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ log.status.lower() }}">{{ log.status }}</span></td>
                                                         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
                                                             <td data-label="Admin">
                                                                 {% if log.status == 'Pending' %}
                                                                     <div class="d-flex gap-1">
                                                                         <form action="{{ url_for('campus.verify_buddy_log', campus_id=project.campus_id, project_id=project.id, log_id=log.id) }}" method="POST">
                                                                             <input type="hidden" name="action" value="approve">
-                                                                            <button type="submit" class="btn btn-success btn-sm py-1"><i class="bi bi-check"></i></button>
+                                                                            <button type="submit" class="aurora-button--success aurora-button--small py-1"><i class="ph ph-check"></i></button>
                                                                         </form>
                                                                         <form action="{{ url_for('campus.verify_buddy_log', campus_id=project.campus_id, project_id=project.id, log_id=log.id) }}" method="POST">
                                                                             <input type="hidden" name="action" value="reject">
-                                                                            <button type="submit" class="btn btn-danger btn-sm py-1"><i class="bi bi-x"></i></button>
+                                                                            <button type="submit" class="aurora-button--danger aurora-button--small py-1"><i class="ph ph-x"></i></button>
                                                                         </form>
                                                                     </div>
                                                                 {% else %}
@@ -1140,26 +1140,26 @@
     <!-- LEVEL 1: OVERVIEW -->
     <div class="row g-4 mb-5">
         <div class="col-md-6 col-lg-4">
-            <div class="card-control h-100">
-                <h5 class="card-control-title mb-4"><i class="bi bi-people-fill text-primary"></i> Participant Ratios</h5>
-                <div style="height: 220px; position: relative;">
+            <div class="aurora-card--padded h-100">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-users-three text-primary"></i> Participant Ratios</h5>
+                <div class="chart-frame">
                     <canvas id="participantBreakdownChart"></canvas>
                 </div>
             </div>
         </div>
         
         <div class="col-md-6 col-lg-4">
-            <div class="card-control h-100">
-                <h5 class="card-control-title mb-4"><i class="bi bi-clock-history text-primary"></i> Division Hours</h5>
-                <div style="height: 220px; position: relative;">
+            <div class="aurora-card--padded h-100">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-clock-counter-clockwise text-primary"></i> Division Hours</h5>
+                <div class="chart-frame">
                     <canvas id="contributionDivisionChart"></canvas>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6 col-lg-4">
-            <div class="card-control h-100">
-                <h5 class="card-control-title mb-4"><i class="bi bi-star-fill text-warning"></i> Feedback Rating</h5>
+            <div class="aurora-card--padded h-100">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-star-fill text-warning"></i> Feedback Rating</h5>
                 <div class="text-center py-3">
                     <span class="text-muted small d-block">Overall Score</span>
                     <strong class="text-warning display-4 fw-extrabold d-block my-2">
@@ -1167,8 +1167,8 @@
                     </strong>
                     <div class="text-warning fs-5">
                         {% if summary.avg_feedback_rating %}
-                            {% for i in range(summary.avg_feedback_rating|int) %}<i class="bi bi-star-fill"></i>{% endfor %}
-                            {% if summary.avg_feedback_rating - summary.avg_feedback_rating|int >= 0.5 %}<i class="bi bi-star-half"></i>{% endif %}
+                            {% for i in range(summary.avg_feedback_rating|int) %}<i class="ph ph-star-fill"></i>{% endfor %}
+                            {% if summary.avg_feedback_rating - summary.avg_feedback_rating|int >= 0.5 %}<i class="ph ph-star-half"></i>{% endif %}
                         {% endif %}
                     </div>
                 </div>
@@ -1180,20 +1180,20 @@
     <div class="row g-4 mb-5">
         <!-- Submit Feedback Review (Primary Action) -->
         <div class="col-md-6 mx-auto">
-            <div class="card-control">
+            <div class="aurora-card--padded">
                 <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h5 class="card-control-title mb-0"><i class="bi bi-chat-left-heart text-primary"></i> Submit Feedback Review</h5>
+                    <h5 class="aurora-card__title mb-0"><i class="ph ph-chat-heart text-primary"></i> Submit Feedback Review</h5>
                     
                     <!-- Secondary Action Dropdown (Compile Report) -->
                     {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="insightsActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-three-dots"></i> More
+                    <div class="aurora-menu">
+                        <button class="aurora-button--small aurora-button--secondary aurora-menu__trigger" type="button" id="insightsActionsDropdown" data-ui-toggle="aurora-menu" aria-expanded="false">
+                            <i class="ph ph-dots-three"></i> More
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="insightsActionsDropdown">
+                        <ul class="aurora-menu__popover aurora-menu__popover--dark" aria-labelledby="insightsActionsDropdown">
                             <li>
-                                <button class="dropdown-item" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCompileReportForm" aria-expanded="false" aria-controls="collapseCompileReportForm">
-                                    <i class="bi bi-file-earmark-arrow-up-fill me-2 text-warning"></i> Compile Dynamic Report
+                                <button class="aurora-menu__item" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseCompileReportForm" aria-expanded="false" aria-controls="collapseCompileReportForm">
+                                    <i class="ph ph-file-arrow-up me-2 text-warning"></i> Compile Dynamic Report
                                 </button>
                             </li>
                         </ul>
@@ -1202,9 +1202,9 @@
                 </div>
                 
                 <form action="{{ url_for('campus.submit_feedback', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="fb_type" class="form-label-oia">Feedback Type</label>
-                        <select id="fb_type" name="submission_type" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="fb_type" class="aurora-label">Feedback Type</label>
+                        <select id="fb_type" name="submission_type" class="aurora-input" required>
                             <option value="Event feedback">Event feedback</option>
                             {% if project.program_type.name == 'IGP' %}
                             <option value="IGP feedback">IGP feedback</option>
@@ -1214,9 +1214,9 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label class="form-label-oia">Rating (1 to 5 Stars)</label>
-                        <select name="rating" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label class="aurora-label">Rating (1 to 5 Stars)</label>
+                        <select name="rating" class="aurora-input" required>
                             <option value="5" selected>5 Stars (Excellent)</option>
                             <option value="4">4 Stars (Very Good)</option>
                             <option value="3">3 Stars (Good)</option>
@@ -1225,26 +1225,26 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="fb_comments" class="form-label-oia">Comments / Observations</label>
-                        <textarea id="fb_comments" name="comments" class="form-input-oia" rows="2" required placeholder="Write your review..."></textarea>
+                    <div class="aurora-field">
+                        <label for="fb_comments" class="aurora-label">Comments / Observations</label>
+                        <textarea id="fb_comments" name="comments" class="aurora-input" rows="2" required placeholder="Write your review..."></textarea>
                     </div>
 
-                    <div class="form-group-oia">
-                        <label for="fb_sug" class="form-label-oia">Suggestions for Improvement</label>
-                        <textarea id="fb_sug" name="suggestions" class="form-input-oia" rows="2" placeholder="Write any suggestions..."></textarea>
+                    <div class="aurora-field">
+                        <label for="fb_sug" class="aurora-label">Suggestions for Improvement</label>
+                        <textarea id="fb_sug" name="suggestions" class="aurora-input" rows="2" placeholder="Write any suggestions..."></textarea>
                     </div>
                     
-                    <button type="submit" class="btn-oia-primary w-100">Submit Review</button>
+                    <button type="submit" class="aurora-button--primary w-100">Submit Review</button>
                 </form>
             </div>
         </div>
 
         <!-- Collapsible compile report form (Faculty / Core Committee only) -->
         {% if g.user.role in ['Faculty', 'ICC Core Committee', 'IGP Core', 'ICC Events Core', 'ICC Cultural Core', 'ICC Media Core'] %}
-        <div class="col-md-6 collapse" id="collapseCompileReportForm">
-            <div class="card-control h-100 border border-warning bg-dark bg-opacity-25">
-                <h5 class="card-control-title mb-4"><i class="bi bi-file-earmark-arrow-up text-warning"></i> Compile Project Intelligence Report</h5>
+        <div class="col-md-6 aurora-collapse" id="collapseCompileReportForm">
+            <div class="aurora-card--padded h-100 border border-warning bg-dark bg-opacity-25">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-file-arrow-up text-warning"></i> Compile Project Intelligence Report</h5>
                 <p class="text-muted small mb-4">Save project metrics as a formal static OIA report.</p>
                 <form action="{{ url_for('dashboard.generate_report') }}" method="POST">
                     <input type="hidden" name="report_type" value="Project Report">
@@ -1254,16 +1254,16 @@
                     <input type="hidden" name="start_date" value="{{ project.start_date.strftime('%Y-%m-%d') }}">
                     <input type="hidden" name="end_date" value="{{ project.end_date.strftime('%Y-%m-%d') }}">
 
-                    <div class="form-group-oia">
-                        <label for="rep_title" class="form-label-oia">Report Title</label>
-                        <input type="text" id="rep_title" name="title" class="form-input-oia" required value="{{ project.title }} Operations Evaluation">
+                    <div class="aurora-field">
+                        <label for="rep_title" class="aurora-label">Report Title</label>
+                        <input type="text" id="rep_title" name="title" class="aurora-input" required value="{{ project.title }} Operations Evaluation">
                     </div>
-                    <div class="form-group-oia">
-                        <label for="rep_desc" class="form-label-oia">Scope/Executive Summary</label>
-                        <textarea id="rep_desc" name="description" class="form-input-oia" rows="3" required>Dynamic project review compilation for {{ project.title }}. Contains student roll-call records, buddy logs, and volunteer support hours.</textarea>
+                    <div class="aurora-field">
+                        <label for="rep_desc" class="aurora-label">Scope/Executive Summary</label>
+                        <textarea id="rep_desc" name="description" class="aurora-input" rows="3" required>Dynamic project review compilation for {{ project.title }}. Contains student roll-call records, buddy logs, and volunteer support hours.</textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-warning text-dark w-100 mt-3 fw-bold py-2">Compile & Save Report</button>
+                    <button type="submit" class="aurora-button--warning text-dark w-100 mt-3 fw-bold py-2">Compile & Save Report</button>
                 </form>
             </div>
         </div>
@@ -1273,16 +1273,16 @@
     <!-- LEVEL 3: DETAILED RECORDS -->
     <div class="row g-4">
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-chat-left-quote-fill text-primary"></i> Detailed Reviews Registry</h5>
-                <p class="text-muted small mb-4">Detailed records of review comments and student experience logs are collapsed below.</p>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-quotes text-primary"></i> Detailed Reviews Registry</h5>
+                <p class="text-muted small mb-4">Detailed records of review comments and student experience logs are is-collapsed below.</p>
                 
                 <div>
-                    <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFeedbackReviews" aria-expanded="false" aria-controls="collapseFeedbackReviews">
-                        <span><i class="bi bi-chat-quote me-2"></i> View Participant Reviews Feed ({{ feedback_analytics.total_feedback }} reviews)</span>
-                        <i class="bi bi-chevron-expand"></i>
+                    <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseFeedbackReviews" aria-expanded="false" aria-controls="collapseFeedbackReviews">
+                        <span><i class="ph ph-chat-circle-text me-2"></i> View Participant Reviews Feed ({{ feedback_analytics.total_feedback }} reviews)</span>
+                        <i class="ph ph-caret-up-down"></i>
                     </button>
-                    <div class="collapse mt-3" id="collapseFeedbackReviews">
+                    <div class="aurora-collapse mt-3" id="collapseFeedbackReviews">
                         <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                             {% if feedback_analytics.feedbacks %}
                                 <div class="d-flex flex-column gap-3">
@@ -1291,20 +1291,20 @@
                                             <div class="d-flex align-items-center justify-content-between mb-2">
                                                 <div>
                                                     <strong class="text-white">{{ fb.user.username }}</strong>
-                                                    <span class="badge bg-secondary font-monospace ms-2" style="font-size: 0.65rem;">{{ fb.submission_type }}</span>
+                                                    <span class="aurora-badge bg-secondary font-monospace ms-2 text-2xs">{{ fb.submission_type }}</span>
                                                 </div>
                                                 <div class="text-warning small">
-                                                    {% for i in range(fb.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
-                                                    {% for i in range(5 - fb.rating) %}<i class="bi bi-star text-muted"></i>{% endfor %}
+                                                    {% for i in range(fb.rating) %}<i class="ph ph-star-fill"></i>{% endfor %}
+                                                    {% for i in range(5 - fb.rating) %}<i class="ph ph-star text-muted"></i>{% endfor %}
                                                 </div>
                                             </div>
                                             <p class="text-light mb-1 small">"{{ fb.comments }}"</p>
                                             {% if fb.suggestions %}
-                                                <div class="text-muted small mt-1 border-top border-secondary pt-1" style="font-size: 0.8rem;">
+                                                <div class="text-muted small mt-1 border-top border-secondary pt-1 text-13">
                                                     <strong>Suggestions:</strong> {{ fb.suggestions }}
                                                 </div>
                                             {% endif %}
-                                            <div class="text-end text-muted small" style="font-size: 0.75rem;">{{ fb.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                                            <div class="text-end text-muted small text-xs">{{ fb.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -1318,19 +1318,14 @@
         </div>
     </div>
 
-    <!-- Chart rendering logic -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            OIACharts.initProjectCharts({
-                partTypes: {{ summary.participant_breakdown.keys() | list | tojson }},
-                partCounts: {{ summary.participant_breakdown.values() | list | tojson }},
-                divisions: {{ volunteer_analytics.division_hours.keys() | list | tojson }},
-                hours: {{ volunteer_analytics.division_hours.values() | list | tojson }},
-                ratings: {{ feedback_analytics.distribution.keys() | list | tojson }},
-                ratingCounts: {{ feedback_analytics.distribution.values() | list | tojson }}
-            });
-        });
-    </script>
+    <script id="project-chart-data" type="application/json">{
+      "partTypes": {{ summary.participant_breakdown.keys() | list | tojson }},
+      "partCounts": {{ summary.participant_breakdown.values() | list | tojson }},
+      "divisions": {{ volunteer_analytics.division_hours.keys() | list | tojson }},
+      "hours": {{ volunteer_analytics.division_hours.values() | list | tojson }},
+      "ratings": {{ feedback_analytics.distribution.keys() | list | tojson }},
+      "ratingCounts": {{ feedback_analytics.distribution.values() | list | tojson }}
+    }</script>
     {% endif %}
 
     <!-- 5. RESOURCES WORKSPACE -->
@@ -1339,7 +1334,7 @@
     <!-- LEVEL 1: OVERVIEW -->
     <div class="row g-4 mb-5">
         <div class="col-12">
-            <div class="card-control text-center py-4">
+            <div class="aurora-card--padded text-center py-4">
                 <span class="project-stat-label">linked resources</span>
                 <strong class="text-white fs-3 d-block mt-2">{{ documents | length }} files references linked</strong>
             </div>
@@ -1349,21 +1344,21 @@
     <!-- LEVEL 2: KEY ACTIONS -->
     <div class="row g-4 mb-5">
         <div class="col-md-6 mx-auto">
-            <div class="card-control">
-                <h5 class="card-control-title mb-4"><i class="bi bi-link-45deg text-primary"></i> Link Google Drive Document</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-4"><i class="ph ph-link text-primary"></i> Link Google Drive Document</h5>
                 <p class="text-muted small mb-4">
                     Save references to folders or files stored on Google Drive.
                 </p>
                 
                 <form action="{{ url_for('campus.add_document', campus_id=project.campus_id, project_id=project.id) }}" method="POST">
-                    <div class="form-group-oia">
-                        <label for="doc_title" class="form-label-oia">Document Title</label>
-                        <input type="text" id="doc_title" name="title" class="form-input-oia" required placeholder="e.g. Orientation Deck V2">
+                    <div class="aurora-field">
+                        <label for="doc_title" class="aurora-label">Document Title</label>
+                        <input type="text" id="doc_title" name="title" class="aurora-input" required placeholder="e.g. Orientation Deck V2">
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="doc_type" class="form-label-oia">Document Type</label>
-                        <select id="doc_type" name="document_type" class="form-input-oia" required>
+                    <div class="aurora-field">
+                        <label for="doc_type" class="aurora-label">Document Type</label>
+                        <select id="doc_type" name="document_type" class="aurora-input" required>
                             <option value="Poster">Poster</option>
                             <option value="Report">Report</option>
                             <option value="Presentation">Presentation</option>
@@ -1373,12 +1368,12 @@
                         </select>
                     </div>
                     
-                    <div class="form-group-oia">
-                        <label for="doc_link" class="form-label-oia">Google Drive URL</label>
-                        <input type="url" id="doc_link" name="google_drive_link" class="form-input-oia" required placeholder="https://drive.google.com/...">
+                    <div class="aurora-field">
+                        <label for="doc_link" class="aurora-label">Google Drive URL</label>
+                        <input type="url" id="doc_link" name="google_drive_link" class="aurora-input" required placeholder="https://drive.google.com/...">
                     </div>
                     
-                    <button type="submit" class="btn-oia-primary w-100 mt-2">Add Link Pointer</button>
+                    <button type="submit" class="aurora-button--primary w-100 mt-2">Add Link Pointer</button>
                 </form>
             </div>
         </div>
@@ -1387,20 +1382,20 @@
     <!-- LEVEL 3: DETAILED RECORDS -->
     <div class="row g-4">
         <div class="col-12">
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-folder-fill text-primary"></i> Detailed Drive Repository</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-folder text-primary"></i> Detailed Drive Repository</h5>
                 <p class="text-muted small mb-4">Click below to expand the repository directory and launch files.</p>
                 
                 <div>
-                    <button class="btn btn-outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDocumentsRepositoryTable" aria-expanded="false" aria-controls="collapseDocumentsRepositoryTable">
-                        <span><i class="bi bi-folder-symlink me-2"></i> View Linked Files List ({{ documents | length }} files)</span>
-                        <i class="bi bi-chevron-expand"></i>
+                    <button class="aurora-button--outline-info w-100 py-3 text-start d-flex justify-content-between align-items-center" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseDocumentsRepositoryTable" aria-expanded="false" aria-controls="collapseDocumentsRepositoryTable">
+                        <span><i class="ph ph-folder-notch-open me-2"></i> View Linked Files List ({{ documents | length }} files)</span>
+                        <i class="ph ph-caret-up-down"></i>
                     </button>
-                    <div class="collapse mt-3" id="collapseDocumentsRepositoryTable">
+                    <div class="aurora-collapse mt-3" id="collapseDocumentsRepositoryTable">
                         <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                             {% if documents %}
-                                <div class="table-responsive">
-                                    <table class="table-oia table-to-cards">
+                                <div class="aurora-table-scroll">
+                                    <table class="aurora-table--cards">
                                         <thead>
                                             <tr>
                                                 <th>Title</th>
@@ -1415,12 +1410,12 @@
                                                 <tr>
                                                     <td data-label="Title" class="fw-bold text-white">{{ doc.title }}</td>
                                                     <td data-label="Type">
-                                                        <span class="badge bg-secondary font-monospace">{{ doc.document_type }}</span>
+                                                        <span class="aurora-badge bg-secondary font-monospace">{{ doc.document_type }}</span>
                                                     </td>
                                                     <td data-label="Added By" class="small text-muted">{{ doc.uploaded_by.username if doc.uploaded_by else 'System' }}</td>
                                                     <td data-label="Timestamp" class="small text-muted">{{ doc.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                                     <td data-label="Link">
-                                                        <a href="{{ doc.google_drive_link }}" target="_blank" class="btn btn-outline-primary btn-sm py-1 px-3 rounded-pill"><i class="bi bi-box-arrow-up-right"></i> Open Link</a>
+                                                        <a href="{{ doc.google_drive_link }}" target="_blank" class="aurora-button--outline-primary aurora-button--small py-1 px-3 rounded-pill"><i class="ph ph-arrow-square-out"></i> Open Link</a>
                                                     </td>
                                                 </tr>
                                             {% endfor %}

@@ -6,7 +6,7 @@ import hashlib
 import csv
 import io
 import re
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -581,6 +581,17 @@ def _commit_standard_rows(batch, valid_rows, defaults):
 
 
 def commit_batch(batch, actor=None):
+    # Re-fetch with a row lock so the staged->committed status check and the
+    # eventual status write (below) are effectively one atomic transaction --
+    # otherwise two concurrent commit_batch() calls could both pass the
+    # "not yet committed" guard before either one flips the status, and both
+    # proceed to write rows. On Postgres this is a real row lock held until
+    # the transaction commits/rolls back; on SQLite with_for_update() is a
+    # no-op (SQLite's own database-level write lock provides serialization
+    # for the single-process dev/test case instead).
+    locked_batch = ImportBatch.query.with_for_update().filter_by(id=batch.id).first()
+    if locked_batch is not None:
+        batch = locked_batch
     if batch.status == "Committed":
         return batch
     if batch.status not in {"Staged", "Validated"}:
@@ -823,3 +834,83 @@ def commit_batch(batch, actor=None):
     record_audit("import.commit", batch, after=batch.reconciliation_json, actor=actor)
     db.session.commit()
     return batch
+
+
+def seed_icc_checklist_template():
+    """The only checklist template that exists (IGP-SUMMER-SCHOOL) came from
+    the supplied Summer School source; there is no ICC-side equivalent, so
+    ICC wing leaders had nothing to pick in the checklist step. Seeds a
+    small, generic ICC event checklist template. Idempotent."""
+    template = ChecklistTemplate.query.filter_by(code="ICC-EVENT-STANDARD", is_active=True).first()
+    if template:
+        return {"created": False}
+    template = ChecklistTemplate(code="ICC-EVENT-STANDARD", name="ICC Event Standard Checklist", project_type="ICC event", version=1, source_reference="Manual seed")
+    db.session.add(template)
+    db.session.flush()
+    items = [
+        ("VENUE", "Venue booking confirmed", "Logistics"),
+        ("POSTER", "Poster / invite designed", "Media"),
+        ("ROSTER", "Volunteer roster finalized", "People"),
+        ("ATTENDANCE", "Attendance sheet prepared", "Operations"),
+        ("REPORT", "Post-event report submitted", "Reporting"),
+    ]
+    for sequence, (code, title, category) in enumerate(items, start=1):
+        db.session.add(ChecklistTemplateItem(template_id=template.id, code=code, title=title, category=category, sequence=sequence, mandatory=True))
+    db.session.commit()
+    return {"created": True, "items": len(items)}
+
+
+def backfill_summer_school_sample_content():
+    """The supplied Summer School source (`_Summer School- Check List.xlsx`)
+    is a checklist only -- it carries no schedule, roster, or document data,
+    so the imported project has zero sessions/team/documents even after a
+    full commit. This adds a small, clearly schematic set of sessions/team/
+    documents (reusing existing demonstrator Person records rather than
+    inventing new named individuals) so the project is as complete a
+    reference example as Coffee Meet & Greet. Idempotent: safe to re-run.
+    """
+    project = Project.query.filter_by(code="IGP-2026-CEN-001").first()
+    if not project:
+        return {"skipped": "IGP-2026-CEN-001 project not found; run demo-import-supplied first."}
+
+    sessions_created = 0
+    session_plan = [
+        ("IGP-SS-ORIENT", "Orientation & Welcome", "Orientation", 0, 9, 13),
+        ("IGP-SS-IMMERSION", "Cultural Immersion Week", "Workshop Series", 7, 9, 17),
+        ("IGP-SS-EXCURSION", "Campus & City Excursion", "Excursion", 21, 9, 18),
+        ("IGP-SS-CLOSING", "Closing Ceremony", "Ceremony", 32, 15, 18),
+    ]
+    for code, title, session_type, day_offset, start_hour, end_hour in session_plan:
+        if ProjectSession.query.filter_by(project_id=project.id, code=code).first():
+            continue
+        session_date = project.start_date + timedelta(days=day_offset)
+        db.session.add(ProjectSession(
+            project_id=project.id, code=code, title=title, session_type=session_type,
+            starts_at=datetime.combine(session_date, time(start_hour, 0)),
+            ends_at=datetime.combine(session_date, time(end_hour, 0)),
+            venue="Bangalore Central Campus",
+        ))
+        sessions_created += 1
+
+    team_created = 0
+    team_plan = [("IGP Program Team", "IGP Program Lead"), ("IGP Program Team", "Buddy Coordinator")]
+    available_people = Person.query.order_by(Person.id).limit(len(team_plan)).all()
+    for (assignment_type, role_label), person in zip(team_plan, available_people):
+        if TeamAssignment.query.filter_by(project_id=project.id, person_id=person.id, assignment_type=assignment_type).first():
+            continue
+        db.session.add(TeamAssignment(person_id=person.id, project_id=project.id, assignment_type=assignment_type, role_label=role_label))
+        team_created += 1
+
+    documents_created = 0
+    document_plan = [
+        ("IGP Schedule / Itinerary", "Schedule"),
+        ("Participant Handbook", "Report"),
+    ]
+    for title, category in document_plan:
+        if DocumentRecord.query.filter_by(project_id=project.id, title=title).first():
+            continue
+        db.session.add(DocumentRecord(project_id=project.id, title=title, category=category, status="Missing", mandatory_for_closure=True))
+        documents_created += 1
+
+    db.session.commit()
+    return {"sessions_created": sessions_created, "team_created": team_created, "documents_created": documents_created}

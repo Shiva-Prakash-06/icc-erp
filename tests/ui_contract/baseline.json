@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-17",
+  "contract": "presentation-only Aurora migration",
+  "url_map": {
+    "route_count": 116,
+    "sha256": "9333baffe77a473e9c1b0b3806b63173fd4314306315a65d158452941c1d02e2",
+    "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
+    "includes_parameter_converters": true
+  },
+  "forms": {
+    "/login": {
+      "method": "POST",
+      "names": [
+        "username",
+        "password"
+      ]
+    },
+    "/register": {
+      "method": "POST",
+      "names": [
+        "username",
+        "email",
+        "password",
+        "confirm_password",
+        "preferred_role",
+        "campus_id",
+        "skills",
+        "interests"
+      ]
+    },
+    "/forgot-password": {
+      "method": "POST",
+      "names": [
+        "identifier"
+      ]
+    },
+    "/reset-password": {
+      "method": "POST",
+      "names": [
+        "new_password",
+        "confirm_password"
+      ]
+    },
+    "/recover-password/<token>": {
+      "method": "POST",
+      "names": [
+        "new_password",
+        "confirm_password"
+      ]
+    },
+    "/reports/generate": {
+      "method": "POST",
+      "names": [
+        "report_type",
+        "title",
+        "description",
+        "campus_id",
+        "program_type_id",
+        "project_id",
+        "start_date",
+        "end_date"
+      ]
+    },
+    "/erp/projects": {
+      "method": "POST",
+      "names": [
+        "title",
+        "description",
+        "project_type",
+        "category",
+        "campus_public_id",
+        "program_type_public_id",
+        "academic_year_public_id",
+        "wing_public_id",
+        "start_date",
+        "end_date",
+        "venue",
+        "target_audience"
+      ]
+    },
+    "/erp/projects/<public_id>/transition": {
+      "method": "POST",
+      "names": [
+        "version",
+        "target_status",
+        "reason"
+      ]
+    },
+    "/erp/projects/<public_id>/tasks": {
+      "method": "POST",
+      "names": [
+        "title",
+        "priority",
+        "mandatory_for_closure"
+      ]
+    },
+    "/erp/projects/<public_id>/tasks/<task_public_id>/status": {
+      "method": "POST",
+      "names": [
+        "version",
+        "status",
+        "comment"
+      ]
+    },
+    "/erp/projects/<public_id>/checklist-items/<item_public_id>/status": {
+      "method": "POST",
+      "names": [
+        "version",
+        "status",
+        "comment"
+      ]
+    },
+    "/erp/imports/stage": {
+      "method": "POST",
+      "names": [
+        "import_type"
+      ]
+    },
+    "/erp/notification-preferences": {
+      "method": "POST",
+      "names": [
+        "event_type",
+        "email_enabled",
+        "in_app_enabled"
+      ]
+    },
+    "/admin/users/approve/<user_id>": {
+      "method": "POST",
+      "names": [
+        "role",
+        "campus_public_id",
+        "academic_year_public_id",
+        "wing_public_id",
+        "project_public_id",
+        "platform_scope",
+        "can_view_sensitive_links"
+      ]
+    }
+  },
+  "dynamic_form_names": [
+    "status_<user-id>",
+    "user_ids",
+    "action",
+    "csrf_token"
+  ],
+  "navigation_authority": {
+    "source": "server-side Jinja role and permission branches",
+    "anonymous": [
+      "auth.login",
+      "auth.register",
+      "auth.forgot_password"
+    ],
+    "authenticated": [
+      "dashboard.index",
+      "dashboard.profile",
+      "auth.logout"
+    ],
+    "erp_authorized": [
+      "erp.hub",
+      "erp.projects",
+      "erp.imports",
+      "erp.notifications",
+      "erp.audit"
+    ],
+    "report_authorized": [
+      "dashboard.list_reports",
+      "dashboard.generate_report"
+    ],
+    "admin": [
+      "dashboard.admin_users"
+    ]
+  },
+  "outcome_contracts": {
+    "success": [
+      200,
+      201,
+      302
+    ],
+    "validation": [
+      400,
+      422
+    ],
+    "unauthorized": [
+      401,
+      403
+    ],
+    "missing_or_masked": [
+      404
+    ],
+    "stale_version": [
+      409
+    ],
+    "rate_limited": [
+      429
+    ],
+    "server_error": [
+      500
+    ],
+    "flash_categories": [
+      "success",
+      "warning",
+      "info",
+      "error",
+      "danger"
+    ]
+  },
+  "sensitive_absence": [
+    "password values",
+    "password reset tokens",
+    "unauthorized Drive URLs",
+    "CSRF tokens in island props",
+    "authorization maps in client storage"
+  ],
+  "shared_assets": {
+    "service_worker": "/static/sw.js",
+    "controller": "/static/js/app.js",
+    "manifest": "/static/manifest.webmanifest",
+    "offline_api": "window.ICCOffline"
+  }
+}

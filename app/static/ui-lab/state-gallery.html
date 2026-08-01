@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OIA Intelligence UI state gallery</title>
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/icons.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/utilities.css">
+</head>
+<body>
+  <main id="main-content" class="aurora-content" style="margin:0 auto;max-width:1180px;padding:32px">
+    <header class="page-header">
+      <div><span class="page-eyebrow">Reference surface</span><h1 class="page-title">OIA component state gallery</h1><p class="page-subtitle">Static presentation states only. No ERP behavior is implemented here.</p></div>
+      <button class="aurora-button--primary"><i class="ph ph-plus" aria-hidden="true"></i> Primary action</button>
+    </header>
+
+    <section class="aurora-card mb-6" aria-labelledby="actions-title">
+      <div class="aurora-card__header"><div><span class="section-eyebrow">Actions</span><h2 id="actions-title">Buttons and status</h2></div></div>
+      <div class="aurora-card__body d-flex gap-3 flex-wrap align-items-center">
+        <button class="aurora-button--primary">Primary</button>
+        <button class="aurora-button--secondary">Secondary</button>
+        <button class="aurora-button--danger">Destructive</button>
+        <button class="aurora-button" disabled>Disabled</button>
+        <span class="aurora-badge aurora-badge--status-approved"><i class="ph ph-check-circle" aria-hidden="true"></i> Approved</span>
+        <span class="aurora-badge aurora-badge--status-pending"><i class="ph ph-clock" aria-hidden="true"></i> Pending</span>
+        <span class="aurora-badge aurora-badge--status-rejected"><i class="ph ph-warning" aria-hidden="true"></i> Blocked</span>
+      </div>
+    </section>
+
+    <section class="content-grid mb-4" aria-label="KPI examples">
+      <article class="aurora-card--padded kpi-card col-span-3"><div class="aurora-card__title">Visible projects</div><strong class="aurora-card__value mt-3">128</strong><div class="kpi-card__trend"><span>Portfolio scope</span><span>↗</span></div></article>
+      <article class="aurora-card--padded kpi-card col-span-3"><div class="aurora-card__title">Attendance</div><strong class="aurora-card__value mt-3">94.2%</strong><div class="kpi-card__trend"><span>Current period</span><span>✓</span></div></article>
+      <article class="aurora-card--padded kpi-card col-span-3"><div class="aurora-card__title">Pending actions</div><strong class="aurora-card__value mt-3">07</strong><div class="kpi-card__trend"><span>Needs review</span><span>•</span></div></article>
+      <article class="aurora-card--padded kpi-card col-span-3"><div class="aurora-card__title">Reports</div><strong class="aurora-card__value mt-3">36</strong><div class="kpi-card__trend"><span>Approved records</span><span>↗</span></div></article>
+    </section>
+
+    <div class="content-grid mb-4">
+      <section class="aurora-card col-span-7" aria-labelledby="fields-title">
+        <div class="aurora-card__header"><h2 id="fields-title">Fields and validation</h2></div>
+        <div class="aurora-card__body">
+          <div class="aurora-field"><label class="aurora-label" for="project-name">Project name</label><input id="project-name" class="aurora-input" value="Community Learning Initiative"></div>
+          <div class="aurora-field"><label class="aurora-label" for="unit">Owning unit</label><select id="unit" class="aurora-select"><option>Institutional Growth Programme</option></select></div>
+          <div class="aurora-field"><label class="aurora-label" for="error-field">Evidence reference</label><input id="error-field" class="aurora-input" aria-invalid="true" aria-describedby="error-copy"><small id="error-copy" class="text-danger">Enter an approved reference.</small></div>
+        </div>
+      </section>
+      <section class="aurora-card col-span-5" aria-labelledby="alerts-title">
+        <div class="aurora-card__header"><h2 id="alerts-title">Alerts and empty state</h2></div>
+        <div class="aurora-card__body">
+          <div class="alert alert-info"><i class="ph ph-info" aria-hidden="true"></i><div><strong>Information</strong><p>Server-authoritative guidance appears here.</p></div></div>
+          <div class="empty-state"><i class="ph ph-folder" aria-hidden="true"></i><h3>No records in scope</h3><p>Records appear when the server grants access.</p></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="aurora-card mb-6" aria-labelledby="table-title">
+      <div class="aurora-card__header"><div><span class="section-eyebrow">Operational data</span><h2 id="table-title">Responsive table</h2></div></div>
+      <div class="aurora-table-scroll"><table class="aurora-table--cards aurora-table--hover"><thead><tr><th>Code</th><th>Project</th><th>Owner</th><th>Status</th><th>Progress</th></tr></thead><tbody><tr><td data-label="Code"><code>OIA-042</code></td><td data-label="Project">Urban Learning Lab</td><td data-label="Owner">Central Campus</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-active">Active</span></td><td data-label="Progress"><span class="data-value">72%</span></td></tr><tr><td data-label="Code"><code>OIA-051</code></td><td data-label="Project">Community Research Cohort</td><td data-label="Owner">Yeshwanthpur</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-pending">Review</span></td><td data-label="Progress"><span class="data-value">48%</span></td></tr></tbody></table></div>
+    </section>
+
+    <div class="content-grid">
+      <section class="aurora-card col-span-6"><div class="aurora-card__header"><h2>Timeline</h2></div><div class="aurora-card__body"><div class="timeline-stream"><div class="timeline-event"><span class="timeline-event-time">01 · Plan</span><strong class="d-block">Scope approved</strong><p class="timeline-event-desc">Governance record established.</p></div><div class="timeline-event"><span class="timeline-event-time">02 · Deliver</span><strong class="d-block">Work in progress</strong><p class="timeline-event-desc">Sessions and evidence are being recorded.</p></div></div></div></section>
+      <section class="aurora-card col-span-6"><div class="aurora-card__header"><h2>Skeleton and progress</h2></div><div class="aurora-card__body"><div class="skeleton skeleton--line"></div><div class="skeleton skeleton--block mt-3"></div><div class="progress mt-4" aria-label="72 percent complete"><span class="progress-bar" style="transform:scaleX(.72);width:100%"></span></div></div></section>
+    </div>
+  </main>
+</body>
+</html>

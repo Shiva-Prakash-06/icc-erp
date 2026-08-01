@@ -1,0 +1,109 @@
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const source = join(root, "node_modules", "lucide-static", "icons");
+const target = join(root, "app", "static", "icons");
+
+const icons = {
+  "ph-activity": "activity",
+  "ph-arrow-left": "arrow-left",
+  "ph-arrow-right": "arrow-right",
+  "ph-arrow-square-out": "external-link",
+  "ph-arrow-up-right": "arrow-up-right",
+  "ph-award": "award",
+  "ph-bell": "bell",
+  "ph-bookmark-simple": "bookmark",
+  "ph-broadcast": "radio-tower",
+  "ph-building-office": "building",
+  "ph-buildings": "building-2",
+  "ph-calendar": "calendar",
+  "ph-calendar-blank": "calendar-days",
+  "ph-calendar-check": "calendar-check-2",
+  "ph-calendar-dots": "calendar-clock",
+  "ph-calendar-x": "calendar-x",
+  "ph-caret-left": "chevron-left",
+  "ph-caret-right": "chevron-right",
+  "ph-caret-up-down": "chevrons-up-down",
+  "ph-chart-bar": "chart-column-big",
+  "ph-chart-pie-slice": "chart-pie",
+  "ph-chat-circle-text": "message-circle",
+  "ph-chat-heart": "message-circle-heart",
+  "ph-chat-heart-fill": "message-circle-heart",
+  "ph-check": "check",
+  "ph-check-circle": "circle-check-big",
+  "ph-check-square": "square-check-big",
+  "ph-check-square-fill": "square-check-big",
+  "ph-checks": "check-check",
+  "ph-clock": "clock",
+  "ph-clock-counter-clockwise": "history",
+  "ph-database": "database",
+  "ph-dots-three": "ellipsis",
+  "ph-envelope": "mail",
+  "ph-exclamation-triangle": "triangle-alert",
+  "ph-file-arrow-up": "file-up",
+  "ph-file-dashed": "file",
+  "ph-file-pdf": "file-text",
+  "ph-file-plus": "file-plus",
+  "ph-file-xls": "sheet",
+  "ph-flag": "flag",
+  "ph-folder": "folder",
+  "ph-folder-notch-open": "folder-open",
+  "ph-folder-open": "folder-open",
+  "ph-folder-simple": "folder",
+  "ph-funnel": "funnel",
+  "ph-gauge": "gauge",
+  "ph-globe": "earth",
+  "ph-globe-hemisphere-west": "globe-2",
+  "ph-heartbeat": "heart-pulse",
+  "ph-identification-badge": "badge",
+  "ph-info": "circle-alert",
+  "ph-kanban": "kanban",
+  "ph-link": "link",
+  "ph-list": "list",
+  "ph-list-checks": "list-checks",
+  "ph-magnifying-glass": "search",
+  "ph-notebook": "notebook",
+  "ph-pencil-simple": "pen-line",
+  "ph-person": "user-round",
+  "ph-plus": "plus",
+  "ph-plus-circle": "circle-plus",
+  "ph-power": "power",
+  "ph-quotes": "quote",
+  "ph-shield-check": "shield-check",
+  "ph-shield-lock": "lock-keyhole",
+  "ph-square": "square",
+  "ph-squares-four": "grid-2x2",
+  "ph-star": "star",
+  "ph-star-fill": "star",
+  "ph-star-half": "star-half",
+  "ph-tools": "wrench",
+  "ph-tree-structure": "network",
+  "ph-user": "user-round",
+  "ph-user-check": "user-check",
+  "ph-user-circle": "circle-user-round",
+  "ph-user-plus": "user-round-plus",
+  "ph-user-warning": "user-round-x",
+  "ph-users": "users",
+  "ph-users-three": "users-round",
+  "ph-warning": "triangle-alert",
+  "ph-warning-octagon": "octagon-alert",
+  "ph-x": "x",
+  "ph-x-circle": "circle-x",
+};
+
+mkdirSync(target, { recursive: true });
+
+const rules = [
+  ".ph { display: inline-block; width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -.125em; background: currentColor; -webkit-mask: var(--oia-icon) center / contain no-repeat; mask: var(--oia-icon) center / contain no-repeat; }",
+  ".ph::before { content: none !important; }",
+  ".ph-star-fill, .ph-check-square-fill, .ph-chat-heart-fill { filter: drop-shadow(0 0 6px currentColor); }",
+];
+
+for (const [className, lucideName] of Object.entries(icons)) {
+  copyFileSync(join(source, `${lucideName}.svg`), join(target, `${lucideName}.svg`));
+  rules.push(`.${className} { --oia-icon: url(\"../icons/${lucideName}.svg\"); }`);
+}
+
+writeFileSync(join(root, "app", "static", "css", "icons.css"), `${rules.join("\n")}\n`);

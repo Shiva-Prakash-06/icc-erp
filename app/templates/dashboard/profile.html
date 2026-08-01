@@ -7,40 +7,41 @@
      DESKTOP LAYOUT (Unchanged)
      ========================================== -->
 <div class="d-none d-lg-block">
-    <div class="page-header animate-fade-in">
+    <div class="page-header">
         <div>
-            <h1 class="page-title"><i class="bi bi-person-badge text-primary me-2"></i>My Performance Portfolio</h1>
+            <div class="page-eyebrow">Identity and impact</div>
+            <h1 class="page-title">My performance portfolio</h1>
             <p class="page-subtitle">Personal profile, volunteer details, and verified skills acquired through contributions.</p>
         </div>
     </div>
 
-    <div class="row g-4 animate-fade-in">
+    <div class="row g-4">
         <!-- Left Column: User details and skills -->
         <div class="col-lg-4">
-            <!-- User Identity card -->
-            <div class="card-control mb-4 text-center py-4">
-                <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 80px; height: 80px; font-size: 2.5rem;">
-                    <i class="bi bi-person-circle"></i>
+            <!-- User Identity aurora-card -->
+            <div class="aurora-card--padded mb-4 text-center py-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-xl">
+                    <i class="ph ph-user-circle"></i>
                 </div>
                 <h4 class="text-white fw-bold mb-1">{{ g.user.username }}</h4>
-                <p class="text-muted small mb-2"><i class="bi bi-envelope"></i> {{ g.user.email }}</p>
-                <span class="badge bg-primary px-3 py-1.5 rounded-pill mb-3">{{ g.user.role }}</span>
+                <p class="text-muted small mb-2"><i class="ph ph-envelope"></i> {{ g.user.email }}</p>
+                <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3">{{ g.user.role }}</span>
                 <div class="border-top border-secondary pt-3 mt-2 text-start px-3">
                     <small class="text-muted d-block">Campus Assignment</small>
-                    <span class="text-white fw-bold"><i class="bi bi-building"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
+                    <span class="text-white fw-bold"><i class="ph ph-building-office"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
                 </div>
             </div>
 
             {% if volunteer_profile %}
             <!-- Volunteer Profile Details -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-tools text-primary"></i> Profile Skills & Interests</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-tools text-primary"></i> Profile Skills & Interests</h5>
                 
                 <small class="text-muted d-block mb-2">Registered Skills</small>
                 <div class="d-flex flex-wrap gap-2 mb-3">
                     {% if volunteer_profile.skills %}
                         {% for skill in volunteer_profile.skills.split(',') %}
-                            <span class="badge bg-secondary py-1.5 px-3 rounded-pill" style="font-size: 0.75rem;">{{ skill.strip() }}</span>
+                            <span class="aurora-badge bg-secondary py-1.5 px-3 rounded-pill text-xs">{{ skill.strip() }}</span>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted small">None registered.</span>
@@ -51,7 +52,7 @@
                 <div class="d-flex flex-wrap gap-2">
                     {% if volunteer_profile.interests %}
                         {% for interest in volunteer_profile.interests.split(',') %}
-                            <span class="badge bg-dark bg-opacity-50 border border-secondary text-light py-1.5 px-3 rounded-pill" style="font-size: 0.75rem;">{{ interest.strip() }}</span>
+                            <span class="aurora-badge bg-dark bg-opacity-50 border border-secondary text-light py-1.5 px-3 rounded-pill text-xs">{{ interest.strip() }}</span>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted small">None registered.</span>
@@ -64,8 +65,8 @@
         <!-- Right Column -->
         <div class="col-lg-8">
             <!-- Acquired Skills -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-award text-success"></i> Skills Acquired from Contributions</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-award text-success"></i> Skills Acquired from Contributions</h5>
                 <p class="text-muted small mb-4">These skills are dynamically calculated and accumulated based on your verified log entries and approved contribution hours.</p>
 
                 {% if skills_hours %}
@@ -73,32 +74,32 @@
                         {% for skill, hours in skills_hours.items() %}
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold text-white" style="font-size: 0.9rem;">{{ skill }}</span>
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success">{{ hours }} hours logged</span>
+                                    <span class="fw-bold text-white text-ui">{{ skill }}</span>
+                                    <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success">{{ hours }} hours logged</span>
                                 </div>
                                 <div class="progress-container-custom">
                                     {% set percentage = min(100, (hours / 20 * 100) | int) %}
-                                    <div class="progress-bar-custom bg-success" style="width: {{ percentage }}%;"></div>
+                                    <div class="progress-bar-custom bg-success" data-progress="{{ percentage }}"></div>
                                 </div>
                             </div>
                         {% endfor %}
                     </div>
                 {% else %}
                     <div class="text-center py-5">
-                        <i class="bi bi-clock-history text-muted fs-2"></i>
+                        <i class="ph ph-clock-counter-clockwise text-muted fs-2"></i>
                         <p class="text-muted mt-2 small">No approved contribution hours logged yet. Contribute to active project workspaces to build your skills portfolio.</p>
                     </div>
                 {% endif %}
             </div>
 
             <!-- Contributed Workspaces -->
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-folder-check text-primary"></i> My Contributed Workspaces</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-folder-simple text-primary"></i> My Contributed Workspaces</h5>
                 <p class="text-muted small mb-3">You are authorized to view and interact only with the following workspaces because you have verified contributions or participation history on them.</p>
 
                 {% if contributed_projects %}
-                    <div class="table-responsive">
-                        <table class="table-oia">
+                    <div class="aurora-table-scroll">
+                        <table class="aurora-table">
                             <thead>
                                 <tr>
                                     <th>Project Workspace</th>
@@ -114,15 +115,15 @@
                                 <tr>
                                     <td class="fw-bold text-white">{{ p.title }}</td>
                                     <td>{{ p.campus.name.replace(" Campus", "") }}</td>
-                                    <td><span class="badge bg-primary font-monospace" style="font-size: 0.7rem;">{{ p.program_type.name }}</span></td>
+                                    <td><span class="aurora-badge bg-primary font-monospace text-caption">{{ p.program_type.name }}</span></td>
                                     <td class="small">{{ p.start_date.strftime('%b %d, %Y') }}</td>
                                     <td>
-                                        <span class="badge badge-oia {% if p.status == 'Active' %}badge-status-active{% elif p.status == 'Completed' %}badge-status-completed{% else %}badge-status-pending{% endif %}">
+                                        <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% elif p.status == 'Completed' %}aurora-badge--status-completed{% else %}aurora-badge--status-pending{% endif %}">
                                             {{ p.status }}
                                         </span>
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1">Open Workspace</a>
+                                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="aurora-button--outline-info aurora-button--small rounded-pill px-3 py-1">Open Workspace</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -140,33 +141,33 @@
 <!-- ==========================================
      MOBILE LAYOUT (Redesigned)
      ========================================== -->
-<div class="d-block d-lg-none animate-fade-in">
+<div class="d-block d-lg-none">
     <!-- Profile Headshot Card -->
-    <div class="card-control mb-4 text-center py-4">
-        <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 70px; height: 70px; font-size: 2.2rem;">
-            <i class="bi bi-person-circle"></i>
+    <div class="aurora-card--padded mb-4 text-center py-4">
+        <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-lg">
+            <i class="ph ph-user-circle"></i>
         </div>
-        <h4 class="text-white fw-bold mb-1" style="font-size: 1.25rem;">{{ g.user.username }}</h4>
+        <h4 class="text-white fw-bold mb-1 text-xl">{{ g.user.username }}</h4>
         <p class="text-muted small mb-2">{{ g.user.email }}</p>
-        <span class="badge bg-primary px-3 py-1.5 rounded-pill mb-3" style="font-size: 0.75rem;">{{ g.user.role }}</span>
+        <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3 text-xs">{{ g.user.role }}</span>
         
         <div class="border-top border-secondary pt-3 mt-2 text-start px-2">
-            <span class="text-muted small d-block" style="font-size: 0.7rem;">Campus Assignment</span>
-            <span class="text-white fw-bold small"><i class="bi bi-building me-1 text-info"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
+            <span class="text-muted small d-block text-caption">Campus Assignment</span>
+            <span class="text-white fw-bold small"><i class="ph ph-building-office me-1 text-info"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
         </div>
     </div>
 
     <!-- Registered Skills & Interests -->
     {% if volunteer_profile %}
-    <div class="card-control mb-4">
-        <h5 class="card-control-title mb-3"><i class="bi bi-tools text-primary me-2"></i>Skills & Interests</h5>
+    <div class="aurora-card--padded mb-4">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-tools text-primary me-2"></i>Skills & Interests</h5>
         
         <div class="mb-3">
-            <span class="text-muted small d-block mb-1.5" style="font-size: 0.7rem;">Registered Skills</span>
+            <span class="text-muted small d-block mb-1.5 text-caption">Registered Skills</span>
             <div class="d-flex flex-wrap gap-1.5">
                 {% if volunteer_profile.skills %}
                     {% for skill in volunteer_profile.skills.split(',') %}
-                        <span class="badge bg-secondary py-1 px-2.5 rounded" style="font-size: 0.7rem;">{{ skill.strip() }}</span>
+                        <span class="aurora-badge bg-secondary py-1 px-2.5 rounded text-caption">{{ skill.strip() }}</span>
                     {% endfor %}
                 {% else %}
                     <span class="text-muted small">None registered.</span>
@@ -175,11 +176,11 @@
         </div>
         
         <div>
-            <span class="text-muted small d-block mb-1.5" style="font-size: 0.7rem;">Interests</span>
+            <span class="text-muted small d-block mb-1.5 text-caption">Interests</span>
             <div class="d-flex flex-wrap gap-1.5">
                 {% if volunteer_profile.interests %}
                     {% for interest in volunteer_profile.interests.split(',') %}
-                        <span class="badge bg-dark bg-opacity-50 border border-secondary text-light py-1 px-2.5 rounded" style="font-size: 0.7rem;">{{ interest.strip() }}</span>
+                        <span class="aurora-badge bg-dark bg-opacity-50 border border-secondary text-light py-1 px-2.5 rounded text-caption">{{ interest.strip() }}</span>
                     {% endfor %}
                 {% else %}
                     <span class="text-muted small">None registered.</span>
@@ -190,47 +191,47 @@
     {% endif %}
 
     <!-- Dynamically Earned Skills Progress -->
-    <div class="card-control mb-4">
-        <h5 class="card-control-title mb-3"><i class="bi bi-award text-success me-2"></i>Contribution Acquired Skills</h5>
+    <div class="aurora-card--padded mb-4">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-award text-success me-2"></i>Contribution Acquired Skills</h5>
         {% if skills_hours %}
             <div class="d-flex flex-column gap-3.5">
                 {% for skill, hours in skills_hours.items() %}
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="fw-bold text-white small">{{ skill }}</span>
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success" style="font-size: 0.65rem;">{{ hours }} hrs</span>
+                            <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success text-2xs">{{ hours }} hrs</span>
                         </div>
                         <div class="progress-container-custom">
                             {% set percentage = min(100, (hours / 20 * 100) | int) %}
-                            <div class="progress-bar-custom bg-success" style="width: {{ percentage }}%;"></div>
+                            <div class="progress-bar-custom bg-success" data-progress="{{ percentage }}"></div>
                         </div>
                     </div>
                 {% endfor %}
             </div>
         {% else %}
             <div class="text-center py-4 text-muted small">
-                <i class="bi bi-clock-history fs-2 d-block mb-1"></i>
+                <i class="ph ph-clock-counter-clockwise fs-2 d-block mb-1"></i>
                 No approved contribution hours.
             </div>
         {% endif %}
     </div>
 
     <!-- Contributed Workspaces (Stacked cards) -->
-    <div class="card-control">
-        <h5 class="card-control-title mb-3"><i class="bi bi-folder-check text-primary me-2"></i>My Workspace Authorization</h5>
+    <div class="aurora-card--padded">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-folder-simple text-primary me-2"></i>My Workspace Authorization</h5>
         {% if contributed_projects %}
             <div class="d-flex flex-column gap-3">
                 {% for p in contributed_projects %}
                     <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="badge bg-primary font-monospace" style="font-size: 0.65rem;">{{ p.program_type.name }}</span>
-                            <span class="badge badge-oia {% if p.status == 'Active' %}badge-status-active{% elif p.status == 'Completed' %}badge-status-completed{% else %}badge-status-pending{% endif %}" style="font-size: 0.65rem;">
+                            <span class="aurora-badge bg-primary font-monospace text-2xs">{{ p.program_type.name }}</span>
+                            <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% elif p.status == 'Completed' %}aurora-badge--status-completed{% else %}aurora-badge--status-pending{% endif %} text-2xs">
                                 {{ p.status }}
                             </span>
                         </div>
-                        <h6 class="text-white mb-2 fw-bold" style="font-size: 0.95rem;">{{ p.title }}</h6>
-                        <div class="text-muted small mb-3"><i class="bi bi-building"></i> {{ p.campus.name }}</div>
-                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="btn btn-outline-info w-100 py-2 small">Open Workspace</a>
+                        <h6 class="text-white mb-2 fw-bold text-ui-lg">{{ p.title }}</h6>
+                        <div class="text-muted small mb-3"><i class="ph ph-building-office"></i> {{ p.campus.name }}</div>
+                        <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="aurora-button--outline-info w-100 py-2 small">Open Workspace</a>
                     </div>
                 {% endfor %}
             </div>

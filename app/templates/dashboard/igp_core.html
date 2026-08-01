@@ -7,17 +7,18 @@
      DESKTOP LAYOUT (Unchanged)
      ========================================== -->
 <div class="d-none d-lg-block">
-    <div class="page-header animate-fade-in">
+    <div class="page-header">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
             <div>
-                <h1 class="page-title"><i class="bi bi-globe text-primary me-2"></i>IGP Operations deck</h1>
+                <div class="page-eyebrow">IGP command · {{ g.user.role }}</div>
+                <h1 class="page-title">IGP operations deck</h1>
                 <p class="page-subtitle">Strategic overview of India Gateway Program (IGP) exchange operations on <strong>{{ campus.name }}</strong>.</p>
             </div>
             
             <!-- Academic Year Filtering Dropdown -->
             <form action="{{ url_for('dashboard.index') }}" method="GET" class="d-flex align-items-center gap-2">
                 <label for="academic_year_id_desk" class="small text-muted text-nowrap">Switch Year:</label>
-                <select name="academic_year_id" id="academic_year_id_desk" class="form-input-oia py-2" onchange="this.form.submit()">
+                <select name="academic_year_id" id="academic_year_id_desk" class="aurora-input py-2" data-ui-auto-submit>
                     {% for ay in academic_years %}
                         <option value="{{ ay.id }}" {% if ay.id == selected_year_id %}selected{% endif %}>{{ ay.name }}</option>
                     {% endfor %}
@@ -27,107 +28,107 @@
     </div>
 
     <!-- KPI Summary Cards Grid -->
-    <div class="row g-4 mb-4 animate-fade-in">
+    <div class="row g-4 mb-4">
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">IGP Projects</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-folder-fill text-primary"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">IGP Projects</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-folder text-primary"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.total_projects }}</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">Total tracked</div>
+                <div class="aurora-card__value icon-display">{{ stats.total_projects }}</div>
+                <div class="aurora-card__description text-xs">Total tracked</div>
             </div>
         </div>
         
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">Active Vol.</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-people text-info"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">Active Vol.</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-users text-info"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.active_volunteers }}</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">IGP Volunteers</div>
+                <div class="aurora-card__value icon-display">{{ stats.active_volunteers }}</div>
+                <div class="aurora-card__description text-xs">IGP Volunteers</div>
             </div>
         </div>
         
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">Buddies</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-person-check-fill text-success"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">Buddies</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-user-check text-success"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.active_buddies }}</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">Assignments</div>
+                <div class="aurora-card__value icon-display">{{ stats.active_buddies }}</div>
+                <div class="aurora-card__description text-xs">Assignments</div>
             </div>
         </div>
         
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">Approved Hours</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-clock-history text-warning"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">Approved Hours</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-clock-counter-clockwise text-warning"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.total_contribution_hours }}</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">Work logged</div>
+                <div class="aurora-card__value icon-display">{{ stats.total_contribution_hours }}</div>
+                <div class="aurora-card__description text-xs">Work logged</div>
             </div>
         </div>
         
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">IGP Attendance</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-check-circle text-primary"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">IGP Attendance</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-check-circle text-primary"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.overall_attendance_rate }}%</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">Average rate</div>
+                <div class="aurora-card__value icon-display">{{ stats.overall_attendance_rate }}%</div>
+                <div class="aurora-card__description text-xs">Average rate</div>
             </div>
         </div>
         
         <div class="col-6 col-md-4 col-lg-2">
-            <div class="card-control py-3">
-                <div class="card-control-header mb-2">
-                    <span class="card-control-title" style="font-size: 0.85rem;">Active Proj.</span>
-                    <span class="card-control-icon" style="width: 32px; height: 32px; font-size: 1.1rem;"><i class="bi bi-activity text-danger"></i></span>
+            <div class="aurora-card--padded py-3">
+                <div class="aurora-card__header mb-2">
+                    <span class="aurora-card__title text-compact">Active Proj.</span>
+                    <span class="aurora-card__icon compact-icon"><i class="ph ph-activity text-danger"></i></span>
                 </div>
-                <div class="card-control-value" style="font-size: 1.8rem;">{{ stats.projects_by_status.get('Active', 0) }}</div>
-                <div class="card-control-desc" style="font-size: 0.75rem;">Running now</div>
+                <div class="aurora-card__value icon-display">{{ stats.projects_by_status.get('Active', 0) }}</div>
+                <div class="aurora-card__description text-xs">Running now</div>
             </div>
         </div>
     </div>
 
-    <div class="row g-4 animate-fade-in">
+    <div class="row g-4">
         <!-- Left Column -->
         <div class="col-lg-8">
             <!-- Pending Approvals Panel -->
-            <div class="card-control mb-4">
+            <div class="aurora-card--padded mb-4">
                 <div class="d-flex align-items-center justify-content-between mb-3 border-bottom border-secondary pb-2">
-                    <h5 class="card-control-title"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Pending Approvals (Campus IGP Scope)</h5>
-                    <span class="badge bg-warning text-dark">{{ pending_contributions|length + pending_buddy_logs|length }} items</span>
+                    <h5 class="aurora-card__title"><i class="ph ph-warning text-warning me-2"></i>Pending Approvals (Campus IGP Scope)</h5>
+                    <span class="aurora-badge bg-warning text-dark">{{ pending_contributions|length + pending_buddy_logs|length }} items</span>
                 </div>
                 
                 {% if not pending_contributions and not pending_buddy_logs %}
                     <div class="p-4 rounded border border-success bg-success bg-opacity-10 text-center">
-                        <i class="bi bi-check-circle-fill text-success fs-3 mb-2 d-block"></i>
+                        <i class="ph ph-check-circle text-success fs-3 mb-2 d-block"></i>
                         <span class="text-success fw-bold">All caught up!</span>
                         <p class="text-muted small mb-0 mt-1">There are no pending contributions or buddy log verifications for your campus program.</p>
                     </div>
                 {% else %}
-                    <div class="accordion accordion-flush bg-transparent border-0" id="pendingActionsAccordionDesk">
+                    <div class="aurora-disclosure-list aurora-disclosure-list--flush bg-transparent border-0" id="pendingActionsAccordionDesk">
                         <!-- 2. Contributions -->
                         {% if pending_contributions %}
-                        <div class="accordion-item bg-transparent border-0 border-bottom border-secondary">
-                            <h2 class="accordion-header bg-transparent" id="headingContribsDesk">
-                                <button class="accordion-button bg-transparent text-white collapsed px-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseContribsDesk" aria-expanded="false" aria-controls="collapseContribsDesk">
+                        <div class="aurora-disclosure bg-transparent border-0 border-bottom border-secondary">
+                            <h2 class="aurora-disclosure__heading bg-transparent" id="headingContribsDesk">
+                                <button class="aurora-disclosure__trigger bg-transparent text-white is-collapsed px-0" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseContribsDesk" aria-expanded="false" aria-controls="collapseContribsDesk">
                                     <span class="d-flex align-items-center justify-content-between w-100 me-3">
-                                        <span><i class="bi bi-clock-fill text-primary me-2"></i>IGP Contributions</span>
-                                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill">{{ pending_contributions|length }}</span>
+                                        <span><i class="ph ph-clock text-primary me-2"></i>IGP Contributions</span>
+                                        <span class="aurora-badge bg-primary bg-opacity-25 text-primary rounded-pill">{{ pending_contributions|length }}</span>
                                     </span>
                                 </button>
                             </h2>
-                            <div id="collapseContribsDesk" class="accordion-collapse collapse" aria-labelledby="headingContribsDesk" data-bs-parent="#pendingActionsAccordionDesk">
-                                <div class="accordion-body bg-transparent px-0 py-2">
-                                    <div class="table-responsive">
-                                        <table class="table table-dark table-striped table-hover align-middle border border-secondary mb-0" style="font-size: 0.85rem;">
+                            <div id="collapseContribsDesk" class="aurora-collapse" aria-labelledby="headingContribsDesk" data-ui-parent="#pendingActionsAccordionDesk">
+                                <div class="aurora-disclosure__content bg-transparent px-0 py-2">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--dark aurora-table--striped aurora-table--hover align-middle border border-secondary mb-0 text-compact">
                                             <thead>
                                                 <tr>
                                                     <th>Volunteer</th>
@@ -147,11 +148,11 @@
                                                     <td>
                                                         <form action="{{ url_for('campus.verify_contribution', campus_id=c.project.campus_id, project_id=c.project_id, contrib_id=c.id) }}" method="POST" class="d-inline">
                                                             <input type="hidden" name="action" value="approve">
-                                                            <button type="submit" class="btn btn-sm btn-success py-1 px-2"><i class="bi bi-check"></i> Approve</button>
+                                                            <button type="submit" class="aurora-button--small aurora-button--success py-1 px-2"><i class="ph ph-check"></i> Approve</button>
                                                         </form>
                                                         <form action="{{ url_for('campus.verify_contribution', campus_id=c.project.campus_id, project_id=c.project_id, contrib_id=c.id) }}" method="POST" class="d-inline">
                                                             <input type="hidden" name="action" value="reject">
-                                                            <button type="submit" class="btn btn-sm btn-danger py-1 px-2"><i class="bi bi-x"></i> Reject</button>
+                                                            <button type="submit" class="aurora-button--small aurora-button--danger py-1 px-2"><i class="ph ph-x"></i> Reject</button>
                                                         </form>
                                                     </td>
                                                 </tr>
@@ -166,19 +167,19 @@
                         
                         <!-- 3. Buddy Logs -->
                         {% if pending_buddy_logs %}
-                        <div class="accordion-item bg-transparent border-0 border-bottom border-secondary">
-                            <h2 class="accordion-header bg-transparent" id="headingBuddyLogsDesk">
-                                <button class="accordion-button bg-transparent text-white collapsed px-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyLogsDesk" aria-expanded="false" aria-controls="collapseBuddyLogsDesk">
+                        <div class="aurora-disclosure bg-transparent border-0 border-bottom border-secondary">
+                            <h2 class="aurora-disclosure__heading bg-transparent" id="headingBuddyLogsDesk">
+                                <button class="aurora-disclosure__trigger bg-transparent text-white is-collapsed px-0" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyLogsDesk" aria-expanded="false" aria-controls="collapseBuddyLogsDesk">
                                     <span class="d-flex align-items-center justify-content-between w-100 me-3">
-                                        <span><i class="bi bi-chat-heart-fill text-success me-2"></i>Buddy Interaction Logs</span>
-                                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill">{{ pending_buddy_logs|length }}</span>
+                                        <span><i class="ph ph-chat-heart-fill text-success me-2"></i>Buddy Interaction Logs</span>
+                                        <span class="aurora-badge bg-success bg-opacity-25 text-success rounded-pill">{{ pending_buddy_logs|length }}</span>
                                     </span>
                                 </button>
                             </h2>
-                            <div id="collapseBuddyLogsDesk" class="accordion-collapse collapse" aria-labelledby="headingBuddyLogsDesk" data-bs-parent="#pendingActionsAccordionDesk">
-                                <div class="accordion-body bg-transparent px-0 py-2">
-                                    <div class="table-responsive">
-                                        <table class="table table-dark table-striped table-hover align-middle border border-secondary mb-0" style="font-size: 0.85rem;">
+                            <div id="collapseBuddyLogsDesk" class="aurora-collapse" aria-labelledby="headingBuddyLogsDesk" data-ui-parent="#pendingActionsAccordionDesk">
+                                <div class="aurora-disclosure__content bg-transparent px-0 py-2">
+                                    <div class="aurora-table-scroll">
+                                        <table class="aurora-table--dark aurora-table--striped aurora-table--hover align-middle border border-secondary mb-0 text-compact">
                                             <thead>
                                                 <tr>
                                                     <th>Buddy Pair</th>
@@ -201,11 +202,11 @@
                                                     <td>
                                                         <form action="{{ url_for('campus.verify_buddy_log', campus_id=b.assignment.project.campus_id, project_id=b.assignment.project_id, log_id=b.id) }}" method="POST" class="d-inline">
                                                             <input type="hidden" name="action" value="approve">
-                                                            <button type="submit" class="btn btn-sm btn-success py-1 px-2"><i class="bi bi-check"></i> Approve</button>
+                                                            <button type="submit" class="aurora-button--small aurora-button--success py-1 px-2"><i class="ph ph-check"></i> Approve</button>
                                                         </form>
                                                         <form action="{{ url_for('campus.verify_buddy_log', campus_id=b.assignment.project.campus_id, project_id=b.assignment.project_id, log_id=b.id) }}" method="POST" class="d-inline">
                                                             <input type="hidden" name="action" value="reject">
-                                                            <button type="submit" class="btn btn-sm btn-danger py-1 px-2"><i class="bi bi-x"></i> Reject</button>
+                                                            <button type="submit" class="aurora-button--small aurora-button--danger py-1 px-2"><i class="ph ph-x"></i> Reject</button>
                                                         </form>
                                                     </td>
                                                 </tr>
@@ -223,17 +224,17 @@
             </div>
 
             <!-- Campus Quick Drill-Down -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-building-fill text-primary"></i> Campus Drill-down Hub</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-building-office text-primary"></i> Campus Drill-down Hub</h5>
                 <p class="text-muted small">Access your campus directory details to review resources, insights, and overall project logs.</p>
-                <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="btn btn-outline-info rounded-pill px-4 py-2 mt-2">
-                    Open Campus Deck <i class="bi bi-arrow-right-short ms-1"></i>
+                <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="aurora-button--outline-info rounded-pill px-4 py-2 mt-2">
+                    Open Campus Deck <i class="ph ph-arrow-right ms-1"></i>
                 </a>
             </div>
             
             <!-- Recent Activity Track -->
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-activity text-primary"></i> IGP Activity Track ({{ campus.name }})</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-activity text-primary"></i> IGP Activity Track ({{ campus.name }})</h5>
                 <div class="timeline-stream">
                     {% for act in recent_activities %}
                         <div class="timeline-event {% if act.status == 'Approved' %}event-success{% elif act.status == 'Pending' %}event-warning{% endif %}">
@@ -244,9 +245,9 @@
                             <div class="timeline-event-desc">
                                 {{ act.desc }} 
                                 {% if act.status == 'Pending' %}
-                                    <span class="badge bg-warning text-dark font-monospace ms-1" style="font-size: 0.65rem;">Pending approval</span>
+                                    <span class="aurora-badge bg-warning text-dark font-monospace ms-1 text-2xs">Pending approval</span>
                                 {% else %}
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success font-monospace ms-1" style="font-size: 0.65rem;">Approved</span>
+                                    <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success font-monospace ms-1 text-2xs">Approved</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -258,26 +259,26 @@
         <!-- Right Column -->
         <div class="col-lg-4">
             <!-- Active Projects Watchlist -->
-            <div class="card-control mb-4">
-                <h5 class="card-control-title mb-3"><i class="bi bi-bookmark-star-fill text-primary"></i> Active IGP Programs</h5>
+            <div class="aurora-card--padded mb-4">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-bookmark-simple text-primary"></i> Active IGP Programs</h5>
                 {% if active_projects %}
                     <div class="d-flex flex-column gap-3">
                         {% for p in active_projects %}
                             <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="text-decoration-none">
-                                <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25 hover-border-light transition-all">
+                                <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="badge bg-primary rounded-pill font-monospace small" style="font-size: 0.7rem;">{{ p.category }}</span>
-                                        <span class="badge badge-oia badge-status-active">Active</span>
+                                        <span class="aurora-badge bg-primary rounded-pill font-monospace small text-caption">{{ p.category }}</span>
+                                        <span class="aurora-badge aurora-badge--status-active">Active</span>
                                     </div>
                                     <h6 class="text-white mb-1 fw-bold">{{ p.title }}</h6>
-                                    <p class="text-muted small mb-2"><i class="bi bi-calendar3"></i> {{ p.start_date.strftime('%b %d') }} - {{ p.end_date.strftime('%b %d, %Y') }}</p>
+                                    <p class="text-muted small mb-2"><i class="ph ph-calendar"></i> {{ p.start_date.strftime('%b %d') }} - {{ p.end_date.strftime('%b %d, %Y') }}</p>
                                     
                                     <div class="d-flex align-items-center justify-content-between small text-muted">
                                         <span>Elapsed Duration</span>
                                         <span>{{ p.progress_percent }}%</span>
                                     </div>
                                     <div class="progress-container-custom">
-                                        <div class="progress-bar-custom" style="width: {{ p.progress_percent }}%;"></div>
+                                        <div class="progress-bar-custom" data-progress="{{ p.progress_percent }}"></div>
                                     </div>
                                 </div>
                             </a>
@@ -285,30 +286,30 @@
                     </div>
                 {% else %}
                     <div class="text-center py-5">
-                        <i class="bi bi-journal-x fs-2 text-muted"></i>
+                        <i class="ph ph-notebook fs-2 text-muted"></i>
                         <p class="text-muted mt-2 small">No active exchange programs currently running.</p>
                     </div>
                 {% endif %}
             </div>
             
             <!-- Upcoming IGP Timeline -->
-            <div class="card-control">
-                <h5 class="card-control-title mb-3"><i class="bi bi-calendar-event text-primary"></i> Upcoming IGP Events</h5>
+            <div class="aurora-card--padded">
+                <h5 class="aurora-card__title mb-3"><i class="ph ph-calendar-dots text-primary"></i> Upcoming IGP Events</h5>
                 {% if upcoming_events %}
                     <div class="d-flex flex-column gap-3">
                         {% for p in upcoming_events %}
                             <div class="p-3 border border-secondary rounded bg-dark bg-opacity-10 d-flex justify-content-between align-items-start gap-2">
                                 <div>
-                                    <h6 class="text-white mb-1 fw-bold" style="font-size: 0.9rem;">{{ p.title }}</h6>
-                                    <small class="text-muted d-block"><i class="bi bi-calendar-check"></i> Starts: {{ p.start_date.strftime('%b %d, %Y') }}</small>
+                                    <h6 class="text-white mb-1 fw-bold text-ui">{{ p.title }}</h6>
+                                    <small class="text-muted d-block"><i class="ph ph-calendar-check"></i> Starts: {{ p.start_date.strftime('%b %d, %Y') }}</small>
                                 </div>
-                                <span class="badge badge-oia {% if p.status == 'Active' %}badge-status-active{% else %}badge-status-pending{% endif %} text-capitalize" style="font-size: 0.65rem;">{{ p.status }}</span>
+                                <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% else %}aurora-badge--status-pending{% endif %} text-capitalize text-2xs">{{ p.status }}</span>
                             </div>
                         {% endfor %}
                     </div>
                 {% else %}
                     <div class="text-center py-5">
-                        <i class="bi bi-calendar-x fs-2 text-muted"></i>
+                        <i class="ph ph-calendar-x fs-2 text-muted"></i>
                         <p class="text-muted mt-2 small">No future exchange programs scheduled.</p>
                     </div>
                 {% endif %}
@@ -320,12 +321,12 @@
 <!-- ==========================================
      MOBILE LAYOUT (Redesigned)
      ========================================== -->
-<div class="d-block d-lg-none animate-fade-in">
+<div class="d-block d-lg-none">
     <!-- Academic Year Selector & Header Info -->
-    <div class="card-control mb-4">
+    <div class="aurora-card--padded mb-4">
         <form action="{{ url_for('dashboard.index') }}" method="GET" class="d-flex flex-column gap-2">
-            <label for="academic_year_id_mob" class="form-label-oia mb-0">Operational Academic Year</label>
-            <select name="academic_year_id" id="academic_year_id_mob" class="form-input-oia w-100" onchange="this.form.submit()">
+            <label for="academic_year_id_mob" class="aurora-label mb-0">Operational Academic Year</label>
+            <select name="academic_year_id" id="academic_year_id_mob" class="aurora-input w-100" data-ui-auto-submit>
                 {% for ay in academic_years %}
                     <option value="{{ ay.id }}" {% if ay.id == selected_year_id %}selected{% endif %}>{{ ay.name }}</option>
                 {% endfor %}
@@ -336,38 +337,38 @@
     <!-- Mobile Alerts (Pending Tasks overview card) -->
     {% set total_pending = pending_contributions|length + pending_buddy_logs|length %}
     {% if total_pending > 0 %}
-        <div class="card-control mb-4 border border-warning" style="background: rgba(234, 179, 8, 0.05);">
+        <div class="aurora-card--padded mb-4 border border-warning surface-warning">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <h6 class="text-warning fw-bold mb-1"><i class="bi bi-exclamation-octagon-fill"></i> Campus Pending Approvals</h6>
+                    <h6 class="text-warning fw-bold mb-1"><i class="ph ph-warning-octagon"></i> Campus Pending Approvals</h6>
                     <span class="text-muted small">{{ total_pending }} contributions or buddy logs await approval.</span>
                 </div>
-                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold">{{ total_pending }}</span>
+                <span class="aurora-badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold">{{ total_pending }}</span>
             </div>
         </div>
     {% endif %}
 
     <!-- 1. Active Watchlist (Prioritized Primary Section) -->
-    <div class="card-control mb-4">
-        <h5 class="card-control-title mb-3"><i class="bi bi-bookmark-star-fill text-primary me-2"></i>Active Watchlist</h5>
+    <div class="aurora-card--padded mb-4">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-bookmark-simple text-primary me-2"></i>Active Watchlist</h5>
         {% if active_projects %}
             <div class="d-flex flex-column gap-3">
                 {% for p in active_projects %}
                     <a href="{{ url_for('campus.project_detail', campus_id=p.campus_id, project_id=p.id) }}" class="text-decoration-none">
-                        <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25 hover-border-light transition-all">
+                        <div class="p-3 border border-secondary rounded bg-dark bg-opacity-25">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="badge bg-primary rounded-pill font-monospace small" style="font-size: 0.65rem;">{{ p.category }}</span>
-                                <span class="badge badge-oia badge-status-active">Active</span>
+                                <span class="aurora-badge bg-primary rounded-pill font-monospace small text-2xs">{{ p.category }}</span>
+                                <span class="aurora-badge aurora-badge--status-active">Active</span>
                             </div>
-                            <h6 class="text-white mb-1 fw-bold" style="font-size: 0.95rem;">{{ p.title }}</h6>
-                            <p class="text-muted small mb-2"><i class="bi bi-calendar3"></i> {{ p.start_date.strftime('%b %d') }} - {{ p.end_date.strftime('%b %d') }}</p>
+                            <h6 class="text-white mb-1 fw-bold text-ui-lg">{{ p.title }}</h6>
+                            <p class="text-muted small mb-2"><i class="ph ph-calendar"></i> {{ p.start_date.strftime('%b %d') }} - {{ p.end_date.strftime('%b %d') }}</p>
                             
                             <div class="d-flex align-items-center justify-content-between small text-muted mb-1">
                                 <span>Elapsed Duration</span>
                                 <span>{{ p.progress_percent }}%</span>
                             </div>
                             <div class="progress-container-custom">
-                                <div class="progress-bar-custom" style="width: {{ p.progress_percent }}%;"></div>
+                                <div class="progress-bar-custom" data-progress="{{ p.progress_percent }}"></div>
                             </div>
                         </div>
                     </a>
@@ -375,7 +376,7 @@
             </div>
         {% else %}
             <div class="text-center py-4">
-                <i class="bi bi-journal-x fs-2 text-muted"></i>
+                <i class="ph ph-notebook fs-2 text-muted"></i>
                 <p class="text-muted mt-2 small">No active exchange programs running.</p>
             </div>
         {% endif %}
@@ -383,22 +384,22 @@
 
     <!-- 2. Actionable Pending Tasks Lists -->
     {% if total_pending > 0 %}
-        <div class="card-control mb-4">
-            <h5 class="card-control-title mb-3"><i class="bi bi-check2-square text-warning me-2"></i>Actionable Verifications</h5>
+        <div class="aurora-card--padded mb-4">
+            <h5 class="aurora-card__title mb-3"><i class="ph ph-check-square text-warning me-2"></i>Actionable Verifications</h5>
             
-            <div class="accordion accordion-flush bg-transparent border-0" id="pendingActionsAccordionMob">
+            <div class="aurora-disclosure-list aurora-disclosure-list--flush bg-transparent border-0" id="pendingActionsAccordionMob">
                 {% if pending_contributions %}
-                    <div class="accordion-item bg-transparent border-0 border-bottom border-secondary">
-                        <h2 class="accordion-header bg-transparent" id="headingContribsMob">
-                            <button class="accordion-button bg-transparent text-white collapsed px-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseContribsMob" aria-expanded="false">
+                    <div class="aurora-disclosure bg-transparent border-0 border-bottom border-secondary">
+                        <h2 class="aurora-disclosure__heading bg-transparent" id="headingContribsMob">
+                            <button class="aurora-disclosure__trigger bg-transparent text-white is-collapsed px-0" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseContribsMob" aria-expanded="false">
                                 <span class="d-flex align-items-center justify-content-between w-100 me-3">
-                                    <span><i class="bi bi-clock text-primary me-2"></i>Contributions</span>
-                                    <span class="badge bg-primary rounded-pill">{{ pending_contributions|length }}</span>
+                                    <span><i class="ph ph-clock text-primary me-2"></i>Contributions</span>
+                                    <span class="aurora-badge bg-primary rounded-pill">{{ pending_contributions|length }}</span>
                                 </span>
                             </button>
                         </h2>
-                        <div id="collapseContribsMob" class="accordion-collapse collapse" data-bs-parent="#pendingActionsAccordionMob">
-                            <div class="accordion-body bg-transparent px-0 py-2">
+                        <div id="collapseContribsMob" class="aurora-collapse" data-ui-parent="#pendingActionsAccordionMob">
+                            <div class="aurora-disclosure__content bg-transparent px-0 py-2">
                                 <div class="d-flex flex-column gap-3">
                                     {% for c in pending_contributions %}
                                         <div class="p-3 rounded border border-secondary bg-dark bg-opacity-25">
@@ -408,11 +409,11 @@
                                             <div class="d-flex gap-2">
                                                 <form action="{{ url_for('campus.verify_contribution', campus_id=c.project.campus_id, project_id=c.project_id, contrib_id=c.id) }}" method="POST" class="flex-grow-1">
                                                     <input type="hidden" name="action" value="approve">
-                                                    <button type="submit" class="btn btn-success w-100 py-1.5 small"><i class="bi bi-check"></i> Approve</button>
+                                                    <button type="submit" class="aurora-button--success w-100 py-1.5 small"><i class="ph ph-check"></i> Approve</button>
                                                 </form>
                                                 <form action="{{ url_for('campus.verify_contribution', campus_id=c.project.campus_id, project_id=c.project_id, contrib_id=c.id) }}" method="POST" class="flex-grow-1">
                                                     <input type="hidden" name="action" value="reject">
-                                                    <button type="submit" class="btn btn-outline-danger w-100 py-1.5 small"><i class="bi bi-x"></i> Reject</button>
+                                                    <button type="submit" class="aurora-button--outline-danger w-100 py-1.5 small"><i class="ph ph-x"></i> Reject</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -424,17 +425,17 @@
                 {% endif %}
 
                 {% if pending_buddy_logs %}
-                    <div class="accordion-item bg-transparent border-0 border-bottom border-secondary">
-                        <h2 class="accordion-header bg-transparent" id="headingBuddyLogsMob">
-                            <button class="accordion-button bg-transparent text-white collapsed px-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBuddyLogsMob" aria-expanded="false">
+                    <div class="aurora-disclosure bg-transparent border-0 border-bottom border-secondary">
+                        <h2 class="aurora-disclosure__heading bg-transparent" id="headingBuddyLogsMob">
+                            <button class="aurora-disclosure__trigger bg-transparent text-white is-collapsed px-0" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyLogsMob" aria-expanded="false">
                                 <span class="d-flex align-items-center justify-content-between w-100 me-3">
-                                    <span><i class="bi bi-chat-heart text-success me-2"></i>Buddy Logs</span>
-                                    <span class="badge bg-success text-dark rounded-pill">{{ pending_buddy_logs|length }}</span>
+                                    <span><i class="ph ph-chat-heart text-success me-2"></i>Buddy Logs</span>
+                                    <span class="aurora-badge bg-success text-dark rounded-pill">{{ pending_buddy_logs|length }}</span>
                                 </span>
                             </button>
                         </h2>
-                        <div id="collapseBuddyLogsMob" class="accordion-collapse collapse" data-bs-parent="#pendingActionsAccordionMob">
-                            <div class="accordion-body bg-transparent px-0 py-2">
+                        <div id="collapseBuddyLogsMob" class="aurora-collapse" data-ui-parent="#pendingActionsAccordionMob">
+                            <div class="aurora-disclosure__content bg-transparent px-0 py-2">
                                 <div class="d-flex flex-column gap-3">
                                     {% for b in pending_buddy_logs %}
                                         {% if b.assignment %}
@@ -444,11 +445,11 @@
                                                 <div class="d-flex gap-2">
                                                     <form action="{{ url_for('campus.verify_buddy_log', campus_id=b.assignment.project.campus_id, project_id=b.assignment.project_id, log_id=b.id) }}" method="POST" class="flex-grow-1">
                                                         <input type="hidden" name="action" value="approve">
-                                                        <button type="submit" class="btn btn-success w-100 py-1.5 small"><i class="bi bi-check"></i> Approve</button>
+                                                        <button type="submit" class="aurora-button--success w-100 py-1.5 small"><i class="ph ph-check"></i> Approve</button>
                                                     </form>
                                                     <form action="{{ url_for('campus.verify_buddy_log', campus_id=b.assignment.project.campus_id, project_id=b.assignment.project_id, log_id=b.id) }}" method="POST" class="flex-grow-1">
                                                         <input type="hidden" name="action" value="reject">
-                                                        <button type="submit" class="btn btn-outline-danger w-100 py-1.5 small"><i class="bi bi-x"></i> Reject</button>
+                                                        <button type="submit" class="aurora-button--outline-danger w-100 py-1.5 small"><i class="ph ph-x"></i> Reject</button>
                                                     </form>
                                                 </div>
                                             </div>
@@ -464,49 +465,49 @@
     {% endif %}
 
     <!-- 3. Campus Drill-down Shortcut -->
-    <div class="card-control mb-4">
-        <h5 class="card-control-title mb-3"><i class="bi bi-building me-2 text-info"></i>Campus Workspace</h5>
+    <div class="aurora-card--padded mb-4">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-building-office me-2 text-info"></i>Campus Workspace</h5>
         <p class="text-light small mb-3">View linked folders, feedback distributions, and logs for {{ campus.name }}.</p>
-        <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="btn btn-oia-primary w-100 py-2.5">Open Campus Workspace Deck</a>
+        <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="aurora-button--primary w-100 py-2.5">Open Campus Workspace Deck</a>
     </div>
 
     <!-- 4. Progressive Disclosure: Secondary Performance KPIs -->
-    <div class="accordion bg-transparent border-0 mb-4" id="mobileSecondaryKpis">
-        <div class="accordion-item bg-transparent border-0">
-            <h2 class="accordion-header bg-transparent" id="secondaryKpisHeader">
-                <button class="accordion-button bg-transparent text-info border-secondary py-3 px-0 justify-content-center collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSecondaryKpis" aria-expanded="false" aria-controls="collapseSecondaryKpis">
-                    <i class="bi bi-bar-chart-steps me-2"></i> View Program Performance KPIs
+    <div class="aurora-disclosure-list bg-transparent border-0 mb-4" id="mobileSecondaryKpis">
+        <div class="aurora-disclosure bg-transparent border-0">
+            <h2 class="aurora-disclosure__heading bg-transparent" id="secondaryKpisHeader">
+                <button class="aurora-disclosure__trigger bg-transparent text-info border-secondary py-3 px-0 justify-content-center is-collapsed" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseSecondaryKpis" aria-expanded="false" aria-controls="collapseSecondaryKpis">
+                    <i class="ph ph-chart-bar me-2"></i> View Program Performance KPIs
                 </button>
             </h2>
-            <div id="collapseSecondaryKpis" class="accordion-collapse collapse" aria-labelledby="secondaryKpisHeader" data-bs-parent="#mobileSecondaryKpis">
-                <div class="accordion-body bg-transparent px-0 py-3">
+            <div id="collapseSecondaryKpis" class="aurora-collapse" aria-labelledby="secondaryKpisHeader" data-ui-parent="#mobileSecondaryKpis">
+                <div class="aurora-disclosure__content bg-transparent px-0 py-3">
                     <div class="row g-3">
                         <div class="col-6">
-                            <div class="card-control py-3">
+                            <div class="aurora-card--padded py-3">
                                 <span class="project-stat-label">IGP Projects</span>
                                 <strong class="text-white fs-4 mt-1 d-block">{{ stats.total_projects }}</strong>
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="card-control py-3">
+                            <div class="aurora-card--padded py-3">
                                 <span class="project-stat-label">Active Vol.</span>
                                 <strong class="text-white fs-4 mt-1 d-block">{{ stats.active_volunteers }}</strong>
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="card-control py-3">
+                            <div class="aurora-card--padded py-3">
                                 <span class="project-stat-label">Buddies</span>
                                 <strong class="text-white fs-4 mt-1 d-block">{{ stats.active_buddies }}</strong>
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="card-control py-3">
+                            <div class="aurora-card--padded py-3">
                                 <span class="project-stat-label">Hours Logged</span>
                                 <strong class="text-white fs-4 mt-1 d-block">{{ stats.total_contribution_hours }}</strong>
                             </div>
                         </div>
                         <div class="col-12">
-                            <div class="card-control py-3 text-center">
+                            <div class="aurora-card--padded py-3 text-center">
                                 <span class="project-stat-label">IGP Attendance</span>
                                 <strong class="text-primary fs-3 mt-1 d-block">{{ stats.overall_attendance_rate }}%</strong>
                             </div>
@@ -518,38 +519,38 @@
     </div>
 
     <!-- 5. Upcoming exchange programs -->
-    <div class="card-control mb-4">
-        <h5 class="card-control-title mb-3"><i class="bi bi-calendar-event text-primary me-2"></i>Upcoming Programs</h5>
+    <div class="aurora-card--padded mb-4">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-calendar-dots text-primary me-2"></i>Upcoming Programs</h5>
         {% if upcoming_events %}
             <div class="d-flex flex-column gap-3">
                 {% for p in upcoming_events %}
                     <div class="p-3 border border-secondary rounded bg-dark bg-opacity-10 d-flex justify-content-between align-items-center gap-2">
                         <div>
-                            <h6 class="text-white mb-1 fw-bold" style="font-size: 0.9rem;">{{ p.title }}</h6>
-                            <small class="text-muted d-block"><i class="bi bi-calendar-check"></i> Starts: {{ p.start_date.strftime('%b %d, %Y') }}</small>
+                            <h6 class="text-white mb-1 fw-bold text-ui">{{ p.title }}</h6>
+                            <small class="text-muted d-block"><i class="ph ph-calendar-check"></i> Starts: {{ p.start_date.strftime('%b %d, %Y') }}</small>
                         </div>
-                        <span class="badge badge-oia {% if p.status == 'Active' %}badge-status-active{% else %}badge-status-pending{% endif %} text-capitalize" style="font-size: 0.65rem;">{{ p.status }}</span>
+                        <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% else %}aurora-badge--status-pending{% endif %} text-capitalize text-2xs">{{ p.status }}</span>
                     </div>
                 {% endfor %}
             </div>
         {% else %}
             <div class="text-center py-4">
-                <i class="bi bi-calendar-x fs-2 text-muted"></i>
+                <i class="ph ph-calendar-x fs-2 text-muted"></i>
                 <p class="text-muted mt-2 small">No planned exchange programs scheduled.</p>
             </div>
         {% endif %}
     </div>
 
     <!-- 6. Recent IGP Activities -->
-    <div class="card-control">
-        <h5 class="card-control-title mb-3"><i class="bi bi-activity text-primary me-2"></i>Recent Activity</h5>
+    <div class="aurora-card--padded">
+        <h5 class="aurora-card__title mb-3"><i class="ph ph-activity text-primary me-2"></i>Recent Activity</h5>
         <div class="timeline-stream">
             {% for act in recent_activities[:10] %}
                 <div class="timeline-event {% if act.status == 'Approved' %}event-success{% elif act.status == 'Pending' %}event-warning{% endif %}">
                     <span class="timeline-event-time">@{{ act.user }}</span>
-                    <div class="timeline-event-desc text-white" style="font-size: 0.85rem;">
+                    <div class="timeline-event-desc text-white text-compact">
                         {{ act.desc }} 
-                        <span class="badge bg-secondary bg-opacity-50 font-monospace" style="font-size: 0.6rem;">{{ act.project|truncate(25) }}</span>
+                        <span class="aurora-badge bg-secondary bg-opacity-50 font-monospace text-micro">{{ act.project|truncate(25) }}</span>
                     </div>
                 </div>
             {% endfor %}

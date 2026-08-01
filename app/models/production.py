@@ -127,6 +127,8 @@ class ProjectRisk(PublicIdMixin, TimestampMixin, db.Model):
     is_critical = db.Column(db.Boolean, nullable=False, default=False)
     version = db.Column(db.Integer, nullable=False, default=1)
 
+    project = db.relationship("Project", backref=db.backref("risks", cascade="all, delete-orphan"))
+
 
 class TaskStatusEvent(PublicIdMixin, db.Model):
     __tablename__ = "task_status_events"
@@ -187,6 +189,9 @@ class ContributionRecord(PublicIdMixin, TimestampMixin, db.Model):
     approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     approved_at = db.Column(db.DateTime(timezone=True), nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
+
+    project = db.relationship("Project", backref=db.backref("contribution_records", cascade="all, delete-orphan"))
+    person = db.relationship("Person")
 
     __table_args__ = (db.CheckConstraint("duration_hours >= 0", name="ck_contribution_hours"),)
 

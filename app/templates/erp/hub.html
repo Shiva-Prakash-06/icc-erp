@@ -1,42 +1,67 @@
 {% extends "base.html" %}
 {% block title %}ERP Operations{% endblock %}
+{% block mobile_title %}ERP operations{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+<header class="page-header">
   <div>
-    <p class="text-info text-uppercase small fw-bold mb-1">OIA Operations Suite</p>
-    <h1 class="h2 mb-1">Authoritative operational record</h1>
-    <p class="text-muted mb-0">ICC governance and IGP program delivery remain separately scoped in one institutional system.</p>
+    <div class="page-eyebrow">OIA operations suite</div>
+    <h1 class="page-title">Authoritative operational record</h1>
+    <p class="page-subtitle">ICC governance and IGP program delivery remain separately scoped in one institutional system.</p>
   </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-primary" href="{{ url_for('erp.imports') }}"><i class="bi bi-database-up me-1"></i> Imports</a>
-    <a class="btn btn-primary" href="{{ url_for('erp.projects') }}"><i class="bi bi-kanban me-1"></i> Projects</a>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="aurora-button--secondary" href="{{ url_for('erp.imports') }}"><i class="ph ph-database" aria-hidden="true"></i>Imports</a>
+    <a class="aurora-button--primary" href="{{ url_for('erp.projects') }}"><i class="ph ph-kanban" aria-hidden="true"></i>Projects</a>
   </div>
-</div>
+</header>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Visible projects</div><div class="display-6 fw-semibold">{{ stats.projects }}</div></div></div></div>
-  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">In delivery</div><div class="display-6 fw-semibold">{{ stats.active }}</div></div></div></div>
-  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">People records</div><div class="display-6 fw-semibold">{{ stats.people if stats.people is not none else 'Scoped' }}</div></div></div></div>
-  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Import batches</div><div class="display-6 fw-semibold">{{ stats.imports if stats.imports is not none else 'Scoped' }}</div></div></div></div>
-</div>
+<section class="content-grid mb-4" aria-label="Operational indicators">
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Visible projects</div><div class="aurora-card__value mt-3">{{ stats.projects }}</div></div><span class="aurora-card__icon"><i class="ph ph-folder-open" aria-hidden="true"></i></span></div>
+    <div class="kpi-card__trend"><span>Portfolio scope</span><span>↗</span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">In delivery</div><div class="aurora-card__value mt-3">{{ stats.active }}</div></div><span class="aurora-card__icon"><i class="ph ph-activity" aria-hidden="true"></i></span></div>
+    <div class="kpi-card__trend"><span>Active lifecycle</span><span>●</span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">People records</div><div class="aurora-card__value mt-3">{{ stats.people if stats.people is not none else 'Scoped' }}</div></div><span class="aurora-card__icon"><i class="ph ph-users-three" aria-hidden="true"></i></span></div>
+    <div class="kpi-card__trend"><span>Permission aware</span><span>✓</span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Import batches</div><div class="aurora-card__value mt-3">{{ stats.imports if stats.imports is not none else 'Scoped' }}</div></div><span class="aurora-card__icon"><i class="ph ph-database" aria-hidden="true"></i></span></div>
+    <div class="kpi-card__trend"><span>Reconciled sources</span><span>↗</span></div>
+  </article>
+</section>
 
-<div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center"><strong>Recent projects</strong><a href="{{ url_for('erp.projects') }}">View all</a></div>
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Code</th><th>Project / program</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead>
-      <tbody>
-      {% for project in projects %}
-        <tr>
-          <td class="font-monospace">{{ project.code or 'Uncoded' }}</td>
-          <td><a class="fw-semibold" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.title }}</a></td>
-          <td>{{ project.program_type.name }}</td>
-          <td>{{ project.start_date }} – {{ project.end_date }}</td>
-          <td><span class="badge text-bg-info">{{ project.status }}</span></td>
-        </tr>
-      {% else %}<tr><td colspan="5" class="text-center py-5 text-muted">No projects are visible in your assigned scope.</td></tr>{% endfor %}
-      </tbody>
-    </table>
+<section class="content-grid">
+  <div class="aurora-card col-span-8">
+    <div class="aurora-card__header"><div><span class="page-eyebrow">Portfolio pulse</span><strong>Recent projects</strong></div><a class="aurora-button--link aurora-button--small" href="{{ url_for('erp.projects') }}">View all <i class="ph ph-arrow-right" aria-hidden="true"></i></a></div>
+    <div class="aurora-table-scroll">
+      <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+        <thead><tr><th>Code</th><th>Project / program</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for project in projects %}
+          <tr>
+            <td data-label="Code" class="font-monospace">{{ project.code or 'Uncoded' }}</td>
+            <td data-label="Project"><a class="fw-semibold" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.title }}</a><div class="small text-muted">{{ project.campus.name }}</div></td>
+            <td data-label="Unit">{{ project.program_type.name }}</td>
+            <td data-label="Dates" class="font-monospace text-xs">{{ project.start_date }} – {{ project.end_date }}</td>
+            <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span></td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="text-center py-5 text-muted">No projects are visible in your assigned scope.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
+  <aside class="aurora-card--padded col-span-4">
+    <div class="page-eyebrow">Operational flow</div>
+    <h2 class="h4">Record-to-report pathway</h2>
+    <div class="timeline-stream">
+      <div class="timeline-event"><div class="timeline-event-time">01 · Plan</div><div class="timeline-event-desc">Create a scoped Draft project and its operating record.</div></div>
+      <div class="timeline-event"><div class="timeline-event-time">02 · Deliver</div><div class="timeline-event-desc">Track sessions, people, tasks, evidence and approvals.</div></div>
+      <div class="timeline-event"><div class="timeline-event-time">03 · Close</div><div class="timeline-event-desc">Resolve blockers before lifecycle closure.</div></div>
+      <div class="timeline-event"><div class="timeline-event-time">04 · Report</div><div class="timeline-event-desc">Compile an auditable snapshot from approved data.</div></div>
+    </div>
+  </aside>
+</section>
 {% endblock %}

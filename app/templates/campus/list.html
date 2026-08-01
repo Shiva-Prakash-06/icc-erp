@@ -3,21 +3,21 @@
 {% block title %}Campus Directory - OIA Project Intelligence{% endblock %}
 
 {% block content %}
-<div class="page-header animate-fade-in">
+<div class="page-header">
     <h1 class="page-title">Campus Directory</h1>
     <p class="page-subtitle">Select a Christ University campus to inspect its local ICC and IGP projects and operational statistics.</p>
 </div>
 
 <!-- Campuses Cards Grid -->
-<div class="row g-4 animate-fade-in">
+<div class="row g-4">
     {% for campus in campuses %}
         {% set sum = summaries.get(campus.id) %}
         <div class="col-md-6 col-lg-4">
-            <div class="card-control d-flex flex-column justify-content-between h-100">
+            <div class="aurora-card--padded d-flex flex-column justify-content-between h-100">
                 <div>
-                    <div class="card-control-header">
-                        <h4 class="text-white fw-bold mb-0"><i class="bi bi-building text-info"></i> {{ campus.name }}</h4>
-                        <span class="badge bg-primary font-monospace">{{ sum.total_projects }} Projects</span>
+                    <div class="aurora-card__header">
+                        <h4 class="text-white fw-bold mb-0"><i class="ph ph-building-office text-info"></i> {{ campus.name }}</h4>
+                        <span class="aurora-badge bg-primary font-monospace">{{ sum.total_projects }} Projects</span>
                     </div>
                     
                     <p class="text-muted small mt-2">
@@ -27,15 +27,15 @@
                     <div class="p-3 rounded bg-dark bg-opacity-25 border border-secondary my-4">
                         <div class="row text-center">
                             <div class="col-4 border-end border-secondary">
-                                <span class="d-block text-muted small" style="font-size: 0.7rem;">Active Part.</span>
+                                <span class="d-block text-muted small text-caption">Active Part.</span>
                                 <span class="fs-5 fw-bold text-white">{{ sum.active_participants }}</span>
                             </div>
                             <div class="col-4 border-end border-secondary">
-                                <span class="d-block text-muted small" style="font-size: 0.7rem;">Work Hours</span>
+                                <span class="d-block text-muted small text-caption">Work Hours</span>
                                 <span class="fs-5 fw-bold text-white">{{ sum.contribution_hours }}</span>
                             </div>
                             <div class="col-4">
-                                <span class="d-block text-muted small" style="font-size: 0.7rem;">Attendance</span>
+                                <span class="d-block text-muted small text-caption">Attendance</span>
                                 <span class="fs-5 fw-bold text-white">{{ sum.attendance_rate }}%</span>
                             </div>
                         </div>
@@ -50,7 +50,7 @@
                     </div>
                 </div>
 
-                <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="btn-oia-primary w-100 mt-2 py-2.5">Open Campus Command</a>
+                <a href="{{ url_for('campus.campus_detail', campus_id=campus.id) }}" class="aurora-button--primary w-100 mt-2 py-2.5">Open Campus Command</a>
             </div>
         </div>
     {% endfor %}

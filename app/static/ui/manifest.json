@@ -1,0 +1,34 @@
+{
+  "_animate-BF7PFydr.js": {
+    "file": "assets/animate-BF7PFydr.js",
+    "name": "animate"
+  },
+  "frontend/src/entries/aurora.tsx": {
+    "file": "assets/aurora-CgSLQwuh.js",
+    "name": "aurora",
+    "src": "frontend/src/entries/aurora.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "frontend/src/islands/command-palette.ts",
+      "frontend/src/islands/shell-motion.ts"
+    ]
+  },
+  "frontend/src/islands/command-palette.ts": {
+    "file": "assets/command-palette-DJAwvi9Y.js",
+    "name": "command-palette",
+    "src": "frontend/src/islands/command-palette.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_animate-BF7PFydr.js"
+    ]
+  },
+  "frontend/src/islands/shell-motion.ts": {
+    "file": "assets/shell-motion-D-kTz5Ms.js",
+    "name": "shell-motion",
+    "src": "frontend/src/islands/shell-motion.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_animate-BF7PFydr.js"
+    ]
+  }
+}

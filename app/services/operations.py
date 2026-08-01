@@ -5,8 +5,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.database import db
-from app.models.erp import ChecklistItemStatus, DocumentRecord, FeedbackResponse, OperationalRequest, ProjectSession, SessionAttendance, TeamAssignment, WorkTask
+from app.models.erp import (
+    BudgetLine,
+    ChecklistInstance,
+    ChecklistItemStatus,
+    ChecklistTemplateItem,
+    DocumentRecord,
+    FeedbackResponse,
+    OperationalRequest,
+    ProjectSession,
+    SessionAttendance,
+    TeamAssignment,
+    WorkTask,
+)
 from app.models.production import ApprovalEvent, AttendanceChangeEvent, ContributionRecord, RecruitmentApplication, TaskStatusEvent
+from app.models.project import BuddyLog
 from app.services.audit import record_audit
 from app.services.notifications import queue_notification
 
@@ -14,6 +27,14 @@ from app.services.notifications import queue_notification
 TASK_STATUSES = {"Not Started", "In Progress", "Blocked", "Submitted", "Approved", "Rejected", "Waived", "Completed"}
 DECISION_STATUSES = {"Submitted", "Interview Scheduled", "Selected", "Rejected", "Withdrawn"}
 ATTENDANCE_STATUSES = {"Present", "Absent", "Excused", "Late"}
+BUDGET_LINE_TRANSITIONS = {
+    "Draft": {"Submitted", "Cancelled"},
+    "Submitted": {"Approved", "Rejected", "Cancelled"},
+    "Rejected": {"Submitted", "Cancelled"},
+    "Approved": {"Completed", "Cancelled"},
+    "Completed": set(),
+    "Cancelled": set(),
+}
 
 
 def session_conflicts(session):
@@ -207,6 +228,71 @@ def decide_operational_request(operational_request, status, actor, *, expected_v
     record_audit("operational_request.transition", operational_request, {"status": previous}, {"status": status, "version": operational_request.version}, actor)
     db.session.commit()
     return operational_request
+
+
+def instantiate_checklist(project, template, actor=None):
+    """Create a ChecklistInstance for `project` from `template`, populating
+    one ChecklistItemStatus per ChecklistTemplateItem. Idempotent: returns
+    the existing instance untouched if project+template already has one.
+    This is the reusable form of the logic the import pipeline builds
+    inline row-by-row (`app/services/imports.py`), needed so the
+    wing-leader wizard can instantiate a whole template in one step.
+    """
+    existing = ChecklistInstance.query.filter_by(project_id=project.id, template_id=template.id).first()
+    if existing:
+        return existing
+    instance = ChecklistInstance(project_id=project.id, template_id=template.id, name=f"{project.title} Checklist")
+    db.session.add(instance)
+    db.session.flush()
+    template_items = ChecklistTemplateItem.query.filter_by(template_id=template.id).order_by(ChecklistTemplateItem.sequence).all()
+    for template_item in template_items:
+        db.session.add(ChecklistItemStatus(
+            checklist_instance_id=instance.id,
+            template_item_id=template_item.id,
+            external_owner=template_item.default_owner_label,
+        ))
+    record_audit(
+        "checklist.instantiate", instance,
+        after={"template_id": template.id, "items": len(template_items)},
+        actor=actor,
+    )
+    db.session.commit()
+    return instance
+
+
+def decide_budget_line(line, status, actor, *, expected_version, reason=None, official_reference=None):
+    _check_version(line, expected_version)
+    if status not in BUDGET_LINE_TRANSITIONS.get(line.status, set()):
+        raise ValueError(f"Budget line cannot move from {line.status} to {status}.")
+    if status in {"Rejected", "Cancelled"} and not (reason or "").strip():
+        raise ValueError(f"{status} budget lines require a reason.")
+    previous = line.status
+    line.status = status
+    line.official_reference = official_reference or line.official_reference
+    if status == "Approved" and line.approved_amount is None:
+        line.approved_amount = line.estimated_amount
+    line.version += 1
+    db.session.add(ApprovalEvent(entity_type="BudgetLine", entity_public_id=line.public_id, action=status, reason=reason, actor_user_id=actor.id))
+    record_audit("budget_line.transition", line, {"status": previous}, {"status": status, "version": line.version}, actor)
+    db.session.commit()
+    return line
+
+
+def decide_buddy_log(log, status, actor, *, expected_version, reason=None):
+    _check_version(log, expected_version)
+    if status not in {"Approved", "Rejected"}:
+        raise ValueError("Buddy log decisions must be Approved or Rejected.")
+    if status == "Rejected" and not (reason or "").strip():
+        raise ValueError("Rejected buddy logs require a reason.")
+    previous = log.status
+    log.status = status
+    log.verified_by_id = actor.id
+    log.verified_at = datetime.now(timezone.utc)
+    log.version += 1
+    db.session.add(ApprovalEvent(entity_type="BuddyLog", entity_public_id=log.public_id, action=status, reason=reason, actor_user_id=actor.id))
+    record_audit("buddy_log.decision", log, {"status": previous}, {"status": status, "version": log.version}, actor)
+    db.session.commit()
+    return log
 
 
 def moderate_feedback(response, status, actor, *, reason=None):

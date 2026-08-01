@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ICC and IGP public event calendar and published reports — Christ University.">
+  <title>{% block title %}Public overview{% endblock %} | ICC/IGP Christ University</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/utilities.css') }}">
+</head>
+<body data-analytics-url="{{ url_for('public.analytics_data') }}">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="app-topbar public-topbar">
+    <div class="app-topbar__context">
+      <a href="{{ url_for('public.landing') }}" class="brand-lockup text-decoration-none" aria-label="ICC/IGP public overview home">
+        <span class="brand-mark" aria-hidden="true">OI</span>
+        <span class="brand-copy">ICC / IGP<small>Public overview</small></span>
+      </a>
+    </div>
+    <nav class="topbar-actions" aria-label="Public site navigation">
+      <a class="aurora-button--link" href="{{ url_for('public.events') }}">Events</a>
+      <a class="aurora-button--link" href="{{ url_for('public.reports') }}">Reports</a>
+    </nav>
+  </header>
+  <main id="main-content" class="app-content public-container" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="text-center text-muted py-4 small">
+    Christ University · Office of International Affairs · Public transparency overview — aggregate and published data only.
+  </footer>
+  <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

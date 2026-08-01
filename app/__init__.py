@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 
 from flask import Flask, g, jsonify, redirect, request, session, url_for
 from sqlalchemy import text
@@ -44,13 +46,63 @@ def create_app(config_object=None):
     from app.blueprints.erp import erp_bp
     from app.blueprints.api_v1 import api_v1_bp
     from app.blueprints.internal_jobs import internal_jobs_bp
+    from app.blueprints.public import public_bp
 
     app.register_blueprint(erp_bp)
     app.register_blueprint(api_v1_bp, url_prefix="/api/v1")
     app.register_blueprint(internal_jobs_bp)
+    app.register_blueprint(public_bp)
 
     from app.cli import register_cli
     register_cli(app)
+
+    @app.context_processor
+    def ui_assets():
+        """Resolve content-hashed Vite entries without requiring Node at runtime."""
+        manifest_path = Path(app.static_folder) / "ui" / "manifest.json"
+
+        def ui_asset(entry: str):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                filename = manifest.get(entry, {}).get("file")
+                return url_for("static", filename=f"ui/{filename}") if filename else None
+            except (OSError, ValueError, TypeError):
+                return None
+
+        return {"ui_asset": ui_asset}
+
+    @app.context_processor
+    def authorization_helpers():
+        """Expose has_permission to Jinja so navigation/page conditionals can
+        gate on real scoped permissions instead of matching legacy role
+        strings (base.html's nav previously did `g.user.role in [...]`)."""
+        from app.services.authorization import has_permission
+
+        return {"has_permission": has_permission}
+
+    @app.context_processor
+    def current_academic_year_label():
+        from app.models.project import AcademicYear
+
+        year = AcademicYear.query.filter_by(is_current=True).first()
+        return {"current_academic_year_label": year.name if year else "—"}
+
+    @app.context_processor
+    def shell_notifications():
+        """Expose only the signed-in user's latest in-app notices to the shell."""
+        user = getattr(g, "user", None)
+        if not user:
+            return {"shell_notifications": [], "shell_unread_count": 0}
+        from app.models.production import Notification
+
+        items = (
+            Notification.query.filter_by(user_id=user.id)
+            .order_by(Notification.created_at.desc())
+            .limit(4)
+            .all()
+        )
+        unread = Notification.query.filter_by(user_id=user.id, read_at=None).count()
+        return {"shell_notifications": items, "shell_unread_count": unread}
 
     @app.before_request
     def load_request_context():
@@ -59,7 +111,7 @@ def create_app(config_object=None):
         user_id = session.get("user_id")
         g.user = db.session.get(User, user_id) if user_id else None
 
-        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/")):
+        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")):
             return None
 
         public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.recover_password"}
@@ -103,7 +155,7 @@ def create_app(config_object=None):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "script-src 'self'; img-src 'self' data:; "
             "font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
         )
         if request.is_secure:

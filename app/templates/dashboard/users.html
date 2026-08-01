@@ -4,40 +4,40 @@
 
 {% block content %}
 {% macro assignment_fields(user) %}
-<select name="role" class="form-select form-select-sm" aria-label="Role for {{ user.username }}" required>
+<select name="role" class="aurora-select aurora-select--small" aria-label="Role for {{ user.username }}" required>
   {% if user.role and user.role not in role_options and user.role != 'Pending' %}<option value="{{ user.role }}" selected>{{ user.role }} (legacy label)</option>{% endif %}
   {% if user.role == 'Pending' and user.preferred_role and user.preferred_role not in role_options %}<option value="{{ user.preferred_role }}" selected>{{ user.preferred_role }} (requested legacy label)</option>{% endif %}
   {% for role in role_options %}<option value="{{ role }}"{% if user.role == role or user.preferred_role == role %} selected{% endif %}>{{ role }}</option>{% endfor %}
 </select>
-<select name="campus_public_id" class="form-select form-select-sm" aria-label="Campus scope for {{ user.username }}">
+<select name="campus_public_id" class="aurora-select aurora-select--small" aria-label="Campus scope for {{ user.username }}">
   <option value="">Home campus</option>{% for campus in campuses %}<option value="{{ campus.public_id }}"{% if user.campus_id == campus.id %} selected{% endif %}>{{ campus.name }}</option>{% endfor %}
 </select>
-<select name="academic_year_public_id" class="form-select form-select-sm" aria-label="Academic year scope for {{ user.username }}">
+<select name="academic_year_public_id" class="aurora-select aurora-select--small" aria-label="Academic year scope for {{ user.username }}">
   <option value="">No year scope</option>{% for year in academic_years %}<option value="{{ year.public_id }}">{{ year.name }}</option>{% endfor %}
 </select>
-<select name="wing_public_id" class="form-select form-select-sm" aria-label="Wing scope for {{ user.username }}">
+<select name="wing_public_id" class="aurora-select aurora-select--small" aria-label="Wing scope for {{ user.username }}">
   <option value="">No wing</option>{% for wing in wings %}<option value="{{ wing.public_id }}">{{ wing.name }}</option>{% endfor %}
 </select>
-<select name="project_public_id" class="form-select form-select-sm" aria-label="Project scope for {{ user.username }}">
+<select name="project_public_id" class="aurora-select aurora-select--small" aria-label="Project scope for {{ user.username }}">
   <option value="">No project scope</option>{% for project in scope_projects %}<option value="{{ project.public_id }}">{{ project.code }} · {{ project.title }}</option>{% endfor %}
 </select>
-<div class="form-check"><input class="form-check-input" type="checkbox" name="platform_scope" id="platform-{{ user.public_id }}"><label class="form-check-label small" for="platform-{{ user.public_id }}">Platform scope</label></div>
-<div class="form-check"><input class="form-check-input" type="checkbox" name="can_view_sensitive_links" id="sensitive-{{ user.public_id }}"><label class="form-check-label small" for="sensitive-{{ user.public_id }}">Restricted references</label></div>
+<div class="aurora-choice"><input class="aurora-choice__input" type="checkbox" name="platform_scope" id="platform-{{ user.public_id }}"><label class="aurora-choice__label small" for="platform-{{ user.public_id }}">Platform scope</label></div>
+<div class="aurora-choice"><input class="aurora-choice__input" type="checkbox" name="can_view_sensitive_links" id="sensitive-{{ user.public_id }}"><label class="aurora-choice__label small" for="sensitive-{{ user.public_id }}">Restricted references</label></div>
 {% endmacro %}
-<div class="page-header animate-fade-in">
+<div class="page-header">
     <h1 class="page-title">User Approvals & Role Assignments</h1>
     <p class="page-subtitle">Faculty and ICC Core Committee dashboard to verify registrations and grant system clearance.</p>
 </div>
 
 <!-- Pending Registrations Panel -->
-<div class="row mb-4 animate-fade-in">
+<div class="row mb-4">
     <div class="col-12">
-        <div class="card-control">
-            <h5 class="card-control-title mb-4"><i class="bi bi-clock-history text-warning"></i> Pending Registrations ({{ pending_users | length }})</h5>
+        <div class="aurora-card--padded">
+            <h5 class="aurora-card__title mb-4"><i class="ph ph-clock-counter-clockwise text-warning"></i> Pending Registrations ({{ pending_users | length }})</h5>
             
             {% if pending_users %}
-                <div class="table-responsive">
-                    <table class="table-oia">
+                <div class="aurora-table-scroll">
+                    <table class="aurora-table">
                         <thead>
                             <tr>
                                 <th>Username</th>
@@ -55,10 +55,10 @@
                                     <td class="fw-bold">{{ u.username }}</td>
                                     <td>{{ u.email }}</td>
                                     <td>
-                                        <span class="badge bg-secondary font-monospace">{{ u.preferred_role }}</span>
+                                        <span class="aurora-badge bg-secondary font-monospace">{{ u.preferred_role }}</span>
                                     </td>
                                     <td>{{ u.campus.name if u.campus else "N/A" }}</td>
-                                    <td style="max-width: 300px; font-size: 0.85rem;">
+                                    <td class="max-inline-300 text-compact">
                                         {% if u.volunteer_profile %}
                                             <strong>Skills:</strong> {{ u.volunteer_profile.skills or 'None' }}<br>
                                             <strong>Interests:</strong> {{ u.volunteer_profile.interests or 'None' }}
@@ -67,14 +67,14 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2" style="min-width: 230px;">
+                                        <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
                                             {{ assignment_fields(u) }}
-                                            <button type="submit" class="btn btn-success btn-sm py-1 px-3 fw-bold rounded-pill"><i class="bi bi-check-lg"></i> Grant</button>
+                                            <button type="submit" class="aurora-button--success aurora-button--small py-1 px-3 fw-bold rounded-pill"><i class="ph ph-check"></i> Grant</button>
                                         </form>
                                     </td>
                                     <td>
-                                        <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" onsubmit="return confirm('Reject registration for {{ u.username }}?');">
-                                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill"><i class="bi bi-x-circle"></i> Reject</button>
+                                        <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" data-confirm-submit="Reject registration for {{ u.username }}?">
+                                            <button type="submit" class="aurora-button--outline-danger aurora-button--small rounded-pill"><i class="ph ph-x-circle"></i> Reject</button>
                                         </form>
                                     </td>
                                 </tr>
@@ -84,7 +84,7 @@
                 </div>
             {% else %}
                 <div class="text-center py-5">
-                    <i class="bi bi-check2-circle fs-1 text-success"></i>
+                    <i class="ph ph-check-circle fs-1 text-success"></i>
                     <p class="text-muted mt-2">All registration requests have been cleared. No pending approvals.</p>
                 </div>
             {% endif %}
@@ -93,14 +93,14 @@
 </div>
 
 <!-- Active Users Directory -->
-<div class="row animate-fade-in">
+<div class="row">
     <div class="col-12">
-        <div class="card-control">
-            <h5 class="card-control-title mb-4"><i class="bi bi-people-fill text-primary"></i> Active User Directory ({{ approved_users | length }})</h5>
+        <div class="aurora-card--padded">
+            <h5 class="aurora-card__title mb-4"><i class="ph ph-users-three text-primary"></i> Active User Directory ({{ approved_users | length }})</h5>
             
             {% if approved_users %}
-                <div class="table-responsive">
-                    <table class="table-oia">
+                <div class="aurora-table-scroll">
+                    <table class="aurora-table">
                         <thead>
                             <tr>
                                 <th>Username</th>
@@ -117,14 +117,14 @@
                                     <td class="fw-bold">{{ u.username }}</td>
                                     <td>{{ u.email }}</td>
                                     <td>
-                                        <span class="badge badge-oia badge-role">{{ u.role }}</span>
+                                        <span class="aurora-badge aurora-badge--role">{{ u.role }}</span>
                                     </td>
                                     <td>{{ u.campus.name if u.campus else "N/A" }}</td>
                                     <td class="small text-muted">{{ u.approved_at.strftime('%Y-%m-%d %H:%M') if u.approved_at else "N/A" }}</td>
                                     <td>
-                                        <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2" style="min-width: 230px;">
+                                        <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
                                             {{ assignment_fields(u) }}
-                                            <button type="submit" class="btn btn-outline-info btn-sm py-1 px-3 rounded-pill">Update</button>
+                                            <button type="submit" class="aurora-button--outline-info aurora-button--small py-1 px-3 rounded-pill">Update</button>
                                         </form>
                                     </td>
                                 </tr>

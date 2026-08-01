@@ -276,6 +276,13 @@ class TeamAssignment(PublicIdMixin, TimestampMixin, db.Model):
     starts_on = db.Column(db.Date, nullable=True)
     ends_on = db.Column(db.Date, nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
+    # Added for legacy ProjectParticipant migration: a convenience
+    # denormalization pointing back to the same user as `person_id`'s linked
+    # account (when one exists), plus fields with no other production home.
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cohort_id = db.Column(db.Integer, db.ForeignKey("cohorts.id", ondelete="SET NULL"), nullable=True)
+    nationality = db.Column(db.String(100), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="Active")
 
     person = db.relationship("Person", backref="team_assignments")
     project = db.relationship("Project", backref=db.backref("team_assignments", cascade="all, delete-orphan"))
@@ -347,6 +354,8 @@ class BudgetLine(PublicIdMixin, TimestampMixin, db.Model):
     currency = db.Column(db.String(3), nullable=False, default="INR")
     version = db.Column(db.Integer, nullable=False, default=1)
 
+    project = db.relationship("Project", backref=db.backref("budget_lines", cascade="all, delete-orphan"))
+
     __table_args__ = (
         db.CheckConstraint("estimated_amount >= 0", name="ck_budget_estimate_nonnegative"),
         db.CheckConstraint("approved_amount IS NULL OR approved_amount >= 0", name="ck_budget_approved_nonnegative"),
@@ -372,6 +381,8 @@ class OperationalRequest(PublicIdMixin, TimestampMixin, db.Model):
     decision_comment = db.Column(db.Text, nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
 
+    project = db.relationship("Project", backref=db.backref("operational_requests", cascade="all, delete-orphan"))
+
 
 class FeedbackForm(PublicIdMixin, TimestampMixin, db.Model):
     __tablename__ = "feedback_forms"
@@ -388,6 +399,8 @@ class FeedbackForm(PublicIdMixin, TimestampMixin, db.Model):
     opens_at = db.Column(db.DateTime(timezone=True), nullable=True)
     closes_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
+    project = db.relationship("Project", backref=db.backref("feedback_forms", cascade="all, delete-orphan"))
+
 
 class FeedbackResponse(PublicIdMixin, TimestampMixin, db.Model):
     __tablename__ = "feedback_responses"
@@ -399,6 +412,9 @@ class FeedbackResponse(PublicIdMixin, TimestampMixin, db.Model):
     publication_consent = db.Column(db.Boolean, nullable=False, default=False)
     moderation_status = db.Column(db.String(30), nullable=False, default="Pending")
     response_key_hash = db.Column(db.String(64), nullable=True)
+
+    form = db.relationship("FeedbackForm", backref=db.backref("responses", cascade="all, delete-orphan"))
+    person = db.relationship("Person")
 
     __table_args__ = (
         db.UniqueConstraint("form_id", "response_key_hash", name="uq_feedback_response_key"),

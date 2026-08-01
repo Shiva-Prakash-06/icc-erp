@@ -29,6 +29,11 @@ ROLE_PERMISSIONS = {
     "AUDITOR": {"report", "audit"},
 }
 
+# Permissions that are inherently platform-wide (not tied to any single project's
+# campus/wing/operating-unit scope). Only these may be granted by an assignment
+# scope check performed without a `project` argument.
+GLOBAL_PERMISSIONS = {"manage_users", "manage_governance", "manage_imports", "audit"}
+
 LEGACY_ROLE_MAP = {
     "System Administrator": "SYSTEM_ADMINISTRATOR",
     "OIA Faculty Administrator": "OIA_FACULTY_ADMINISTRATOR",
@@ -80,17 +85,33 @@ def has_permission(user, permission, project=None, sensitive=False):
     assignments = _active_assignments(user)
     legacy_code = LEGACY_ROLE_MAP.get(user.role)
     if legacy_code and permission in ROLE_PERMISSIONS.get(legacy_code, set()):
-        # Legacy faculty retains broad access only during demonstrator migration.
-        if legacy_code == "OIA_FACULTY_ADMINISTRATOR":
-            return not sensitive or permission == "sensitive_links"
+        # Legacy faculty retains broad access only during demonstrator migration,
+        # but is still bounded to the caller's own campus once a project is given
+        # (never an unconditional cross-campus grant).
+        if legacy_code == "OIA_FACULTY_ADMINISTRATOR" and (not sensitive or permission == "sensitive_links"):
+            if project is None or user.campus_id is None or user.campus_id == project.campus_id:
+                return True
 
     for assignment in assignments:
         if permission not in ROLE_PERMISSIONS.get(assignment.role_code, set()):
             continue
         if sensitive and not assignment.can_view_sensitive_links:
             continue
+        is_unscoped = not any((
+            assignment.project_id,
+            assignment.campus_id,
+            assignment.operating_unit_id,
+            assignment.wing_id,
+            assignment.academic_year_id,
+        ))
         if not project:
-            return True
+            # A project-less check can only be satisfied by a genuinely unscoped
+            # assignment, or a permission that is inherently platform-wide.
+            # Otherwise a wing/campus-scoped assignment would silently grant
+            # cross-scope access whenever a caller omits the project argument.
+            if is_unscoped or permission in GLOBAL_PERMISSIONS:
+                return True
+            continue
         if assignment.project_id and assignment.project_id != project.id:
             continue
         if assignment.campus_id and assignment.campus_id != project.campus_id:

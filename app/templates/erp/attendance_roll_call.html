@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Attendance — {{ session.title }}{% endblock %}
+{% block content %}
+<nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}">{{ project.code }}</a></li><li class="aurora-breadcrumb__item" aria-current="page">Attendance</li></ol></nav>
+<header class="page-header">
+  <div><div class="page-eyebrow">{{ session.session_type }}</div><h1 class="page-title mb-2">{{ session.title }}</h1><p class="page-subtitle">{{ session.starts_at.strftime('%b %d, %Y · %I:%M %p') }} – {{ session.ends_at.strftime('%I:%M %p') }}</p></div>
+</header>
+
+<div class="aurora-card">
+  <div class="aurora-card__header"><strong>Roll call</strong></div>
+  <form method="POST" action="{{ url_for('erp.mark_session_attendance', public_id=project.public_id, session_public_id=session.public_id) }}">
+    <div class="aurora-table-scroll">
+      <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+        <thead><tr><th>Name</th><th>Registration</th><th>Attendance</th></tr></thead>
+        <tbody>
+          {% for assignment in team %}
+          {% set record = records.get(assignment.person_id) %}
+          <tr>
+            <td data-label="Name">{{ assignment.person.display_name }}</td>
+            <td data-label="Registration" class="font-monospace">{{ assignment.person.registration_number or '—' }}</td>
+            <td data-label="Attendance">
+              <select class="aurora-select aurora-select--small" name="status_{{ assignment.person_id }}" aria-label="Attendance for {{ assignment.person.display_name }}">
+                {% for status in ['Present', 'Absent', 'Excused', 'Late'] %}
+                <option{% if record and record.status == status %} selected{% endif %}{% if not record and status == 'Present' %} selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted py-4">No team members enrolled yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="aurora-card__body border-top"><button class="aurora-button--primary">Save attendance</button></div>
+  </form>
+</div>
+{% endblock %}

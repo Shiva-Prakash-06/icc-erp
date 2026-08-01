@@ -1,26 +1,89 @@
 {% extends "base.html" %}
 {% block title %}ERP Projects{% endblock %}
+{% block mobile_title %}Projects{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h2 mb-1">Projects and programs</h1><p class="text-muted mb-0">Lifecycle-controlled records for ICC and IGP operations.</p></div>{% if can_create %}<button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#newProject">New project</button>{% endif %}</div>
+<header class="page-header">
+  <div>
+    <div class="page-eyebrow">Portfolio command</div>
+    <h1 class="page-title">Projects and programs</h1>
+    <p class="page-subtitle">Lifecycle-controlled records for ICC and IGP operations.</p>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="project-view-switch" role="group" aria-label="Project presentation">
+      <button type="button" class="is-active" data-project-view="cards" aria-pressed="true" aria-label="Card view"><i class="ph ph-squares-four" aria-hidden="true"></i></button>
+      <button type="button" data-project-view="board" aria-pressed="false" aria-label="Board view"><i class="ph ph-kanban" aria-hidden="true"></i></button>
+      <button type="button" data-project-view="table" aria-pressed="false" aria-label="Table view"><i class="ph ph-list" aria-hidden="true"></i></button>
+    </div>
+    {% if can_create %}<button class="aurora-button--primary" data-ui-toggle="disclosure" data-ui-target="#newProject" aria-expanded="false"><i class="ph ph-plus-circle" aria-hidden="true"></i>New project</button>{% endif %}
+  </div>
+</header>
+
 {% if can_create %}
-<div id="newProject" class="collapse mb-4"><div class="card"><div class="card-header"><strong>Create draft</strong></div><div class="card-body">
-<form method="POST" class="row g-3">
-  <div class="col-md-8"><label class="form-label" for="title">Title</label><input class="form-control" id="title" name="title" required></div>
-  <div class="col-md-4"><label class="form-label" for="project_type">Type</label><select class="form-select" id="project_type" name="project_type"><option>ICC event</option><option>ICC internal activity</option><option>IGP inbound program</option><option>Immersion</option><option>Exchange cohort</option><option>Visitor program</option></select></div>
-  <div class="col-md-3"><label class="form-label" for="campus_public_id">Campus</label><select class="form-select" id="campus_public_id" name="campus_public_id" required>{% for item in campuses %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
-  <div class="col-md-3"><label class="form-label" for="program_type_public_id">Operating unit</label><select class="form-select" id="program_type_public_id" name="program_type_public_id" required>{% for item in program_types %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
-  <div class="col-md-3"><label class="form-label" for="wing_public_id">Wing (ICC)</label><select class="form-select" id="wing_public_id" name="wing_public_id"><option value="">No wing / IGP</option>{% for item in wings %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
-  <div class="col-md-3"><label class="form-label" for="academic_year_public_id">Academic year</label><select class="form-select" id="academic_year_public_id" name="academic_year_public_id" required>{% for item in academic_years %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
-  <div class="col-md-3"><label class="form-label" for="start_date">Start</label><input class="form-control" type="date" id="start_date" name="start_date" required></div>
-  <div class="col-md-3"><label class="form-label" for="end_date">End</label><input class="form-control" type="date" id="end_date" name="end_date" required></div>
-  <div class="col-md-6"><label class="form-label" for="venue">Venue</label><input class="form-control" id="venue" name="venue"></div>
-  <div class="col-md-6"><label class="form-label" for="target_audience">Target audience</label><input class="form-control" id="target_audience" name="target_audience"></div>
-  <div class="col-md-6"><label class="form-label" for="category">Category</label><input class="form-control" id="category" name="category" value="Operational"></div>
-  <div class="col-12"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="2"></textarea></div>
-  <div class="col-12"><button class="btn btn-primary">Create draft</button></div>
-</form></div></div></div>
+<div id="newProject" class="aurora-collapse mb-4">
+  <div class="aurora-card">
+    <div class="aurora-card__header"><div><span class="page-eyebrow">New record</span><strong>Create draft</strong></div><span class="aurora-badge">Server validated</span></div>
+    <div class="aurora-card__body">
+      <form method="POST" class="row g-3">
+        <div class="col-md-8"><label class="aurora-label" for="title">Title</label><input class="aurora-input" id="title" name="title" required></div>
+        <div class="col-md-4"><label class="aurora-label" for="project_type">Type</label><select class="aurora-select" id="project_type" name="project_type"><option>ICC event</option><option>ICC internal activity</option><option>IGP inbound program</option><option>Immersion</option><option>Exchange cohort</option><option>Visitor program</option></select></div>
+        <div class="col-md-3"><label class="aurora-label" for="campus_public_id">Campus</label><select class="aurora-select" id="campus_public_id" name="campus_public_id" required>{% for item in campuses %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="aurora-label" for="program_type_public_id">Operating unit</label><select class="aurora-select" id="program_type_public_id" name="program_type_public_id" required>{% for item in program_types %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="aurora-label" for="wing_public_id">Wing (ICC)</label><select class="aurora-select" id="wing_public_id" name="wing_public_id"><option value="">No wing / IGP</option>{% for item in wings %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="aurora-label" for="academic_year_public_id">Academic year</label><select class="aurora-select" id="academic_year_public_id" name="academic_year_public_id" required>{% for item in academic_years %}<option value="{{ item.public_id }}">{{ item.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="aurora-label" for="start_date">Start</label><input class="aurora-input" type="date" id="start_date" name="start_date" required></div>
+        <div class="col-md-3"><label class="aurora-label" for="end_date">End</label><input class="aurora-input" type="date" id="end_date" name="end_date" required></div>
+        <div class="col-md-6"><label class="aurora-label" for="venue">Venue</label><input class="aurora-input" id="venue" name="venue"></div>
+        <div class="col-md-6"><label class="aurora-label" for="target_audience">Target audience</label><input class="aurora-input" id="target_audience" name="target_audience"></div>
+        <div class="col-md-6"><label class="aurora-label" for="category">Category</label><input class="aurora-input" id="category" name="category" value="Operational"></div>
+        <div class="col-12"><label class="aurora-label" for="description">Description</label><textarea class="aurora-input" id="description" name="description" rows="2"></textarea></div>
+        <div class="col-12"><button class="aurora-button--primary"><i class="ph ph-check" aria-hidden="true"></i>Create draft</button></div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endif %}
-<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Code</th><th>Title</th><th>Campus</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead><tbody>
-{% for project in projects %}<tr><td class="font-monospace">{{ project.code or '—' }}</td><td><a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}" class="fw-semibold">{{ project.title }}</a></td><td>{{ project.campus.name }}</td><td>{{ project.program_type.name }}</td><td>{{ project.start_date }} – {{ project.end_date }}</td><td><span class="badge text-bg-info">{{ project.status }}</span></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-5">No projects in scope.</td></tr>{% endfor %}
-</tbody></table></div></div>
+
+<section class="project-view is-active" data-project-view-panel="cards" aria-label="Project cards">
+  {% if projects %}
+  <div class="project-card-grid">
+    {% for project in projects %}
+    <a class="project-card-link" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
+      <article class="aurora-card--padded">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div class="project-card__code">{{ project.code or 'Project record' }}</div>
+          <span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span>
+        </div>
+        <h2 class="project-card__title">{{ project.title }}</h2>
+        <p class="project-card__meta">{{ project.campus.name }} · {{ project.program_type.name }}</p>
+        <p class="project-card__meta mb-0">{{ project.description|truncate(110) if project.description else 'No project description recorded.' }}</p>
+        <div class="project-card__footer"><span class="font-monospace text-xs">{{ project.start_date }} → {{ project.end_date }}</span><i class="ph ph-arrow-up-right text-primary" aria-hidden="true"></i></div>
+      </article>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="aurora-card--padded empty-state"><i class="ph ph-folder-open" aria-hidden="true"></i><h2 class="h4 mb-0">No projects in scope</h2><p class="mb-0">Projects appear here when the server grants access.</p></div>
+  {% endif %}
+</section>
+
+<section class="project-view" data-project-view-panel="board" aria-label="Projects grouped by lifecycle status">
+  <div class="project-board">
+    {% for column, statuses in [('Planning', ['Draft', 'Planned']), ('Delivery', ['Active', 'Closing']), ('Completed', ['Completed']), ('Archived', ['Archived', 'Cancelled'])] %}
+    <div class="project-board__column">
+      <div class="project-board__header"><span>{{ column }}</span><span class="aurora-badge">{{ projects|selectattr('status', 'in', statuses)|list|length }}</span></div>
+      <div class="project-board__items">
+        {% for project in projects if project.status in statuses %}
+        <a class="project-board__item" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}"><strong>{{ project.title }}</strong><small>{{ project.code or project.program_type.name }} · {{ project.campus.name }}</small></a>
+        {% else %}<div class="text-muted text-xs p-2">No records</div>{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="project-view" data-project-view-panel="table" aria-label="Project table">
+  <div class="aurora-card"><div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Code</th><th>Title</th><th>Campus</th><th>Unit</th><th>Dates</th><th>Status</th></tr></thead><tbody>
+  {% for project in projects %}<tr><td data-label="Code" class="font-monospace">{{ project.code or '—' }}</td><td data-label="Title"><a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}" class="fw-semibold">{{ project.title }}</a></td><td data-label="Campus">{{ project.campus.name }}</td><td data-label="Unit">{{ project.program_type.name }}</td><td data-label="Dates">{{ project.start_date }} – {{ project.end_date }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-5">No projects in scope.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+</section>
 {% endblock %}

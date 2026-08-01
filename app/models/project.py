@@ -80,7 +80,6 @@ class Project(db.Model):
     campus = db.relationship('Campus', back_populates='projects')
     program_type = db.relationship('ProgramType', back_populates='projects')
     academic_year = db.relationship('AcademicYear', back_populates='projects')
-    participants = db.relationship('ProjectParticipant', back_populates='project', cascade="all, delete-orphan")
     buddy_assignments = db.relationship('BuddyAssignment', back_populates='project', cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -92,32 +91,6 @@ ProgramType.projects = db.relationship('Project', order_by=Project.id, back_popu
 AcademicYear.projects = db.relationship('Project', order_by=Project.id, back_populates='academic_year', cascade="all, delete-orphan")
 
 
-class ProjectParticipant(db.Model):
-    __tablename__ = 'project_participants'
-
-    id = db.Column(db.Integer, primary_key=True)
-    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
-    person_id = db.Column(db.Integer, db.ForeignKey('people.id', ondelete='CASCADE'), nullable=True)
-    cohort_id = db.Column(db.Integer, db.ForeignKey('cohorts.id', ondelete='SET NULL'), nullable=True)
-    participant_type = db.Column(db.String(50), nullable=False)  # 'Volunteer', 'Buddy', 'Exchange Student', 'Faculty', 'Core Committee', 'Attendee'
-    nationality = db.Column(db.String(100), nullable=True)
-    status = db.Column(db.String(20), default='Active', nullable=False)  # 'Active', 'Inactive'
-    registration_date = db.Column(db.DateTime, default=db.func.current_timestamp())
-    version = db.Column(db.Integer, default=1, nullable=False)
-
-    __table_args__ = (
-        db.CheckConstraint('user_id IS NOT NULL OR person_id IS NOT NULL', name='ck_participant_identity'),
-        db.UniqueConstraint('project_id', 'person_id', name='uq_project_person_participant'),
-    )
-
-    # Relationships
-    project = db.relationship('Project', back_populates='participants')
-    user = db.relationship('User', back_populates='participants')
-
-    def __repr__(self):
-        return f"<ProjectParticipant project_id={self.project_id} user_id={self.user_id} type={self.participant_type}>"
 
 
 class BuddyAssignment(db.Model):
@@ -126,8 +99,13 @@ class BuddyAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
-    buddy_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    exchange_student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    # Nullable: a buddy or exchange student may be represented by a bare
+    # Person (no login account). Exactly one of the *_user_id/*_person_id
+    # pair must be set per side -- enforced by ck_buddy_identity below.
+    buddy_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    exchange_student_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    buddy_person_id = db.Column(db.Integer, db.ForeignKey('people.id', ondelete='SET NULL'), nullable=True)
+    exchange_student_person_id = db.Column(db.Integer, db.ForeignKey('people.id', ondelete='SET NULL'), nullable=True)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.String(20), default='Active', nullable=False)  # 'Active', 'Completed', 'Inactive'
@@ -138,6 +116,11 @@ class BuddyAssignment(db.Model):
 
     __table_args__ = (
         db.CheckConstraint('end_date >= start_date', name='ck_buddy_assignment_dates'),
+        db.CheckConstraint(
+            '(buddy_user_id IS NOT NULL OR buddy_person_id IS NOT NULL) '
+            'AND (exchange_student_id IS NOT NULL OR exchange_student_person_id IS NOT NULL)',
+            name='ck_buddy_identity',
+        ),
         db.UniqueConstraint('project_id', 'buddy_user_id', 'exchange_student_id', 'start_date', name='uq_buddy_assignment_exact'),
     )
 
@@ -145,7 +128,25 @@ class BuddyAssignment(db.Model):
     project = db.relationship('Project', back_populates='buddy_assignments')
     buddy = db.relationship('User', foreign_keys=[buddy_user_id], backref='buddy_assignments')
     exchange_student = db.relationship('User', foreign_keys=[exchange_student_id], backref='exchange_buddy_assignments')
+    buddy_person = db.relationship('Person', foreign_keys=[buddy_person_id])
+    exchange_student_person = db.relationship('Person', foreign_keys=[exchange_student_person_id])
     logs = db.relationship('BuddyLog', back_populates='assignment', cascade="all, delete-orphan")
+
+    @property
+    def buddy_identity_person_id(self):
+        """Resolve the buddy side to a person_id regardless of which
+        identity column is populated -- every User is expected to have a
+        linked Person (see the person-link backfill), so this collapses the
+        two representations to a single axis for overlap-checking."""
+        if self.buddy_person_id:
+            return self.buddy_person_id
+        return getattr(self.buddy, "person_id", None)
+
+    @property
+    def exchange_student_identity_person_id(self):
+        if self.exchange_student_person_id:
+            return self.exchange_student_person_id
+        return getattr(self.exchange_student, "person_id", None)
 
     def __repr__(self):
         return f"<BuddyAssignment project_id={self.project_id} buddy={self.buddy_user_id} student={self.exchange_student_id}>"

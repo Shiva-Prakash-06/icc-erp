@@ -3,30 +3,30 @@
 {% block title %}Compile Report - OIA Project Intelligence{% endblock %}
 
 {% block content %}
-<div class="page-header animate-fade-in">
+<div class="page-header">
     <h1 class="page-title">Compile Dynamic Report</h1>
     <p class="page-subtitle">Configure report parameters to dynamically calculate metrics from real-time operational data.</p>
 </div>
 
-<div class="row animate-fade-in">
+<div class="row">
     <div class="col-md-8 col-lg-6 mx-auto">
-        <div class="card-control">
-            <h5 class="card-control-title mb-4"><i class="bi bi-file-earmark-plus text-primary"></i> Report Configuration</h5>
+        <div class="aurora-card--padded">
+            <h5 class="aurora-card__title mb-4"><i class="ph ph-file-plus text-primary"></i> Report Configuration</h5>
             
             <form action="{{ url_for('dashboard.generate_report') }}" method="POST">
-                <div class="form-group-oia">
-                    <label for="title" class="form-label-oia">Report Title</label>
-                    <input type="text" id="title" name="title" class="form-input-oia" required placeholder="e.g. BGR ICC Coffee Meet & Greet Report">
+                <div class="aurora-field">
+                    <label for="title" class="aurora-label">Report Title</label>
+                    <input type="text" id="title" name="title" class="aurora-input" required placeholder="e.g. BGR ICC Coffee Meet & Greet Report">
                 </div>
 
-                <div class="form-group-oia">
-                    <label for="description" class="form-label-oia">Description / Purpose</label>
-                    <textarea id="description" name="description" class="form-input-oia" rows="3" placeholder="Brief outline of why this report is generated..."></textarea>
+                <div class="aurora-field">
+                    <label for="description" class="aurora-label">Description / Purpose</label>
+                    <textarea id="description" name="description" class="aurora-input" rows="3" placeholder="Brief outline of why this report is generated..."></textarea>
                 </div>
 
-                <div class="form-group-oia">
-                    <label for="report_type" class="form-label-oia">Report Type</label>
-                    <select id="report_type" name="report_type" class="form-input-oia" required>
+                <div class="aurora-field">
+                    <label for="report_type" class="aurora-label">Report Type</label>
+                    <select id="report_type" name="report_type" class="aurora-input" required>
                         <option value="Project Report">Project Report</option>
                         <option value="Monthly Report">Monthly Report</option>
                         <option value="Academic Year Report">Academic Year Report</option>
@@ -37,9 +37,9 @@
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group-oia">
-                            <label for="campus_id" class="form-label-oia">Filter by Campus</label>
-                            <select id="campus_id" name="campus_id" class="form-input-oia">
+                        <div class="aurora-field">
+                            <label for="campus_id" class="aurora-label">Filter by Campus</label>
+                            <select id="campus_id" name="campus_id" class="aurora-input">
                                 <option value="">All Campuses</option>
                                 {% for campus in campuses %}
                                     <option value="{{ campus.id }}">{{ campus.name }}</option>
@@ -49,9 +49,9 @@
                     </div>
                     
                     <div class="col-md-6">
-                        <div class="form-group-oia">
-                            <label for="program_type_id" class="form-label-oia">Filter by Program Type</label>
-                            <select id="program_type_id" name="program_type_id" class="form-input-oia">
+                        <div class="aurora-field">
+                            <label for="program_type_id" class="aurora-label">Filter by Program Type</label>
+                            <select id="program_type_id" name="program_type_id" class="aurora-input">
                                 <option value="">All Programs</option>
                                 {% for pt in program_types %}
                                     <option value="{{ pt.id }}">{{ pt.name }}</option>
@@ -61,9 +61,9 @@
                     </div>
                 </div>
 
-                <div class="form-group-oia">
-                    <label for="project_id" class="form-label-oia">Filter by Specific Project</label>
-                    <select id="project_id" name="project_id" class="form-input-oia">
+                <div class="aurora-field">
+                    <label for="project_id" class="aurora-label">Filter by Specific Project</label>
+                    <select id="project_id" name="project_id" class="aurora-input">
                         <option value="">All Projects</option>
                         {% for p in projects %}
                             <option value="{{ p.id }}">{{ p.title }} ({{ p.campus.name }})</option>
@@ -73,22 +73,22 @@
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group-oia">
-                            <label for="start_date" class="form-label-oia">Start Date Limit</label>
-                            <input type="date" id="start_date" name="start_date" class="form-input-oia">
+                        <div class="aurora-field">
+                            <label for="start_date" class="aurora-label">Start Date Limit</label>
+                            <input type="date" id="start_date" name="start_date" class="aurora-input">
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="form-group-oia">
-                            <label for="end_date" class="form-label-oia">End Date Limit</label>
-                            <input type="date" id="end_date" name="end_date" class="form-input-oia">
+                        <div class="aurora-field">
+                            <label for="end_date" class="aurora-label">End Date Limit</label>
+                            <input type="date" id="end_date" name="end_date" class="aurora-input">
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2 mt-4">
-                    <button type="submit" class="btn-oia-primary flex-grow-1 py-2.5">Compile & Save Definition</button>
-                    <a href="{{ url_for('dashboard.list_reports') }}" class="btn-oia-secondary py-2.5">Cancel</a>
+                    <button type="submit" class="aurora-button--primary flex-grow-1 py-2.5">Compile & Save Definition</button>
+                    <a href="{{ url_for('dashboard.list_reports') }}" class="aurora-button--secondary py-2.5">Cancel</a>
                 </div>
             </form>
         </div>

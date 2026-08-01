@@ -1,0 +1,26 @@
+{
+  "scripts": {
+    "build:icons": "node scripts/build-icon-assets.mjs",
+    "build:ui": "npm run build:icons && vite build --config frontend/vite.config.ts",
+    "dev:ui": "vite --config frontend/vite.config.ts",
+    "typecheck": "tsc -p frontend/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.25.0",
+    "lucide-static": "^1.25.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
+  }
+}

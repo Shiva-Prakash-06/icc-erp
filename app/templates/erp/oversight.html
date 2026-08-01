@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Faculty Oversight{% endblock %}
+{% block mobile_title %}Oversight{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><div class="page-eyebrow">Faculty oversight</div><h1 class="page-title">Everything in your scope</h1><p class="page-subtitle">Monitor progress and act on anything pending approval, across every ICC and IGP project you oversee.</p></div>
+</header>
+
+<section class="content-grid mb-4">
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Projects in scope</div><div class="aurora-card__value mt-3">{{ projects|length }}</div></div><span class="aurora-card__icon"><i class="ph ph-folder-open" aria-hidden="true"></i></span></div>
+    <div class="kpi-card__trend"><span>{% for status, count in status_counts.items() %}<span class="aurora-badge aurora-badge--status-{{ status|lower|replace(' ', '-') }} me-1">{{ status }}: {{ count }}</span>{% endfor %}</span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Overdue tasks</div><div class="aurora-card__value mt-3">{{ overdue_tasks }}</div></div><span class="aurora-card__icon"><i class="ph ph-clock-countdown" aria-hidden="true"></i></span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Pending your decision</div><div class="aurora-card__value mt-3">{{ pending_count }}</div></div><span class="aurora-card__icon"><i class="ph ph-scales" aria-hidden="true"></i></span></div>
+  </article>
+  <article class="aurora-card--padded kpi-card col-span-3">
+    <div class="kpi-card__meta"><div><div class="aurora-card__title">Open critical risks</div><div class="aurora-card__value mt-3">{{ open_critical_risks }}</div></div><span class="aurora-card__icon"><i class="ph ph-warning-octagon" aria-hidden="true"></i></span></div>
+  </article>
+</section>
+
+<div class="aurora-card mb-4">
+  <div class="aurora-card__header d-flex justify-content-between"><strong>Budget (in scope)</strong><span>Committed {{ budget_committed }} · Actual {{ budget_actual }}</span></div>
+</div>
+
+<div class="aurora-card mb-4">
+  <div class="aurora-card__header d-flex justify-content-between"><strong>Action queue</strong><span>{{ action_queue|length }} shown{% if action_queue_overflow %} · {{ action_queue_overflow }} more{% endif %}</span></div>
+  <div class="aurora-table-scroll">
+    <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+      <thead><tr><th>Type</th><th>Item</th><th>Project</th><th></th></tr></thead>
+      <tbody>
+        {% for item in action_queue %}
+        <tr>
+          <td data-label="Type"><span class="aurora-badge">{{ item.kind }}</span></td>
+          <td data-label="Item">{{ item.title }}</td>
+          <td data-label="Project">{{ item.project.code }}</td>
+          <td><a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab=item.tab) }}">Review</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">Nothing pending your decision right now.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="aurora-card">
+  <div class="aurora-card__header d-flex justify-content-between"><strong>Projects in scope</strong><span>{{ projects|length }}</span></div>
+  <div class="aurora-table-scroll">
+    <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+      <thead><tr><th>Code</th><th>Title</th><th>Campus</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for project in projects %}
+        <tr>
+          <td data-label="Code" class="font-monospace">{{ project.code }}</td>
+          <td data-label="Title">{{ project.title }}</td>
+          <td data-label="Campus">{{ project.campus.name }}</td>
+          <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span></td>
+          <td><a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Open</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No projects in scope.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,10 +1,18 @@
-const CACHE_NAME = 'icc-erp-shell-v2';
+const CACHE_NAME = 'icc-erp-sky-hub-v5';
 const SHELL_ASSETS = [
-  '/static/css/theme.css',
+  '/static/css/tokens.css',
+  '/static/css/base.css',
+  '/static/css/icons.css',
+  '/static/css/layout.css',
+  '/static/css/components.css',
+  '/static/css/utilities.css',
   '/static/js/app.js',
-  '/static/vendor/bootstrap/bootstrap.min.css',
-  '/static/vendor/bootstrap/bootstrap.bundle.min.js',
-  '/static/vendor/bootstrap-icons/bootstrap-icons.min.css'
+  '/static/fonts/inter-400.woff2',
+  '/static/fonts/inter-600.woff2',
+  '/static/fonts/space-grotesk-500.woff2',
+  '/static/fonts/space-grotesk-700.woff2',
+  '/static/fonts/ibm-plex-mono-400.woff2',
+  '/static/fonts/ibm-plex-mono-600.woff2'
 ];
 
 self.addEventListener('install', event => {
@@ -25,5 +33,15 @@ self.addEventListener('fetch', event => {
   // Operational snapshots are encrypted in IndexedDB by app.js; the service
   // worker never caches authentication, API, ERP, IGP, or report responses.
   if (!url.pathname.startsWith('/static/')) return;
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });
