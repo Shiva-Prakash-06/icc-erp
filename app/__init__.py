@@ -231,6 +231,7 @@ def create_app(config_object=None):
         return {"status": "ok", "service": "icc-oia-erp"}
 
     @app.post("/internal/seed-acceptance")
+    @csrf.exempt
     def seed_acceptance_internal():
         """One-time, token-gated acceptance fixture provisioning hook."""
         expected = os.getenv("ACCEPTANCE_SEED_TOKEN")
