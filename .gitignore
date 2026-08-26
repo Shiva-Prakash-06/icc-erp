@@ -21,3 +21,6 @@ crash.log
 test-results/
 playwright-report/
 dist/
+.vercel
+.env*
+supabase/.temp/
