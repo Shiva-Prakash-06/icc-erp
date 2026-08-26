@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "PYTHONPATH= MIGRATION_ONLY=true uv run --frozen python -m flask --app run.py db upgrade",
+  "buildCommand": "PYTHONPATH= APP_ENV=production MIGRATION_ONLY=true DEMONSTRATOR=true uv run --frozen python -m flask --app run.py db upgrade && PYTHONPATH= APP_ENV=production MIGRATION_ONLY=true DEMONSTRATOR=true ACCEPTANCE_SEED=1 uv run --frozen python -m flask --app run.py seed-acceptance",
   "outputDirectory": ".",
   "functions": {
     "api/index.py": {
