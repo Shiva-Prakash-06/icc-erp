@@ -58,7 +58,7 @@ tests/ui_e2e/
 tests/ui_visual/
 ```
 
-Production images never require Node at runtime. Docker/Cloud Build runs `npm ci && npm run build:ui` before packaging Flask static assets.
+Production runtimes never require Node. The native release builder—or optional remote Cloud Build path—runs `npm ci` and `npm run build:ui` before packaging Flask static assets.
 
 ### 2.3 Vite contract
 

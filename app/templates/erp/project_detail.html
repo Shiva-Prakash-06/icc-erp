@@ -1,12 +1,41 @@
 {% extends "base.html" %}
 {% block title %}{{ project.title }}{% endblock %}
+{% block mobile_title %}{{ project.code }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Projects</a> <span aria-hidden="true">/</span> {{ project.code }}{% endblock %}
+{% block back_url %}{{ url_for('erp.projects') }}{% endblock %}
 {% block content %}
-<nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item" aria-current="page">{{ project.code }}</li></ol></nav>
-<header class="project-hero">
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-    <div><div class="page-eyebrow font-monospace">{{ project.code }}</div><h1 class="page-title mb-2">{{ project.title }}</h1><p class="text-muted mb-0">{{ project.campus.name }} · {{ project.program_type.name }} · {{ project.start_date }} – {{ project.end_date }}</p></div>
-    <div class="d-flex gap-2 flex-wrap"><span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }} fs-6 align-self-center">{{ project.status }}</span><a class="aurora-button--secondary" href="{{ url_for('erp.report_preview', public_id=project.public_id) }}"><i class="ph ph-chart-bar" aria-hidden="true"></i>Report preview</a></div>
+{% set project_tabs = [('overview','Overview'), ('people','People'), ('delivery','Delivery'), ('contributions','Contributions'), ('finance','Budget'), ('insights','Insights'), ('resources','Resources')] %}
+
+<header class="project-context">
+  <div class="project-context__row">
+    <div>
+      <div class="page-eyebrow font-monospace">{{ project.code }}</div>
+      <h1 class="project-context__title">{{ project.title }}</h1>
+      <p class="project-context__meta">
+        <span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span>
+        <span>{{ project.campus.name }} · {{ project.program_type.name }} · {{ project.start_date }} – {{ project.end_date }}</span>
+      </p>
+    </div>
+    <div class="project-context__actions">
+      <a class="aurora-button--primary" href="{{ url_for('erp.complete_report_preview', public_id=project.public_id) }}"><i class="ph ph-file-pdf" aria-hidden="true"></i>Complete PDF report</a>
+    </div>
   </div>
+  {% if blockers %}
+  <div class="aurora-disclosure project-context__blockers" id="closureBlockersDisclosure">
+    <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseClosureBlockers" aria-expanded="false" aria-controls="collapseClosureBlockers">
+      <span class="aurora-badge aurora-badge--status-pending"><i class="ph ph-warning" aria-hidden="true"></i>{{ blockers|length }} closure blocker{{ '' if blockers|length == 1 else 's' }}</span>
+      <span class="small text-muted">Show details</span>
+    </button>
+    <div id="collapseClosureBlockers" class="aurora-collapse" data-ui-parent="#closureBlockersDisclosure">
+      <ul class="aurora-list mt-2 mb-0">
+        {% for item in blockers[:8] %}<li class="aurora-list__item">{{ 'Operational request' if item.kind == 'OperationalRequest' else item.kind }}: {{ item.title }} <span class="text-muted">({{ item.reason }})</span></li>{% endfor %}
+        {% if blockers|length > 8 %}<li class="aurora-list__item fw-semibold">+ {{ blockers|length - 8 }} more shown in the operational sections below</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+  {% else %}
+  <p class="project-context__clear"><span class="aurora-badge aurora-badge--status-active"><i class="ph ph-check-circle" aria-hidden="true"></i>All modeled closure requirements are satisfied</span></p>
+  {% endif %}
 </header>
 
 <div class="project-stats-bar" aria-label="Project record summary">
@@ -17,139 +46,622 @@
   <div class="project-stat-item"><div class="project-stat-label">Team</div><div class="project-stat-value">{{ project.team_assignments|length }}</div></div>
 </div>
 
-{% if blockers %}<div class="alert alert-warning"><strong>{{ blockers|length }} closure blocker{% if blockers|length != 1 %}s{% endif %}</strong><ul class="mb-0 mt-2">{% for item in blockers[:8] %}<li>{{ item.kind }}: {{ item.title }} <span class="text-muted">({{ item.reason }})</span></li>{% endfor %}{% if blockers|length > 8 %}<li class="fw-semibold">+ {{ blockers|length - 8 }} more shown in the operational sections below</li>{% endif %}</ul></div>{% else %}<div class="alert alert-success">All modeled closure requirements are satisfied.</div>{% endif %}
+<!-- Desktop: real links, existing tab query parameter and history. -->
+<nav class="aurora-tabs d-none d-md-flex" aria-label="Project sections">
+  {% for tab_key, tab_label in project_tabs %}
+  <a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab_key) }}" class="aurora-tab{% if active_tab == tab_key %} active{% endif %}" {% if active_tab == tab_key %}aria-current="page"{% endif %}>{{ tab_label }}</a>
+  {% endfor %}
+</nav>
 
-<div class="aurora-tabs" role="tablist" aria-label="Project sections">
-  {% for tab_key, tab_label in [('overview','Overview'), ('people','People'), ('operations','Operations'), ('insights','Insights'), ('resources','Resources')] %}
-  <a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab_key) }}" class="aurora-tab{% if active_tab == tab_key %} active{% endif %}" role="tab" id="tab-{{ tab_key }}" aria-selected="{{ 'true' if active_tab == tab_key else 'false' }}" aria-controls="panel-{{ tab_key }}">{{ tab_label }}</a>
-  {% endfor %}
-</div>
-<div class="mobile-tab-ribbon" role="tablist" aria-label="Project sections (mobile)">
-  {% for tab_key, tab_label in [('overview','Overview'), ('people','People'), ('operations','Operations'), ('insights','Insights'), ('resources','Resources')] %}
-  <a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab_key) }}" class="mobile-aurora-tab{% if active_tab == tab_key %} active{% endif %}" role="tab" aria-selected="{{ 'true' if active_tab == tab_key else 'false' }}">{{ tab_label }}</a>
-  {% endfor %}
+<!-- Mobile (<=767px): labelled native select, same route/tab semantics. -->
+<div class="project-tab-select d-md-none">
+  <form method="GET" action="{{ url_for('erp.project_detail', public_id=project.public_id) }}" class="project-tab-select__row" aria-label="Project sections">
+    <div class="project-tab-select__field">
+      <label class="aurora-label" for="projectTabSelect">Section</label>
+      <select id="projectTabSelect" name="tab" class="aurora-select" data-ui-auto-submit>
+        {% for tab_key, tab_label in project_tabs %}
+        <option value="{{ tab_key }}"{% if active_tab == tab_key %} selected{% endif %}>{{ tab_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="aurora-button--secondary" type="submit">Go</button>
+  </form>
 </div>
 
 {% if active_tab == 'overview' %}
-<div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+<div id="panel-overview">
 <div class="row g-4"><div class="col-xl-8">
-  <div class="aurora-card mb-4"><div class="aurora-card__header"><strong>Project record</strong></div><div class="aurora-card__body"><dl class="row mb-0"><dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ project.project_type or project.category }}</dd><dt class="col-sm-3">Venue</dt><dd class="col-sm-9">{{ project.venue or 'Not recorded' }}</dd><dt class="col-sm-3">Audience</dt><dd class="col-sm-9">{{ project.target_audience or 'Not recorded' }}</dd><dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ project.description or 'Not recorded' }}</dd><dt class="col-sm-3">Reach</dt><dd class="col-sm-9">Expected {{ project.expected_reach or '—' }} · Actual {{ project.actual_reach or '—' }}</dd></dl></div></div>
-  {% if project.sessions %}<div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Programme schedule</strong><span>{{ project.sessions|length }} sessions</span></div><div class="aurora-table-scroll"><table class="aurora-table align-middle mb-0"><thead><tr><th>Time</th><th>Session</th><th>Type</th><th>Venue</th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td class="text-nowrap">{{ session.starts_at.strftime('%I:%M %p') }} – {{ session.ends_at.strftime('%I:%M %p') }}</td><td>{{ session.title }}</td><td>{{ session.session_type }}</td><td>{{ session.venue or project.venue or '—' }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
-  {% if can_manage %}
-  <div class="aurora-card--padded empty-state mb-4">
-    <h2 class="h4 mb-2">Checklists</h2>
-    <p class="mb-3">Instantiate a checklist template for this project to track its operational requirements.</p>
-    <form method="POST" action="{{ url_for('erp.instantiate_project_checklist', public_id=project.public_id) }}" class="d-flex gap-2 flex-wrap justify-content-center">
-      <select class="aurora-select" name="template_public_id" aria-label="Checklist template">
-        {% for template in checklist_templates %}<option value="{{ template.public_id }}">{{ template.name }} ({{ template.project_type }})</option>{% endfor %}
-      </select>
-      <button class="aurora-button--primary">Add checklist</button>
-    </form>
-  </div>
-  {% endif %}
+  <div class="aurora-card mb-4"><div class="aurora-card__header"><strong>Project Basics</strong><span class="small text-muted ms-2">Set at creation; immutable here</span></div><div class="aurora-card__body"><dl class="row mb-0">
+    <dt class="col-sm-3">Campus</dt><dd class="col-sm-9">{{ project.campus.name }}{% if project.campus.code %} ({{ project.campus.code }}){% endif %}</dd>
+    <dt class="col-sm-3">Operating unit</dt><dd class="col-sm-9">{{ project.operating_unit.name if project.operating_unit else 'Not set' }}</dd>
+    <dt class="col-sm-3">Program</dt><dd class="col-sm-9">{{ project.program_type.name }}</dd>
+    <dt class="col-sm-3">Academic year</dt><dd class="col-sm-9">{{ project.academic_year.name }}</dd>
+    <dt class="col-sm-3">Wing</dt><dd class="col-sm-9">{{ project.wing.name if project.wing else 'Not set' }}</dd>
+  </dl></div></div>
+  <div class="aurora-card mb-4"><div class="aurora-card__header"><strong>Project record</strong></div><div class="aurora-card__body"><dl class="row mb-0"><dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ vocabulary_display('project_type', project.project_type) if project.project_type else vocabulary_display('project_category', project.category) }}</dd><dt class="col-sm-3">Venue</dt><dd class="col-sm-9">{{ project.venue or 'Not recorded' }}</dd><dt class="col-sm-3">Audience</dt><dd class="col-sm-9">{{ project.target_audience or 'Not recorded' }}</dd><dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ project.description or 'Not recorded' }}</dd><dt class="col-sm-3">Reach</dt><dd class="col-sm-9">Expected {{ project.expected_reach or '—' }} · Actual {{ project.actual_reach or '—' }}</dd></dl></div></div>
+  {% if project.sessions %}<div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Programme schedule</strong><span>{{ project.sessions|length }} sessions</span></div><div class="aurora-table-scroll" tabindex="0"><table class="aurora-table align-middle mb-0"><thead><tr><th>Time</th><th>Session</th><th>Type</th><th>Venue</th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td class="text-nowrap">{{ session.starts_at.strftime('%I:%M %p') }} – {{ session.ends_at.strftime('%I:%M %p') }}</td><td>{{ session.title }}</td><td>{{ session.session_type }}</td><td>{{ session.venue or project.venue or '—' }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
 </div><div class="col-xl-4">
-  {% if can_approve and transitions %}<div class="aurora-card mb-4"><div class="aurora-card__header"><strong>Lifecycle decision</strong></div><div class="aurora-card__body"><form method="POST" action="{{ url_for('erp.transition', public_id=project.public_id) }}"><input type="hidden" name="version" value="{{ project.version }}"><label class="aurora-label" for="target_status">Move to</label><select class="aurora-select mb-3" name="target_status" id="target_status">{% for item in transitions %}<option>{{ item }}</option>{% endfor %}</select><label class="aurora-label" for="reason">Decision/cancellation reason</label><textarea class="aurora-input mb-3" id="reason" name="reason" rows="3"></textarea><button class="aurora-button--primary w-100">Apply transition</button></form></div></div>{% endif %}
+  {% if can_approve and transitions %}<div class="aurora-card mb-4"><div class="aurora-card__header"><strong>Lifecycle decision</strong></div><div class="aurora-card__body"><form method="POST" action="{{ url_for('erp.transition', public_id=project.public_id) }}"><input type="hidden" name="version" value="{{ project.version }}"><label class="aurora-label" for="target_status">Move to</label><select class="aurora-select mb-3" name="target_status" id="target_status">{% for item in transitions %}<option>{{ item }}</option>{% endfor %}</select><label class="aurora-label" for="reason">Decision reason <span class="text-muted fw-normal">(required only if cancelling)</span></label><textarea class="aurora-input mb-3" id="reason" name="reason" rows="3"></textarea><button class="aurora-button--primary w-100">Apply transition</button></form></div></div>{% endif %}
+  <div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Public disclosure</strong><span class="aurora-badge aurora-badge--status-{{ project.publication_status|lower }}">{{ project.publication_status }}</span></div><div class="aurora-card__body">
+    <p class="text-muted small mb-3">This project is only visible on the public site once explicitly Published. Draft/Private data never leaks to the public shell.</p>
+    {% if can_manage and project.publication_status in ['Private', 'Withdrawn'] %}<form method="POST" action="{{ url_for('erp.submit_publication', public_id=project.public_id) }}"><input type="hidden" name="version" value="{{ project.version }}"><button class="aurora-button--secondary w-100">Request publication</button></form>{% endif %}
+    {% if can_decide_publication and project.publication_status == 'Pending' %}
+    <form method="POST" action="{{ url_for('erp.decide_publication', public_id=project.public_id) }}" class="d-flex flex-column gap-2">
+      <input type="hidden" name="version" value="{{ project.version }}">
+      <label class="aurora-label" for="publication_decision">Decision</label>
+      <select class="aurora-select" id="publication_decision" name="decision"><option value="Published">Publish</option><option value="Private">Reject to Private</option></select>
+      <label class="aurora-label" for="publication_reason">Reason <span class="text-muted fw-normal">(required only if rejecting)</span></label>
+      <input class="aurora-input" id="publication_reason" name="reason">
+      <button class="aurora-button--primary w-100">Save decision</button>
+    </form>
+    {% endif %}
+    {% if can_decide_publication and project.publication_status == 'Published' %}
+    <form method="POST" action="{{ url_for('erp.decide_publication', public_id=project.public_id) }}" class="d-flex flex-column gap-2">
+      <input type="hidden" name="version" value="{{ project.version }}">
+      <input type="hidden" name="decision" value="Withdrawn">
+      <label class="aurora-label" for="withdraw_reason">Withdrawal reason</label>
+      <input class="aurora-input" id="withdraw_reason" name="reason" required>
+      <button class="aurora-button--secondary w-100">Withdraw from public site</button>
+    </form>
+    {% endif %}
+  </div></div>
   <div class="aurora-card"><div class="aurora-card__header"><strong>Operational completeness</strong></div><div class="aurora-list aurora-list--flush"><div class="aurora-list__item d-flex justify-content-between"><span>Sessions</span><strong>{{ project.sessions|length }}</strong></div><div class="aurora-list__item d-flex justify-content-between"><span>Checklists</span><strong>{{ project.checklists|length }}</strong></div><div class="aurora-list__item d-flex justify-content-between"><span>Documents</span><strong>{{ project.document_records|length }}</strong></div><div class="aurora-list__item d-flex justify-content-between"><span>Components</span><strong>{{ project.components|length }}</strong></div></div></div>
 </div></div>
 </div>
 {% endif %}
 
 {% if active_tab == 'people' %}
-<div id="panel-people" role="tabpanel" aria-labelledby="tab-people">
+<div id="panel-people">
   <div class="aurora-card mb-4">
-    <div class="aurora-card__header d-flex justify-content-between"><strong>Project team</strong><span>{{ project.team_assignments|length }} people</span></div>
-    <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Name</th><th>Registration</th><th>Assignment</th><th>Recruitment</th></tr></thead><tbody>{% for assignment in project.team_assignments %}<tr><td data-label="Name">{{ assignment.person.display_name }}</td><td data-label="Registration" class="font-monospace">{{ assignment.person.registration_number or '—' }}</td><td data-label="Assignment">{{ assignment.role_label or assignment.assignment_type }}</td><td data-label="Recruitment">{{ assignment.recruitment_status }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No team members enrolled yet.</td></tr>{% endfor %}</tbody></table></div>
-    {% if can_manage %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="row g-2 align-items-end"><div class="col-md-4"><label class="aurora-label" for="registration_number">Registration number</label><input id="registration_number" class="aurora-input" name="registration_number" required></div><div class="col-md-3"><label class="aurora-label" for="assignment_type">Assignment type</label><select id="assignment_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div><div class="col-md-3"><label class="aurora-label" for="role_label">Role label</label><input id="role_label" class="aurora-input" name="role_label" placeholder="e.g. Volunteer"></div><div class="col-md-2"><button class="aurora-button--primary w-100">Add</button></div></form></div>{% endif %}
+    <div class="aurora-card__header d-flex justify-content-between"><h2 class="aurora-card__heading">Project team</h2><span>{{ project.team_assignments|length }} people</span></div>
+    <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Name</th><th>Registration</th><th>Assignment</th><th>Recruitment</th></tr></thead><tbody>{% for assignment in project.team_assignments %}<tr><td data-label="Name">{{ assignment.person.display_name }}</td><td data-label="Registration" class="font-monospace">{{ assignment.person.registration_number or '—' }}</td><td data-label="Assignment">{{ assignment.role_label or assignment.assignment_type }}</td><td data-label="Recruitment">{{ assignment.recruitment_status }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No team members enrolled yet.</td></tr>{% endfor %}</tbody></table></div>
+    {% if can_manage %}<div class="aurora-card__body border-top">
+      <form method="GET" class="row g-2 mb-3"><input type="hidden" name="tab" value="people"><div class="col-md-9"><label class="aurora-label" for="people_q">Search people by name, email, or registration number</label><input id="people_q" class="aurora-input" name="people_q" value="{{ people_query }}" placeholder="Start typing at least 2 characters…"></div><div class="col-md-3 align-self-end"><button class="aurora-button--secondary w-100">Search</button></div></form>
+      {% if people_query %}
+      {% if people_matches %}
+      <div class="aurora-list aurora-list--flush mb-3">
+        {% for match in people_matches %}
+        <form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="aurora-list__item d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <input type="hidden" name="person_public_id" value="{{ match.public_id }}">
+          <span>{{ match.display_name }}{% if match.registration_number %}<span class="small text-muted"> · {{ match.registration_number }}</span>{% endif %}</span>
+          <span class="aurora-inline-decision">
+            <span class="aurora-inline-field"><label class="aurora-inline-label" for="assignment-type-{{ match.public_id }}">Assignment type <span class="visually-hidden">for {{ match.display_name }}</span></label>
+            <select id="assignment-type-{{ match.public_id }}" class="aurora-select aurora-select--small" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></span>
+            {% if match.is_member %}<span class="aurora-badge aurora-badge--status-active">Already a member</span>{% else %}<button class="aurora-button--small aurora-button--outline-primary">Add</button>{% endif %}
+          </span>
+        </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="alert alert-info">No matches. Add them as a new participant below.</div>
+      {% endif %}
+      {% endif %}
+      <div class="aurora-disclosure" id="newParticipantDisclosure">
+        <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseNewParticipant" aria-expanded="false" aria-controls="collapseNewParticipant">Add a new participant</button>
+        <div id="collapseNewParticipant" class="aurora-collapse" data-ui-parent="#newParticipantDisclosure">
+          <form method="POST" action="{{ url_for('erp.create_and_enroll_team_member', public_id=project.public_id) }}" class="row g-2 mt-2">
+            <div class="col-md-3"><label class="aurora-label" for="new_first_name">First name</label><input id="new_first_name" class="aurora-input" name="first_name" required></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_last_name">Last name</label><input id="new_last_name" class="aurora-input" name="last_name"></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_email">Email</label><input id="new_email" type="email" class="aurora-input" name="email"></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_registration_number">Registration number</label><input id="new_registration_number" class="aurora-input" name="registration_number"></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_assignment_type">Assignment type</label><select id="new_assignment_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_role_label">Role</label><select id="new_role_label" class="aurora-select" name="role_label"><option value="">Not specified</option>{% for option in assignment_role_options %}<option>{{ option }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="aurora-label" for="new_role_label_other">If "Other", specify</label><input id="new_role_label_other" class="aurora-input" name="role_label_other"></div>
+            <div class="col-md-3 align-self-end"><button class="aurora-button--primary w-100">Create &amp; add</button></div>
+          </form>
+        </div>
+      </div>
+    </div>{% endif %}
   </div>
+
+  {% if recruitment_applications %}
+  <div class="aurora-card mb-4">
+    <div class="aurora-card__header"><h2 class="aurora-card__heading">Recruitment decisions</h2></div>
+    <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards mb-0"><thead><tr><th>Applicant</th><th>Role</th><th>Decision</th></tr></thead><tbody>
+      {% for application in recruitment_applications %}<tr id="{{ application.public_id }}"><td data-label="Applicant">{{ application.person.display_name }}</td><td data-label="Role">{{ application.desired_role }}</td><td data-label="Decision">{% if can_manage and application.decision in ['Submitted', 'Interview Scheduled'] %}<form method="POST" action="{{ url_for('erp.decide_recruitment_route', public_id=project.public_id, application_public_id=application.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ application.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="recruitment-{{ application.public_id }}">Decision <span class="visually-hidden">for {{ application.person.display_name }}</span></label><select id="recruitment-{{ application.public_id }}" class="aurora-select aurora-select--small" name="decision"><option>Selected</option><option>Rejected</option><option>Waitlisted</option><option>Interview Scheduled</option></select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="recruitment-reason-{{ application.public_id }}">Reason (only if rejecting)</label><input id="recruitment-reason-{{ application.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge">{{ application.decision }}</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  {% endif %}
 
   {% if is_igp %}
   <div class="aurora-card mb-4">
-    <div class="aurora-card__header d-flex justify-content-between"><strong>Buddy pairings</strong><span>{{ project.buddy_assignments|length }} active</span></div>
-    <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Buddy</th><th>Exchange student</th><th>Period</th><th>Status</th></tr></thead><tbody>{% for assignment in project.buddy_assignments %}<tr><td data-label="Buddy">{{ assignment.buddy_person.display_name if assignment.buddy_person else (assignment.buddy.username if assignment.buddy else '—') }}</td><td data-label="Exchange student">{{ assignment.exchange_student_person.display_name if assignment.exchange_student_person else (assignment.exchange_student.username if assignment.exchange_student else '—') }}</td><td data-label="Period">{{ assignment.start_date }} – {{ assignment.end_date }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ assignment.status|lower }}">{{ assignment.status }}</span></td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No buddy pairings yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="aurora-card__header d-flex justify-content-between"><h2 class="aurora-card__heading">Buddy pairings</h2><span>{{ project.buddy_assignments|length }} active</span></div>
+    <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Buddy</th><th>Exchange student</th><th>Period</th><th>Status</th></tr></thead><tbody>{% for assignment in project.buddy_assignments %}<tr><td data-label="Buddy">{{ assignment.buddy_person.display_name if assignment.buddy_person else (assignment.buddy.username if assignment.buddy else '—') }}</td><td data-label="Exchange student">{{ assignment.exchange_student_person.display_name if assignment.exchange_student_person else (assignment.exchange_student.username if assignment.exchange_student else '—') }}</td><td data-label="Period">{{ assignment.start_date }} – {{ assignment.end_date }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ assignment.status|lower }}">{{ assignment.status }}</span></td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No buddy pairings yet.</td></tr>{% endfor %}</tbody></table></div>
     {% if can_manage %}
     <div class="aurora-card__body border-top">
       <div class="aurora-disclosure" id="buddyPairingDisclosure">
         <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyPairingForm" aria-expanded="false" aria-controls="collapseBuddyPairingForm">Pair a new buddy</button>
         <div id="collapseBuddyPairingForm" class="aurora-collapse" data-ui-parent="#buddyPairingDisclosure">
           <form method="POST" action="{{ url_for('erp.add_buddy_assignment', public_id=project.public_id) }}" class="row g-2 mt-2">
-            <div class="col-md-3"><label class="aurora-label" for="buddy_registration_number">Buddy registration #</label><input id="buddy_registration_number" class="aurora-input" name="buddy_registration_number" required></div>
-            <div class="col-md-3"><label class="aurora-label" for="exchange_student_registration_number">Exchange student registration #</label><input id="exchange_student_registration_number" class="aurora-input" name="exchange_student_registration_number" required></div>
+            <div class="col-md-3"><label class="aurora-label" for="buddy_person_public_id">Buddy</label><select id="buddy_person_public_id" class="aurora-select" name="buddy_person_public_id" required><option value="">Select a project participant…</option>{% for person in eligible_participants %}<option value="{{ person.public_id }}">{{ person.display_name }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="aurora-label" for="exchange_student_person_public_id">Exchange student</label><select id="exchange_student_person_public_id" class="aurora-select" name="exchange_student_person_public_id" required><option value="">Select a project participant…</option>{% for person in eligible_participants %}<option value="{{ person.public_id }}">{{ person.display_name }}</option>{% endfor %}</select></div>
             <div class="col-md-3"><label class="aurora-label" for="start_date">Start date</label><input id="start_date" type="date" class="aurora-input" name="start_date" required></div>
             <div class="col-md-3"><label class="aurora-label" for="end_date">End date</label><input id="end_date" type="date" class="aurora-input" name="end_date" required></div>
             <div class="col-12"><button class="aurora-button--primary">Create pairing</button></div>
           </form>
         </div>
       </div>
+      <form method="POST" action="{{ url_for('erp.upload_buddy_allocation', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2 mt-3 border-top pt-3">
+        <div class="col-md-8 aurora-file-field"><label class="aurora-label" for="buddy_allocation_file">Bulk buddy allocation file</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="buddy_allocation_file" type="file" name="source_file" required></div><p class="aurora-file-field__hint">Accepted formats: .xlsx or .csv.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
+        <div class="col-md-4 align-self-end"><button class="aurora-button--secondary w-100">Import allocation</button></div>
+      </form>
     </div>
     {% endif %}
   </div>
   {% endif %}
 
   <div class="aurora-card">
-    <div class="aurora-card__header"><strong>Attendance</strong></div>
-    <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Session</th><th>When</th><th></th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td data-label="Session">{{ session.title }}</td><td data-label="When">{{ session.starts_at.strftime('%b %d, %Y') }}</td><td>{% if can_manage %}<a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.attendance_roll_call', public_id=project.public_id, session_public_id=session.public_id) }}">Roll call</a>{% endif %}</td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted py-4">No sessions scheduled yet.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="aurora-card__header"><h2 class="aurora-card__heading">Attendance</h2></div>
+    <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Session</th><th>When</th><th></th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td data-label="Session">{{ session.title }}</td><td data-label="When">{{ session.starts_at.strftime('%b %d, %Y') }}</td><td>{% if can_manage %}<a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.attendance_roll_call', public_id=project.public_id, session_public_id=session.public_id) }}">Roll call</a>{% endif %}</td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted py-4">No sessions scheduled yet.</td></tr>{% endfor %}</tbody></table></div>
+    {% if can_manage and not is_igp %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.upload_icc_attendance', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2"><div class="col-md-8 aurora-file-field"><label class="aurora-label" for="icc_attendance_file">Volunteer attendance file</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="icc_attendance_file" type="file" name="source_file" required></div><p class="aurora-file-field__hint">Accepted format: .xlsx.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div><div class="col-md-4 align-self-end"><button class="aurora-button--secondary w-100">Import attendance</button></div></form></div>{% endif %}
   </div>
 </div>
 {% endif %}
 
-{% if active_tab == 'operations' %}
-<div id="panel-operations" role="tabpanel" aria-labelledby="tab-operations">
-  <div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Tasks</strong><span>{{ project.work_tasks|length }}</span></div><div class="aurora-table-scroll"><table class="aurora-table align-middle mb-0"><thead><tr><th>Task</th><th>Priority</th><th>Status / decision</th><th>Closure</th></tr></thead><tbody>{% for task in project.work_tasks %}<tr><td>{{ task.title }}{% if task.description %}<div class="small text-muted">{{ task.description }}</div>{% endif %}</td><td>{{ task.priority }}</td><td>{% if can_manage or (can_contribute and current_person_id == task.owner_person_id) %}<form method="POST" action="{{ url_for('erp.update_task', public_id=project.public_id, task_public_id=task.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ task.version }}"><select class="aurora-select aurora-select--small" name="status" aria-label="Status for {{ task.title }}">{% for status in ['Not Started','In Progress','Blocked','Submitted','Approved','Rejected','Waived','Completed'] %}{% if can_approve or status not in ['Approved','Rejected','Waived'] %}<option{% if status == task.status %} selected{% endif %}>{{ status }}</option>{% endif %}{% endfor %}</select><input class="aurora-input aurora-input--small" name="comment" aria-label="Decision comment for {{ task.title }}" placeholder="Reason/comment"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}{{ task.status }}{% endif %}</td><td>{{ 'Required' if task.mandatory_for_closure else 'No' }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No tasks yet.</td></tr>{% endfor %}</tbody></table></div>{% if can_manage %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.add_task', public_id=project.public_id) }}" class="row g-2"><div class="col-md-5"><label class="visually-hidden" for="taskTitle">Task title</label><input id="taskTitle" class="aurora-input" name="title" placeholder="Task title" required></div><div class="col-md-3"><select class="aurora-select" name="priority" aria-label="Priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="col-md-2 aurora-choice align-self-center ps-4"><input class="aurora-choice__input" type="checkbox" name="mandatory_for_closure" id="mandatory"><label class="aurora-choice__label" for="mandatory">Closure</label></div><div class="col-md-2"><button class="aurora-button--primary w-100">Add</button></div></form></div>{% endif %}</div>
+{% if active_tab == 'delivery' %}
+<div id="panel-delivery" class="page-stack">
 
-  {% for checklist in project.checklists %}<div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>{{ checklist.name }}</strong><span>{{ checklist.item_statuses|length }} requirements</span></div><div class="aurora-table-scroll"><table class="aurora-table align-middle mb-0"><thead><tr><th>Requirement</th><th>Owner/contact</th><th>Status / decision</th><th>Evidence</th></tr></thead><tbody>{% for item in checklist.item_statuses|sort(attribute='template_item.sequence') %}<tr><td><div class="fw-semibold">{{ item.template_item.code }} · {{ item.template_item.title }}</div><div class="small text-muted">{{ item.template_item.category }}{% if item.template_item.sensitive %} · Restricted{% endif %}</div></td><td>{{ item.external_owner or 'Unassigned' }}</td><td>{% if can_manage or (can_contribute and current_person_id == item.owner_person_id) %}<form method="POST" action="{{ url_for('erp.update_checklist_item', public_id=project.public_id, item_public_id=item.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ item.version }}"><select class="aurora-select aurora-select--small" name="status" aria-label="Status for {{ item.template_item.title }}">{% for status in ['Not Started','In Progress','Blocked','Submitted','Approved','Rejected','Waived','Completed'] %}{% if can_approve or status not in ['Approved','Rejected','Waived'] %}<option{% if status == item.status %} selected{% endif %}>{{ status }}</option>{% endif %}{% endfor %}</select><input class="aurora-input aurora-input--small" name="comment" aria-label="Decision comment for {{ item.template_item.title }}" placeholder="Reason/comment"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}{{ item.status }}{% endif %}</td><td>{% if item.template_item.sensitive and not can_view_sensitive %}<span class="text-muted">Restricted reference hidden</span>{% else %}{{ item.evidence_reference or 'None' }}{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>{% endfor %}
+  <section class="page-section" aria-labelledby="tasks-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="tasks-title">Tasks</h2>
+        <p class="page-section__hint">Work that must be recorded before this project can close.</p>
+      </div>
+      <ul class="summary-row" role="status">
+        <li class="summary-row__item">Need action <span class="summary-row__value">{{ open_tasks|length }}</span></li>
+        <li class="summary-row__item">Settled <span class="summary-row__value">{{ settled_tasks|length }}</span></li>
+      </ul>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Task</th><th>Priority</th><th>Status / decision</th><th>Closure</th></tr></thead><tbody>{% for task in open_tasks %}<tr id="{{ task.public_id }}"><td data-label="Task">{{ task.title }}{% if task.description %}<div class="small text-muted">{{ task.description }}</div>{% endif %}</td><td data-label="Priority">{{ task.priority }}</td><td data-label="Status / decision">{% if can_manage or (can_contribute and current_person_id == task.owner_person_id) %}<form method="POST" action="{{ url_for('erp.update_task', public_id=project.public_id, task_public_id=task.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ task.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="task-status-{{ task.public_id }}">Status <span class="visually-hidden">for {{ task.title }}</span></label><select id="task-status-{{ task.public_id }}" class="aurora-select aurora-select--small" name="status">{% for status in ['Not Started','In Progress','Blocked','Submitted','Approved','Rejected','Waived','Completed'] %}{% if can_approve or status not in ['Approved','Rejected','Waived'] %}<option{% if status == task.status %} selected{% endif %}>{{ status }}</option>{% endif %}{% endfor %}</select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="task-comment-{{ task.public_id }}">Reason or comment <span class="visually-hidden">for {{ task.title }}</span></label><input id="task-comment-{{ task.public_id }}" class="aurora-input aurora-input--small" name="comment"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}{{ task.status }}{% endif %}</td><td data-label="Closure">{{ 'Required' if task.mandatory_for_closure else 'No' }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Nothing needs action here.</td></tr>{% endfor %}</tbody></table></div>
+      {% if settled_tasks %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="tasksSettledDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseTasksSettled" aria-expanded="false" aria-controls="collapseTasksSettled">Show {{ settled_tasks|length }} settled task{{ '' if settled_tasks|length == 1 else 's' }}</button>
+          <div id="collapseTasksSettled" class="aurora-collapse" data-ui-parent="#tasksSettledDisclosure">
+            <div class="aurora-table-scroll mt-3" tabindex="0"><table class="aurora-table--cards align-middle mb-0"><thead><tr><th>Task</th><th>Priority</th><th>Status</th><th>Closure</th></tr></thead><tbody>{% for task in settled_tasks %}<tr id="{{ task.public_id }}"><td data-label="Task">{{ task.title }}{% if task.description %}<div class="small text-muted">{{ task.description }}</div>{% endif %}</td><td data-label="Priority">{{ task.priority }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ task.status|lower|replace(' ', '-') }}">{{ task.status }}</span></td><td data-label="Closure">{{ 'Required' if task.mandatory_for_closure else 'No' }}</td></tr>{% endfor %}</tbody></table></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="taskAddDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseTaskAdd" aria-expanded="false" aria-controls="collapseTaskAdd">Add a task</button>
+          <div id="collapseTaskAdd" class="aurora-collapse" data-ui-parent="#taskAddDisclosure">
+            <form method="POST" action="{{ url_for('erp.add_task', public_id=project.public_id) }}" class="row g-2 mt-3"><div class="col-md-5"><label class="aurora-label" for="taskTitle">Task title</label><input id="taskTitle" class="aurora-input" name="title" required></div><div class="col-md-3"><label class="aurora-label" for="taskPriority">Priority</label><select id="taskPriority" class="aurora-select" name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="col-md-2 aurora-choice align-self-end mb-3"><input class="aurora-choice__input" type="checkbox" name="mandatory_for_closure" id="mandatory"><label class="aurora-choice__label" for="mandatory">Required for closure</label></div><div class="col-md-2 align-self-end"><button class="aurora-button--primary w-100">Add task</button></div></form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
 
-  <div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Contributions</strong><span>{{ project.contribution_records|length }}</span></div><div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Person</th><th>Activity</th><th>Hours</th><th>Decision</th></tr></thead><tbody>{% for contribution in project.contribution_records %}<tr><td data-label="Person">{{ contribution.person.display_name }}</td><td data-label="Activity">{{ contribution.activity_type }}<div class="small text-muted">{{ contribution.description }}</div></td><td data-label="Hours">{{ contribution.duration_hours }}</td><td data-label="Decision">{% if contribution.approval_status == 'Pending' and can_approve %}<form method="POST" action="{{ url_for('erp.decide_contribution_route', public_id=project.public_id, contribution_public_id=contribution.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ contribution.version }}"><select class="aurora-select aurora-select--small" name="status">{% for status in contribution_statuses %}<option>{{ status }}</option>{% endfor %}</select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason (required if rejected)"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ contribution.approval_status|lower }}">{{ contribution.approval_status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No contributions logged yet.</td></tr>{% endfor %}</tbody></table></div>{% if can_contribute %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.log_contribution', public_id=project.public_id) }}" class="row g-2"><div class="col-md-3"><select class="aurora-select" name="activity_type" aria-label="Activity type"><option>Event support</option><option>Media support</option><option>Logistics support</option><option>Administrative</option></select></div><div class="col-md-5"><input class="aurora-input" name="description" placeholder="What did you do?"></div><div class="col-md-2"><input class="aurora-input" type="number" step="0.5" min="0" name="duration_hours" placeholder="Hours" value="1"></div><div class="col-md-2"><button class="aurora-button--primary w-100">Log</button></div></form></div>{% endif %}</div>
+  {% for checklist in project.checklists %}
+  {% set open_items = checklist.item_statuses|rejectattr('status', 'in', settled_statuses)|sort(attribute='template_item.sequence')|list %}
+  {% set settled_items = checklist.item_statuses|selectattr('status', 'in', settled_statuses)|sort(attribute='template_item.sequence')|list %}
+  <section class="page-section" aria-labelledby="checklist-{{ checklist.public_id }}-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="checklist-{{ checklist.public_id }}-title">{{ checklist.name }}</h2>
+      </div>
+      <ul class="summary-row" role="status">
+        <li class="summary-row__item">Need action <span class="summary-row__value">{{ open_items|length }}</span></li>
+        <li class="summary-row__item">Settled <span class="summary-row__value">{{ settled_items|length }}</span></li>
+      </ul>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards align-middle mb-0"><thead><tr><th>Requirement</th><th>Owner/contact</th><th>Status / decision</th><th>Evidence</th></tr></thead><tbody>
+      {% for item in open_items %}
+      <tr id="{{ item.public_id }}">
+        <td data-label="Requirement"><div class="fw-semibold">{{ item.template_item.code }} · {{ item.template_item.title }}</div><div class="small text-muted">{{ item.template_item.category }}{% if item.template_item.sensitive %} · Restricted{% endif %}</div></td>
+        <td data-label="Owner/contact">{{ item.external_owner or 'Unassigned' }}</td>
+        <td data-label="Status / decision">{% if can_manage or (can_contribute and current_person_id == item.owner_person_id) %}<form method="POST" action="{{ url_for('erp.update_checklist_item', public_id=project.public_id, item_public_id=item.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ item.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="checklist-status-{{ item.public_id }}">Status <span class="visually-hidden">for {{ item.template_item.title }}</span></label><select id="checklist-status-{{ item.public_id }}" class="aurora-select aurora-select--small" name="status">{% for status in ['Not Started','In Progress','Blocked','Submitted','Approved','Rejected','Waived','Completed'] %}{% if can_approve or status not in ['Approved','Rejected','Waived'] %}<option{% if status == item.status %} selected{% endif %}>{{ status }}</option>{% endif %}{% endfor %}</select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="checklist-comment-{{ item.public_id }}">Reason or comment <span class="visually-hidden">for {{ item.template_item.title }}</span></label><input id="checklist-comment-{{ item.public_id }}" class="aurora-input aurora-input--small" name="comment"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}{{ item.status }}{% endif %}</td>
+        <td data-label="Evidence">
+          {% if item.template_item.sensitive and not can_view_sensitive %}
+          <span class="text-muted">Restricted reference hidden</span>
+          {% else %}
+          <fieldset class="aurora-fieldset aurora-fieldset--framed">
+            <legend>Evidence</legend>
+          {% if item.evidence_documents %}
+          <ul class="aurora-list aurora-list--flush">
+            {% for document in item.evidence_documents %}
+            <li class="aurora-list__item">
+              <span class="aurora-badge aurora-badge--status-{{ compute_availability(document)|lower }}">{{ compute_availability(document) }}</span>
+              {% if document.permission_classification == 'Restricted' and not can_view_sensitive %}
+              <span class="text-muted">Restricted</span>
+              {% elif document.drive_url %}
+              <a href="{{ url_for('erp.open_document', public_id=document.public_id) }}" target="_blank" rel="noopener noreferrer">{{ document.title }}</a>
+              {% else %}
+              {{ document.title }} <span class="text-muted">(indexed metadata only)</span>
+              {% endif %}
+              {% if can_manage or (can_contribute and current_person_id == item.owner_person_id) %}
+              <form method="POST" action="{{ url_for('erp.detach_checklist_document', public_id=project.public_id, item_public_id=item.public_id, document_public_id=document.public_id) }}" class="d-inline"><button class="aurora-button--small aurora-button--outline-secondary">Unlink</button></form>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if item.evidence_reference %}<div class="small text-muted">Legacy reference: {{ item.evidence_reference }}</div>{% endif %}
+          {% if can_manage or (can_contribute and current_person_id == item.owner_person_id) %}
+          {% if project.document_records %}
+          <form method="POST" action="{{ url_for('erp.attach_checklist_document', public_id=project.public_id, item_public_id=item.public_id) }}" class="aurora-inline-decision mt-2">
+            <span class="aurora-inline-field aurora-inline-field--reason">
+              <label class="aurora-inline-label" for="evidence-doc-{{ item.public_id }}">Attach a document <span class="visually-hidden">to {{ item.template_item.title }}</span></label>
+              <select id="evidence-doc-{{ item.public_id }}" class="aurora-select aurora-select--small" name="document_public_id">
+                <option value="">Select an indexed document…</option>
+                {% for document in project.document_records if not (document.permission_classification == 'Restricted' and not can_view_sensitive) and document.checklist_status_id in (none, item.id) %}
+                <option value="{{ document.public_id }}">{{ document.title }}</option>
+                {% endfor %}
+              </select>
+            </span>
+            <button class="aurora-button--small aurora-button--outline-primary">Attach</button>
+          </form>
+          {% else %}
+          <p class="page-section__hint mt-2 mb-0">Index a document under Resources before attaching evidence.</p>
+          {% endif %}
+          {% endif %}
+          </fieldset>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted py-4">Nothing needs action here.</td></tr>
+      {% endfor %}
+      </tbody></table></div>
+      {% if settled_items %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="checklist-{{ checklist.public_id }}-settled">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapse-checklist-{{ checklist.public_id }}-settled" aria-expanded="false" aria-controls="collapse-checklist-{{ checklist.public_id }}-settled">Show {{ settled_items|length }} settled requirement{{ '' if settled_items|length == 1 else 's' }}</button>
+          <div id="collapse-checklist-{{ checklist.public_id }}-settled" class="aurora-collapse" data-ui-parent="#checklist-{{ checklist.public_id }}-settled">
+            <div class="aurora-table-scroll mt-3" tabindex="0"><table class="aurora-table--cards align-middle mb-0"><thead><tr><th>Requirement</th><th>Owner/contact</th><th>Status</th><th>Evidence</th></tr></thead><tbody>
+            {% for item in settled_items %}
+            <tr id="{{ item.public_id }}">
+              <td data-label="Requirement"><div class="fw-semibold">{{ item.template_item.code }} · {{ item.template_item.title }}</div><div class="small text-muted">{{ item.template_item.category }}{% if item.template_item.sensitive %} · Restricted{% endif %}</div></td>
+              <td data-label="Owner/contact">{{ item.external_owner or 'Unassigned' }}</td>
+              <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ item.status|lower|replace(' ', '-') }}">{{ item.status }}</span></td>
+              <td data-label="Evidence">{% if item.template_item.sensitive and not can_view_sensitive %}<span class="text-muted">Restricted reference hidden</span>{% elif item.evidence_documents %}{{ item.evidence_documents|map(attribute='title')|join(', ') }}{% elif item.evidence_reference %}{{ item.evidence_reference }}{% else %}None{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody></table></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
 
-  {% if is_igp %}
-  <div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Buddy interaction logs</strong></div><div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Pairing</th><th>Date</th><th>Notes</th><th>Decision</th></tr></thead><tbody>{% for assignment in project.buddy_assignments %}{% for log in assignment.logs %}<tr><td data-label="Pairing">{{ assignment.buddy_person.display_name if assignment.buddy_person else (assignment.buddy.username if assignment.buddy else '—') }}</td><td data-label="Date">{{ log.activity_date }}</td><td data-label="Notes">{{ log.description }}</td><td data-label="Decision">{% if log.status == 'Pending' and can_approve %}<form method="POST" action="{{ url_for('erp.decide_buddy_log_route', public_id=project.public_id, log_public_id=log.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ log.version }}"><select class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ log.status|lower }}">{{ log.status }}</span>{% endif %}</td></tr>{% endfor %}{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No buddy interactions logged yet.</td></tr>{% endfor %}</tbody></table></div>{% if can_contribute and project.buddy_assignments %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.log_buddy_interaction', public_id=project.public_id, assignment_public_id=project.buddy_assignments[0].public_id) }}" class="row g-2"><div class="col-md-3"><input class="aurora-input" type="date" name="activity_date" required></div><div class="col-md-6"><input class="aurora-input" name="description" placeholder="What did you do together?"></div><div class="col-md-2"><input class="aurora-input" type="number" step="0.5" min="0" name="duration_hours" value="1"></div><div class="col-md-1"><button class="aurora-button--primary w-100">Log</button></div></form></div>{% endif %}</div>
+  {% if can_manage %}
+  <section class="page-section" aria-labelledby="checklist-add-title">
+    <div class="page-section__head">
+      <h2 class="page-section__title" id="checklist-add-title">Add a checklist</h2>
+      <p class="page-section__hint">Instantiate a checklist template for this project to track its operational requirements.</p>
+    </div>
+    <form method="POST" action="{{ url_for('erp.instantiate_project_checklist', public_id=project.public_id) }}" class="d-flex gap-2 flex-wrap">
+      <select class="aurora-select" name="template_public_id" aria-label="Checklist template">
+        {% for template in checklist_templates %}<option value="{{ template.public_id }}">{{ template.name }} ({{ template.project_type }})</option>{% endfor %}
+      </select>
+      <button class="aurora-button--primary">Add checklist</button>
+    </form>
+  </section>
   {% endif %}
 
-  <div class="aurora-card mb-4"><div class="aurora-card__header d-flex justify-content-between"><strong>Operational requests</strong></div><div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Title</th><th>Type</th><th>Amount</th><th>Decision</th></tr></thead><tbody>{% for item in project.operational_requests %}<tr><td data-label="Title">{{ item.title }}</td><td data-label="Type">{{ item.request_type }}</td><td data-label="Amount">{{ item.amount or '—' }}</td><td data-label="Decision">{% if can_approve and item.status in ['Submitted'] %}<form method="POST" action="{{ url_for('erp.decide_operational_request_route', public_id=project.public_id, request_public_id=item.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ item.version }}"><select class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No operational requests yet.</td></tr>{% endfor %}</tbody></table></div>{% if can_manage %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.add_operational_request', public_id=project.public_id) }}" class="row g-2"><div class="col-md-3"><input class="aurora-input" name="request_type" placeholder="Type"></div><div class="col-md-4"><input class="aurora-input" name="title" placeholder="Title" required></div><div class="col-md-3"><input class="aurora-input" name="details" placeholder="Details"></div><div class="col-md-2"><button class="aurora-button--primary w-100">Create</button></div></form></div>{% endif %}</div>
+</div>
+{% endif %}
 
-  <div class="aurora-card">
-    <div class="aurora-card__header d-flex justify-content-between"><strong>Budget</strong><span>{{ project.budget_lines|sum(attribute='estimated_amount') }} estimated</span></div>
-    <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Category</th><th>Estimated</th><th>Approved</th><th>Decision</th></tr></thead><tbody>{% for line in project.budget_lines %}<tr><td data-label="Category">{{ line.category }}<div class="small text-muted">{{ line.description }}</div></td><td data-label="Estimated">{{ line.currency }} {{ line.estimated_amount }}</td><td data-label="Approved">{{ line.approved_amount or '—' }}</td><td data-label="Decision">{% if can_approve and line.status == 'Submitted' %}<form method="POST" action="{{ url_for('erp.decide_budget_line_route', public_id=project.public_id, line_public_id=line.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ line.version }}"><select class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% elif can_manage and line.status == 'Draft' %}<form method="POST" action="{{ url_for('erp.decide_budget_line_route', public_id=project.public_id, line_public_id=line.public_id) }}"><input type="hidden" name="version" value="{{ line.version }}"><input type="hidden" name="status" value="Submitted"><button class="aurora-button--small aurora-button--outline-primary">Submit</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ line.status|lower }}">{{ line.status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No budget lines yet.</td></tr>{% endfor %}</tbody></table></div>
-    {% if can_manage %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2"><div class="col-md-3"><input class="aurora-input" name="category" placeholder="Category" required></div><div class="col-md-5"><input class="aurora-input" name="description" placeholder="Description"></div><div class="col-md-2"><input class="aurora-input" type="number" step="0.01" min="0" name="estimated_amount" placeholder="Amount"></div><div class="col-md-2"><button class="aurora-button--primary w-100">Add</button></div></form></div>{% endif %}
-  </div>
+{% if active_tab == 'contributions' %}
+<div id="panel-contributions" class="page-stack">
+
+  <section class="page-section" aria-labelledby="contributions-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="contributions-title">Contributions</h2>
+      </div>
+      <ul class="summary-row" role="status">
+        <li class="summary-row__item">Need action <span class="summary-row__value">{{ open_contributions|length }}</span></li>
+        <li class="summary-row__item">Settled <span class="summary-row__value">{{ settled_contributions|length }}</span></li>
+      </ul>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Person</th><th>Activity</th><th>Hours</th><th>Decision</th></tr></thead><tbody>{% for contribution in open_contributions %}<tr id="{{ contribution.public_id }}"><td data-label="Person">{{ contribution.person.display_name }}</td><td data-label="Activity">{{ vocabulary_display('contribution_activity', contribution.activity_type) }}<div class="small text-muted">{{ contribution.description }}</div></td><td data-label="Hours">{{ contribution.duration_hours }}</td><td data-label="Decision">{% if contribution.approval_status == 'Pending' and can_approve %}<form method="POST" action="{{ url_for('erp.decide_contribution_route', public_id=project.public_id, contribution_public_id=contribution.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ contribution.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="contribution-status-{{ contribution.public_id }}">Decision <span class="visually-hidden">for {{ contribution.person.display_name }}</span></label><select id="contribution-status-{{ contribution.public_id }}" class="aurora-select aurora-select--small" name="status">{% for status in contribution_statuses %}<option>{{ status }}</option>{% endfor %}</select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="contribution-reason-{{ contribution.public_id }}">Reason (only if rejecting)</label><input id="contribution-reason-{{ contribution.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ contribution.approval_status|lower }}">{{ contribution.approval_status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Nothing needs action here.</td></tr>{% endfor %}</tbody></table></div>
+      {% if settled_contributions %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="contributionsSettledDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseContributionsSettled" aria-expanded="false" aria-controls="collapseContributionsSettled">Show {{ settled_contributions|length }} settled contribution{{ '' if settled_contributions|length == 1 else 's' }}</button>
+          <div id="collapseContributionsSettled" class="aurora-collapse" data-ui-parent="#contributionsSettledDisclosure">
+            <div class="aurora-table-scroll mt-3" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Person</th><th>Activity</th><th>Hours</th><th>Status</th></tr></thead><tbody>{% for contribution in settled_contributions %}<tr id="{{ contribution.public_id }}"><td data-label="Person">{{ contribution.person.display_name }}</td><td data-label="Activity">{{ vocabulary_display('contribution_activity', contribution.activity_type) }}<div class="small text-muted">{{ contribution.description }}</div></td><td data-label="Hours">{{ contribution.duration_hours }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ contribution.approval_status|lower }}">{{ contribution.approval_status }}</span></td></tr>{% endfor %}</tbody></table></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if can_contribute %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="contributionAddDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseContributionAdd" aria-expanded="false" aria-controls="collapseContributionAdd">Log a contribution</button>
+          <div id="collapseContributionAdd" class="aurora-collapse" data-ui-parent="#contributionAddDisclosure">
+            <form method="POST" action="{{ url_for('erp.log_contribution', public_id=project.public_id) }}" class="row g-2 mt-3"><div class="col-md-6"><label class="aurora-label" for="contribution_activity_type">Activity type</label><select id="contribution_activity_type" class="aurora-select" name="activity_type">{% for option in contribution_activity_options %}<option>{{ option }}</option>{% endfor %}</select></div><div class="col-md-6"><label class="aurora-label" for="contribution_activity_other">If “Other,” specify</label><input id="contribution_activity_other" class="aurora-input" name="activity_type_other"></div><div class="col-md-8"><label class="aurora-label" for="contribution_description">Contribution</label><input id="contribution_description" class="aurora-input" name="description" required></div><div class="col-md-4"><label class="aurora-label" for="contribution_hours">Hours</label><input id="contribution_hours" class="aurora-input" type="number" step="0.5" min="0.5" name="duration_hours" value="1" required></div><div class="col-12"><button class="aurora-button--primary">Log contribution</button></div></form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if is_igp %}
+  <section class="page-section" aria-labelledby="buddy-logs-title">
+    <div class="page-section__head">
+      <h2 class="page-section__title" id="buddy-logs-title">Buddy interaction logs</h2>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Pairing</th><th>Date</th><th>Notes</th><th>Decision</th></tr></thead><tbody>{% for assignment in project.buddy_assignments %}{% for log in assignment.logs %}<tr id="{{ log.public_id }}"><td data-label="Pairing">{{ assignment.buddy_person.display_name if assignment.buddy_person else (assignment.buddy.username if assignment.buddy else '—') }}</td><td data-label="Date">{{ log.activity_date }}</td><td data-label="Notes">{{ log.description }}</td><td data-label="Decision">{% if log.status == 'Pending' and can_approve %}<form method="POST" action="{{ url_for('erp.decide_buddy_log_route', public_id=project.public_id, log_public_id=log.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ log.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="buddy-status-{{ log.public_id }}">Decision</label><select id="buddy-status-{{ log.public_id }}" class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="buddy-reason-{{ log.public_id }}">Reason (only if rejecting)</label><input id="buddy-reason-{{ log.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ log.status|lower }}">{{ log.status }}</span>{% endif %}</td></tr>{% endfor %}{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No buddy interactions logged yet.</td></tr>{% endfor %}</tbody></table></div>
+      {% if can_contribute and project.buddy_assignments %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="buddyLogAddDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBuddyLogAdd" aria-expanded="false" aria-controls="collapseBuddyLogAdd">Log an interaction</button>
+          <div id="collapseBuddyLogAdd" class="aurora-collapse" data-ui-parent="#buddyLogAddDisclosure">
+            <form method="POST" action="{{ url_for('erp.log_buddy_interaction', public_id=project.public_id, assignment_public_id=project.buddy_assignments[0].public_id) }}" class="row g-2 mt-3"><div class="col-md-6"><label class="aurora-label" for="buddy_log_date">Interaction date</label><input id="buddy_log_date" class="aurora-input" type="date" name="activity_date" required></div><div class="col-md-6"><label class="aurora-label" for="buddy_log_hours">Hours</label><input id="buddy_log_hours" class="aurora-input" type="number" step="0.5" min="0.5" name="duration_hours" value="1" required></div><div class="col-12"><label class="aurora-label" for="buddy_log_description">Interaction summary</label><input id="buddy_log_description" class="aurora-input" name="description" required></div><div class="col-12"><button class="aurora-button--primary">Log interaction</button></div></form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endif %}
+
+{% if active_tab == 'finance' %}
+<div id="panel-finance" class="page-stack">
+
+  <section class="page-section" aria-labelledby="requests-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="requests-title">Operational requests</h2>
+      </div>
+      <ul class="summary-row" role="status">
+        <li class="summary-row__item">Need action <span class="summary-row__value">{{ open_requests|length }}</span></li>
+        <li class="summary-row__item">Settled <span class="summary-row__value">{{ settled_requests|length }}</span></li>
+      </ul>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Title</th><th>Type</th><th class="text-end">Amount</th><th>Decision</th></tr></thead><tbody>{% for item in open_requests %}<tr id="{{ item.public_id }}"><td data-label="Title">{{ item.title }}</td><td data-label="Type">{{ vocabulary_display('operational_request_type', item.request_type) }}</td><td data-label="Amount" class="text-end font-monospace">{{ '%.2f'|format(item.amount) if item.amount is not none else '—' }}</td><td data-label="Decision">{% if can_manage and item.status in ['Draft','Rejected'] %}<form method="POST" action="{{ url_for('erp.decide_operational_request_route', public_id=project.public_id, request_public_id=item.public_id) }}"><input type="hidden" name="version" value="{{ item.version }}"><input type="hidden" name="status" value="Submitted"><button class="aurora-button--small aurora-button--outline-primary">Submit for approval</button></form>{% elif can_approve_operational_requests and item.status == 'Submitted' and current_user_id not in [item.created_by_id, item.submitted_by_id] %}<form method="POST" action="{{ url_for('erp.decide_operational_request_route', public_id=project.public_id, request_public_id=item.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ item.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="request-status-{{ item.public_id }}">Decision <span class="visually-hidden">for {{ item.title }}</span></label><select id="request-status-{{ item.public_id }}" class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option><option>Cancelled</option></select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="request-reason-{{ item.public_id }}">Reason (only if rejecting or cancelling)</label><input id="request-reason-{{ item.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% elif can_approve_operational_requests and item.status == 'Approved' %}<form method="POST" action="{{ url_for('erp.decide_operational_request_route', public_id=project.public_id, request_public_id=item.public_id) }}"><input type="hidden" name="version" value="{{ item.version }}"><input type="hidden" name="status" value="Completed"><button class="aurora-button--small aurora-button--outline-primary">Mark completed</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Nothing needs action here.</td></tr>{% endfor %}</tbody></table></div>
+      {% if settled_requests %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="requestsSettledDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseRequestsSettled" aria-expanded="false" aria-controls="collapseRequestsSettled">Show {{ settled_requests|length }} settled request{{ '' if settled_requests|length == 1 else 's' }}</button>
+          <div id="collapseRequestsSettled" class="aurora-collapse" data-ui-parent="#requestsSettledDisclosure">
+            <div class="aurora-table-scroll mt-3" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Title</th><th>Type</th><th class="text-end">Amount</th><th>Status</th></tr></thead><tbody>{% for item in settled_requests %}<tr id="{{ item.public_id }}"><td data-label="Title">{{ item.title }}</td><td data-label="Type">{{ vocabulary_display('operational_request_type', item.request_type) }}</td><td data-label="Amount" class="text-end font-monospace">{{ '%.2f'|format(item.amount) if item.amount is not none else '—' }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span></td></tr>{% endfor %}</tbody></table></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="requestAddDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseRequestAdd" aria-expanded="false" aria-controls="collapseRequestAdd">Create a request</button>
+          <div id="collapseRequestAdd" class="aurora-collapse" data-ui-parent="#requestAddDisclosure">
+            <form method="POST" action="{{ url_for('erp.add_operational_request', public_id=project.public_id) }}" class="row g-2 mt-3"><div class="col-md-6"><label class="aurora-label" for="request_type">Request type</label><select id="request_type" class="aurora-select" name="request_type">{% for option in operational_request_type_options %}<option>{{ option }}</option>{% endfor %}</select></div><div class="col-md-6"><label class="aurora-label" for="request_type_other">If “Other,” specify</label><input id="request_type_other" class="aurora-input" name="request_type_other"></div><div class="col-md-6"><label class="aurora-label" for="request_title">Title</label><input id="request_title" class="aurora-input" name="title" required></div><div class="col-md-6"><label class="aurora-label" for="request_details">Details</label><input id="request_details" class="aurora-input" name="details"></div><div class="col-md-6"><label class="aurora-label" for="request_amount">Amount</label><input id="request_amount" class="aurora-input" type="number" min="0" step="0.01" name="amount"></div><div class="col-md-6 align-self-end"><button class="aurora-button--primary w-100">Create draft</button></div></form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="page-section" aria-labelledby="budget-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="budget-title">Budget</h2>
+        <p class="page-section__hint">₹{{ '%.2f'|format(project.budget_lines|sum(attribute='estimated_amount')) }} estimated</p>
+      </div>
+      <ul class="summary-row" role="status">
+        <li class="summary-row__item">Need action <span class="summary-row__value">{{ open_budget_lines|length }}</span></li>
+        <li class="summary-row__item">Settled <span class="summary-row__value">{{ settled_budget_lines|length }}</span></li>
+      </ul>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Category</th><th class="text-end">Estimated</th><th class="text-end">Approved</th><th>Decision</th></tr></thead><tbody>{% for line in open_budget_lines %}<tr id="{{ line.public_id }}"><td data-label="Category">{{ vocabulary_display('budget_category', line.category) }}<div class="small text-muted">{{ line.description }}</div></td><td data-label="Estimated" class="text-end font-monospace">{{ line.currency }} {{ '%.2f'|format(line.estimated_amount) }}</td><td data-label="Approved" class="text-end font-monospace">{{ '%.2f'|format(line.approved_amount) if line.approved_amount is not none else '—' }}</td><td data-label="Decision">{% if can_approve and line.status == 'Submitted' %}<form method="POST" action="{{ url_for('erp.decide_budget_line_route', public_id=project.public_id, line_public_id=line.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ line.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="budget-status-{{ line.public_id }}">Decision</label><select id="budget-status-{{ line.public_id }}" class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="budget-reason-{{ line.public_id }}">Reason (only if rejecting)</label><input id="budget-reason-{{ line.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% elif can_manage and line.status == 'Draft' %}<form method="POST" action="{{ url_for('erp.decide_budget_line_route', public_id=project.public_id, line_public_id=line.public_id) }}"><input type="hidden" name="version" value="{{ line.version }}"><input type="hidden" name="status" value="Submitted"><button class="aurora-button--small aurora-button--outline-primary">Submit</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ line.status|lower }}">{{ line.status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Nothing needs action here.</td></tr>{% endfor %}</tbody></table></div>
+      {% if settled_budget_lines %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="budgetSettledDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBudgetSettled" aria-expanded="false" aria-controls="collapseBudgetSettled">Show {{ settled_budget_lines|length }} settled budget line{{ '' if settled_budget_lines|length == 1 else 's' }}</button>
+          <div id="collapseBudgetSettled" class="aurora-collapse" data-ui-parent="#budgetSettledDisclosure">
+            <div class="aurora-table-scroll mt-3" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Category</th><th class="text-end">Estimated</th><th class="text-end">Approved</th><th>Status</th></tr></thead><tbody>{% for line in settled_budget_lines %}<tr id="{{ line.public_id }}"><td data-label="Category">{{ vocabulary_display('budget_category', line.category) }}<div class="small text-muted">{{ line.description }}</div></td><td data-label="Estimated" class="text-end font-monospace">{{ line.currency }} {{ '%.2f'|format(line.estimated_amount) }}</td><td data-label="Approved" class="text-end font-monospace">{{ '%.2f'|format(line.approved_amount) if line.approved_amount is not none else '—' }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ line.status|lower }}">{{ line.status }}</span></td></tr>{% endfor %}</tbody></table></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="budgetAddDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseBudgetAdd" aria-expanded="false" aria-controls="collapseBudgetAdd">Add a budget line</button>
+          <div id="collapseBudgetAdd" class="aurora-collapse" data-ui-parent="#budgetAddDisclosure">
+            <form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2 mt-3"><div class="col-md-2"><label class="aurora-label" for="budget_category">Category</label><select id="budget_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option>{{ option }}</option>{% endfor %}</select></div><div class="col-md-2"><label class="aurora-label" for="budget_category_other">If “Other,” specify</label><input id="budget_category_other" class="aurora-input" name="category_other"></div><div class="col-md-4"><label class="aurora-label" for="budget_description">Description</label><input id="budget_description" class="aurora-input" name="description" required></div><div class="col-md-2"><label class="aurora-label" for="budget_amount">Estimated amount</label><input id="budget_amount" class="aurora-input" type="number" step="0.01" min="0" name="estimated_amount" required></div><div class="col-md-2 align-self-end"><button class="aurora-button--primary w-100">Add budget line</button></div></form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
 </div>
 {% endif %}
 
 {% if active_tab == 'insights' %}
-<div id="panel-insights" role="tabpanel" aria-labelledby="tab-insights">
+<div id="panel-insights">
+  <p class="page-section__hint mb-3">This tab holds project feedback: the open response form (if any), the approved rating distribution, and moderation of submitted responses. {% if approved_feedback_count %}There {{ 'is' if approved_feedback_count == 1 else 'are' }} {{ approved_feedback_count }} approved rating{{ '' if approved_feedback_count == 1 else 's' }} recorded so far.{% else %}No feedback responses have been recorded yet.{% endif %}</p>
+  <div class="aurora-disclosure" id="moreInsightsDisclosure">
+    <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseMoreInsights" aria-expanded="false" aria-controls="collapseMoreInsights">Show feedback form, ratings, and responses</button>
+    <div id="collapseMoreInsights" class="aurora-collapse mt-3" data-ui-parent="#moreInsightsDisclosure">
   {% set open_form = project.feedback_forms|selectattr('is_open')|first %}
   <div class="aurora-card mb-4">
-    <div class="aurora-card__header"><strong>Feedback</strong></div>
+    <div class="aurora-card__header"><h2 class="aurora-card__heading">Feedback</h2></div>
     <div class="aurora-card__body">
       {% if open_form %}
       <p class="text-muted">Open form: <strong>{{ open_form.title }}</strong></p>
       <form method="POST" action="{{ url_for('erp.submit_feedback_response', public_id=project.public_id) }}" class="row g-2 mb-4">
-        <div class="col-md-2"><select class="aurora-select" name="rating" aria-label="Rating">{% for value in [5,4,3,2,1] %}<option value="{{ value }}">{{ value }} ★</option>{% endfor %}</select></div>
-        <div class="col-md-5"><input class="aurora-input" name="comments" placeholder="Comments"></div>
-        <div class="col-md-3"><input class="aurora-input" name="suggestions" placeholder="Suggestions"></div>
-        <div class="col-md-2"><button class="aurora-button--primary w-100">Submit</button></div>
+        {% for question in open_form.questions_json %}
+          {% if question.type == 'scale' %}<div class="col-md-3"><label class="aurora-label" for="feedback-{{ question.key }}">{{ question.label }} <span aria-hidden="true">*</span></label><select id="feedback-{{ question.key }}" class="aurora-select" name="{{ question.key }}" required>{% for value in [5,4,3,2,1] %}<option value="{{ value }}">{{ value }} out of 5</option>{% endfor %}</select></div>
+          {% else %}<div class="col-md-6"><label class="aurora-label" for="feedback-{{ question.key }}">{{ question.label }}</label><textarea id="feedback-{{ question.key }}" class="aurora-input" name="{{ question.key }}" rows="2"></textarea></div>{% endif %}
+        {% endfor %}
+        <div class="col-12"><button class="aurora-button--primary">Submit feedback</button></div>
       </form>
       {% elif can_manage %}
       <form method="POST" action="{{ url_for('erp.add_feedback_form', public_id=project.public_id) }}" class="row g-2 mb-4">
-        <div class="col-md-8"><input class="aurora-input" name="title" placeholder="Feedback form title" value="Project Feedback"></div>
-        <div class="col-md-4"><button class="aurora-button--primary w-100">Open feedback form</button></div>
+        <div class="col-md-6"><label class="aurora-label" for="feedback-title">Form title</label><input id="feedback-title" class="aurora-input" name="title" value="Project Feedback" required maxlength="180"></div>
+        <div class="col-12"><label class="aurora-label" for="feedback-questions">Additional text questions</label><textarea id="feedback-questions" class="aurora-input" name="questions" rows="5" aria-describedby="feedback-question-help"></textarea><div id="feedback-question-help" class="small text-muted">Optional. Enter one question per line, up to 20 questions and 200 characters each. Overall rating (1–5) is always first.</div></div>
+        <div class="col-12"><button class="aurora-button--primary">Open feedback form</button></div>
       </form>
       {% else %}
       <p class="text-muted mb-0">No feedback form is open for this project yet.</p>
       {% endif %}
 
-      <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Rating</th><th>Comments</th><th>Moderation</th></tr></thead><tbody>{% for form in project.feedback_forms %}{% for response in form.responses %}<tr><td data-label="Rating">{{ response.answers_json.get('rating', '—') }} ★</td><td data-label="Comments">{{ response.answers_json.get('comments', '') }}</td><td data-label="Moderation">{% if response.moderation_status == 'Pending' and can_manage %}<form method="POST" action="{{ url_for('erp.moderate_feedback_route', public_id=project.public_id, response_public_id=response.public_id) }}" class="d-flex gap-2"><select class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option><option>Hidden</option></select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ response.moderation_status|lower }}">{{ response.moderation_status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted py-4">No responses yet.</td></tr>{% endfor %}{% endfor %}</tbody></table></div>
+      <section aria-labelledby="feedback-distribution-title" class="mb-4"><h2 id="feedback-distribution-title" class="h5">Approved rating distribution</h2>{% if approved_feedback_count %}<div class="chart-frame" role="img" aria-label="Approved feedback ratings from 1 to 5"><canvas id="feedbackDistributionChart" aria-hidden="true"></canvas></div>{% else %}<p class="text-muted">No approved ratings are available yet.</p>{% endif %}<div class="aurora-table-scroll" tabindex="0"><table class="aurora-table mb-0"><caption class="visually-hidden">Exact approved feedback rating counts</caption><thead><tr><th>Rating</th>{% for value in [1,2,3,4,5] %}<th>{{ value }} of 5</th>{% endfor %}<th>Total approved</th></tr></thead><tbody><tr><th>Responses</th>{% for value in [1,2,3,4,5] %}<td>{{ feedback_distribution[value] }}</td>{% endfor %}<td>{{ approved_feedback_count }}</td></tr></tbody></table></div></section>
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Rating</th><th>Written responses</th><th>Moderation</th></tr></thead><tbody>{% for form in project.feedback_forms %}{% for response in form.responses %}<tr id="{{ response.public_id }}"><td data-label="Rating">{{ response.answers_json.get('rating', '—') }} of 5</td><td data-label="Written responses">{% for question in form.questions_json if question.type == 'text' %}{% if response.answers_json.get(question.key) %}<div><strong>{{ question.label }}:</strong> {{ response.answers_json.get(question.key) }}</div>{% endif %}{% endfor %}</td><td data-label="Moderation">{% if response.moderation_status == 'Pending' and can_manage %}<form method="POST" action="{{ url_for('erp.moderate_feedback_route', public_id=project.public_id, response_public_id=response.public_id) }}" class="aurora-inline-decision"><span class="aurora-inline-field"><label class="aurora-inline-label" for="moderation-{{ response.public_id }}">Moderation decision</label><select id="moderation-{{ response.public_id }}" class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option><option>Hidden</option></select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="moderation-reason-{{ response.public_id }}">Reason (only if rejecting or hiding)</label><input id="moderation-reason-{{ response.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}<span class="aurora-badge aurora-badge--status-{{ response.moderation_status|lower }}">{{ response.moderation_status }}</span>{% endif %}</td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted py-4">No responses yet.</td></tr>{% endfor %}{% endfor %}</tbody></table></div>
     </div>
   </div>
+    </div>
+  </div>
+  {% if report_snapshots %}<div class="aurora-card mb-4"><div class="aurora-card__header"><h2 class="aurora-card__heading">Project reports</h2></div><div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards mb-0"><thead><tr><th>Report</th><th>Approval</th><th>Publication</th><th>Action</th></tr></thead><tbody>{% for snapshot in report_snapshots %}<tr id="{{ snapshot.public_id }}"><td data-label="Report">{{ snapshot.title }}</td><td data-label="Approval">{{ snapshot.approval_status }}</td><td data-label="Publication">{{ snapshot.publication_status }}</td><td data-label="Action">{% if can_approve and snapshot.approval_status == 'Draft' %}<form method="POST" action="{{ url_for('erp.approve_report_route', public_id=project.public_id, snapshot_public_id=snapshot.public_id) }}"><button class="aurora-button--small aurora-button--outline-primary">Approve report</button></form>{% else %}<a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.report_preview', public_id=project.public_id) }}">View report</a>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+  <script id="project-chart-data" type="application/json">{{ {'ratings': ['1','2','3','4','5'], 'ratingCounts': [feedback_distribution[1], feedback_distribution[2], feedback_distribution[3], feedback_distribution[4], feedback_distribution[5]]}|tojson }}</script>
 </div>
 {% endif %}
 
 {% if active_tab == 'resources' %}
-<div id="panel-resources" role="tabpanel" aria-labelledby="tab-resources">
-  <div class="aurora-card">
-    <div class="aurora-card__header d-flex justify-content-between"><strong>Document index</strong><span>{{ project.document_records|length }} records</span></div>
-    <div class="aurora-table-scroll"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Document</th><th>Category</th><th>Status</th><th>Reference</th><th>Decision</th></tr></thead><tbody>{% for document in project.document_records %}<tr><td data-label="Document">{{ document.title }}</td><td data-label="Category">{{ document.category }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ document.status|lower }}">{{ document.status }}</span></td><td data-label="Reference">{% if document.permission_classification == 'Restricted' and not can_view_sensitive %}<span class="text-muted">Restricted</span>{% elif document.drive_url %}<a href="{{ url_for('erp.open_document', public_id=document.public_id) }}" target="_blank" rel="noopener noreferrer">Drive reference</a>{% else %}<span class="text-muted">Indexed metadata only</span>{% endif %}</td><td data-label="Decision">{% if document.status == 'Submitted' and can_approve %}<form method="POST" action="{{ url_for('erp.decide_document_route', public_id=project.public_id, document_public_id=document.public_id) }}" class="d-flex gap-2"><input type="hidden" name="version" value="{{ document.version }}"><select class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option></select><input class="aurora-input aurora-input--small" name="reason" placeholder="Reason"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted py-4">No documents indexed yet.</td></tr>{% endfor %}</tbody></table></div>
-    {% if can_manage %}<div class="aurora-card__body border-top"><form method="POST" action="{{ url_for('erp.add_document', public_id=project.public_id) }}" class="row g-2"><div class="col-md-4"><input class="aurora-input" name="title" placeholder="Document title" required></div><div class="col-md-2"><select class="aurora-select" name="category" aria-label="Category"><option>Report</option><option>Poster</option><option>Presentation</option><option>Photo</option><option>Video</option><option>Other</option></select></div><div class="col-md-3"><input class="aurora-input" name="drive_url" placeholder="Google Drive link"></div><div class="col-md-2"><select class="aurora-select" name="permission_classification" aria-label="Classification"><option>Internal</option><option>Restricted</option><option>Public</option></select></div><div class="col-md-1"><button class="aurora-button--primary w-100">Add</button></div></form></div>{% endif %}
-  </div>
+<div id="panel-resources" class="page-stack">
+
+  <section class="page-section" aria-labelledby="documents-title">
+    <div class="page-section__head">
+      <h2 class="page-section__title" id="documents-title">Documents</h2>
+      <p class="page-section__hint">Indexed project documents, evidence, and drive references. Upload actions are below the list.</p>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-card__header d-flex justify-content-between"><h2 class="aurora-card__heading">Document index</h2><span>{{ project.document_records|length }} records</span></div>
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--hover aurora-table--cards align-middle mb-0"><thead><tr><th>Document</th><th>Category</th><th>Availability</th><th>Workflow status</th><th>Reference</th><th>Decision</th></tr></thead><tbody>{% for document in project.document_records %}<tr id="{{ document.public_id }}"><td data-label="Document">{{ document.title }}</td><td data-label="Category">{{ vocabulary_display('document_category', document.category) }}</td><td data-label="Availability"><span class="aurora-badge aurora-badge--status-{{ compute_availability(document)|lower }}">{{ compute_availability(document) }}</span></td><td data-label="Workflow status"><span class="aurora-badge aurora-badge--status-{{ document.status|lower }}">{{ document.status }}</span>{% if document.waiver_reason %}<div class="small text-muted">Waiver: {{ document.waiver_reason }}</div>{% endif %}</td><td data-label="Reference">{% if document.permission_classification == 'Restricted' and not can_view_sensitive %}<span class="text-muted">Restricted</span>{% elif document.drive_url %}<a href="{{ url_for('erp.open_document', public_id=document.public_id) }}" target="_blank" rel="noopener noreferrer">Drive reference</a>{% else %}<span class="text-muted">Indexed metadata only</span>{% endif %}</td><td data-label="Decision">{% if document.status == 'Submitted' and (can_approve or can_waive) %}<form method="POST" action="{{ url_for('erp.decide_document_route', public_id=project.public_id, document_public_id=document.public_id) }}" class="aurora-inline-decision"><input type="hidden" name="version" value="{{ document.version }}"><span class="aurora-inline-field"><label class="aurora-inline-label" for="document-status-{{ document.public_id }}">Decision <span class="visually-hidden">for {{ document.title }}</span></label><select id="document-status-{{ document.public_id }}" class="aurora-select aurora-select--small" name="status"><option>Approved</option><option>Rejected</option>{% if can_waive %}<option>Waived</option>{% endif %}</select></span><span class="aurora-inline-field aurora-inline-field--reason"><label class="aurora-inline-label" for="document-reason-{{ document.public_id }}">Reason (only if rejecting or waiving)</label><input id="document-reason-{{ document.public_id }}" class="aurora-input aurora-input--small" name="reason"></span><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-4">No documents indexed yet.</td></tr>{% endfor %}</tbody></table></div>
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="uploadDocumentsDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseUploadDocuments" aria-expanded="false" aria-controls="collapseUploadDocuments">Upload documents</button>
+          <div id="collapseUploadDocuments" class="aurora-collapse" data-ui-parent="#uploadDocumentsDisclosure">
+            <form method="POST" action="{{ url_for('erp.upload_documents', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2 mt-2">
+              <div class="col-md-8 aurora-file-field"><label class="aurora-label" for="document_files">Documents (auto-classified &amp; stored in Drive)</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="document_files" type="file" name="source_files" multiple required></div><p class="aurora-file-field__hint">Multiple files accepted.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
+              <div class="col-md-4 align-self-end"><button class="aurora-button--secondary w-100">Upload</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="addDocumentDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseAddDocument" aria-expanded="false" aria-controls="collapseAddDocument">Add a document manually</button>
+          <div id="collapseAddDocument" class="aurora-collapse" data-ui-parent="#addDocumentDisclosure">
+            <form method="POST" action="{{ url_for('erp.add_document', public_id=project.public_id) }}" class="row g-2 mt-2">
+              <div class="col-md-6"><label class="aurora-label" for="document_title">Document title</label><input id="document_title" class="aurora-input" name="title" required></div>
+              <div class="col-md-6"><label class="aurora-label" for="document_category">Category</label><select id="document_category" class="aurora-select" name="category">{% for option in document_category_options %}<option>{{ option }}</option>{% endfor %}</select></div>
+              <div class="col-md-6"><label class="aurora-label" for="document_category_other">If “Other,” specify</label><input id="document_category_other" class="aurora-input" name="category_other"></div>
+              <div class="col-md-6"><label class="aurora-label" for="document_classification">Classification</label><select id="document_classification" class="aurora-select" name="permission_classification"><option>Internal</option><option>Restricted</option><option>Public</option></select></div>
+              <div class="col-md-8"><label class="aurora-label" for="document_drive_url">Google Drive link</label><input id="document_drive_url" class="aurora-input" type="url" name="drive_url" aria-describedby="document_drive_url_hint"><p id="document_drive_url_hint" class="small text-muted mb-0">Paste a Google Drive share link.</p></div>
+              <div class="col-md-4 align-self-end"><button class="aurora-button--primary w-100">Add document</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% if not is_igp %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="eventFolderDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseEventFolder" aria-expanded="false" aria-controls="collapseEventFolder">Upload event folder files</button>
+          <div id="collapseEventFolder" class="aurora-collapse" data-ui-parent="#eventFolderDisclosure">
+            <form method="POST" action="{{ url_for('erp.upload_icc_event_folder', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2 mt-2">
+              <div class="col-md-8 aurora-file-field"><label class="aurora-label" for="event_folder_files">Event folder files (poster, backdrop, programme, photos, report…)</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="event_folder_files" type="file" name="source_files" multiple required></div><p class="aurora-file-field__hint">Multiple files accepted.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
+              <div class="col-md-4 align-self-end"><button class="aurora-button--secondary w-100">Upload &amp; classify</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+  </section>
+
+  {% if project.program_type.name == 'IGP' %}
+  <section class="page-section" aria-labelledby="reimbursements-title">
+    <div class="page-section__head">
+      <h2 class="page-section__title" id="reimbursements-title">Reimbursements</h2>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-card__header d-flex justify-content-between"><h2 class="aurora-card__heading">Reimbursement entries</h2><span>{{ project.reimbursement_entries|length }} entries</span></div>
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards align-middle mb-0"><thead><tr><th>S.No</th><th>Date</th><th>Party</th><th>Bill #</th><th class="text-end">Amount</th><th>Particular</th><th>Status</th></tr></thead><tbody>
+        {% for entry in project.reimbursement_entries|sort(attribute='date') %}
+        <tr><td data-label="S.No">{{ loop.index }}</td><td data-label="Date">{{ entry.date.strftime('%d %b %Y') }}</td><td data-label="Party">{{ entry.party_name }}</td><td data-label="Bill #">{{ entry.bill_number or '—' }}</td><td data-label="Amount" class="text-end font-monospace">₹{{ '%.2f'|format(entry.amount) }}</td><td data-label="Particular">{{ entry.particular or '—' }}</td><td data-label="Status">{% if can_manage %}<form method="POST" action="{{ url_for('erp.update_reimbursement_status', public_id=project.public_id, entry_public_id=entry.public_id) }}" class="aurora-inline-decision"><input class="aurora-input aurora-input--small" name="status" value="{{ entry.status }}"><button class="aurora-button--small aurora-button--outline-primary">Save</button></form>{% else %}{{ entry.status }}{% endif %}</td></tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No reimbursement entries yet.</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      <div class="aurora-card__footer d-flex gap-2">
+        <a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.export_reimbursements_route', public_id=project.public_id, output_format='csv') }}">Export CSV</a>
+        <a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.export_reimbursements_route', public_id=project.public_id, output_format='xlsx') }}">Export XLSX</a>
+      </div>
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="uploadReimbursementDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseUploadReimbursement" aria-expanded="false" aria-controls="collapseUploadReimbursement">Bulk import reimbursements</button>
+          <div id="collapseUploadReimbursement" class="aurora-collapse" data-ui-parent="#uploadReimbursementDisclosure">
+            <form method="POST" action="{{ url_for('erp.upload_reimbursements', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2 mt-2">
+              <div class="col-md-8 aurora-file-field"><label class="aurora-label" for="reimbursement_file">Bulk reimbursements file</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="reimbursement_file" type="file" name="source_file" required></div><p class="aurora-file-field__hint">Accepted formats: .xlsx or .csv.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
+              <div class="col-md-4 align-self-end"><button class="aurora-button--secondary w-100">Import reimbursements</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="addReimbursementDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseAddReimbursement" aria-expanded="false" aria-controls="collapseAddReimbursement">Add reimbursement</button>
+          <div id="collapseAddReimbursement" class="aurora-collapse" data-ui-parent="#addReimbursementDisclosure">
+            <form method="POST" action="{{ url_for('erp.add_reimbursement', public_id=project.public_id) }}" class="row g-2 mt-2">
+              <div class="col-md-6"><label class="aurora-label" for="reimb_date">Date</label><input id="reimb_date" type="date" class="aurora-input" name="date" required></div>
+              <div class="col-md-6"><label class="aurora-label" for="reimb_party">Party name</label><input id="reimb_party" class="aurora-input" name="party_name" required></div>
+              <div class="col-md-6"><label class="aurora-label" for="reimb_bill">Bill number</label><input id="reimb_bill" class="aurora-input" name="bill_number"></div>
+              <div class="col-md-6"><label class="aurora-label" for="reimb_amount">Amount (INR)</label><input id="reimb_amount" type="number" step="0.01" min="0" class="aurora-input" name="amount" required></div>
+              <div class="col-12"><label class="aurora-label" for="reimb_particular">Particular</label><input id="reimb_particular" class="aurora-input" name="particular"></div>
+              <div class="col-12"><button class="aurora-button--primary">Add reimbursement</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="page-section" aria-labelledby="itinerary-title">
+    <div class="page-section__head">
+      <h2 class="page-section__title" id="itinerary-title">Itinerary</h2>
+    </div>
+    <div class="aurora-card">
+      <div class="aurora-card__header d-flex justify-content-between"><h2 class="aurora-card__heading">Active sessions</h2><span>{{ project.sessions|selectattr('is_active')|list|length }} active sessions</span></div>
+      <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards align-middle mb-0"><thead><tr><th>Date</th><th>Time</th><th>Activity</th><th>Venue</th></tr></thead><tbody>
+        {% for session in project.sessions|selectattr('is_active')|sort(attribute='starts_at') %}
+        <tr><td data-label="Date">{{ session.starts_at.strftime('%a, %d %b %Y') }}</td><td data-label="Time">{% if session.is_all_day %}All day{% else %}{{ session.starts_at.strftime('%I:%M %p') }}–{{ session.ends_at.strftime('%I:%M %p') }}{% endif %}</td><td data-label="Activity">{{ session.title }}</td><td data-label="Venue">{{ session.venue or '—' }}</td></tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No itinerary imported yet.</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      {% if can_manage %}
+      <div class="aurora-card__footer">
+        <div class="aurora-disclosure" id="uploadItineraryDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseUploadItinerary" aria-expanded="false" aria-controls="collapseUploadItinerary">Import itinerary</button>
+          <div id="collapseUploadItinerary" class="aurora-collapse" data-ui-parent="#uploadItineraryDisclosure">
+            <form method="POST" action="{{ url_for('erp.upload_itinerary', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2 mt-2">
+              <div class="col-md-8 aurora-file-field"><label class="aurora-label" for="itinerary_file">Itinerary file</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="itinerary_file" type="file" name="source_file" required></div><p class="aurora-file-field__hint">Accepted formats: .xlsx or .csv.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
+              <div class="col-md-4 align-self-end"><button class="aurora-button--primary w-100">Import itinerary</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

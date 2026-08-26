@@ -1,9 +1,54 @@
+# Backstop only -- the Dockerfile COPYs an explicit allowlist of runtime
+# paths (app/, migrations/, run.py) rather than `COPY . .`, so nothing here
+# is the only thing standing between a secret and the image. See PLAN.md
+# "Additional release blockers" finding.
 .git
+.github
 .venv
 .env
+.env.*
 __pycache__
 *.pyc
-instance/*.db
+*.pyo
+
+# Credentials, secrets, backups -- never belong in an image.
+instance
+**/UAT_CREDENTIALS*
+*.pem
+*.key
+*secret*
+*backup*
+*.sql
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend build tooling and dependency trees -- assets are prebuilt into
+# app/static/ui before the image is built, not built inside the container.
+node_modules
+frontend
+design-system
+
+# Tests, docs, and dev-only tooling.
 tests
+e2e
 test-results
+playwright-report
+.pytest_cache
+.coverage
+.coveragerc
+docs
+scripts
 terraform
+seed.py
+KNOWN_LIMITATIONS.md
+USER_ACCEPTANCE_GUIDE.md
+README.md
+Makefile
+compose.yaml
+cloudbuild.yaml
+package.json
+package-lock.json
+playwright.config.ts
+postcss.config.cjs

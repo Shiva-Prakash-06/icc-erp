@@ -1,6 +1,8 @@
 import os
 import unittest
 import io
+import hashlib
+import statistics
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from werkzeug.datastructures import FileStorage
@@ -29,10 +31,10 @@ from app.services.job_auth import verify_internal_job_request
 from app.services.lifecycle import closure_blockers
 from app.services.imports import _reference_data, commit_batch, stage_uploaded_source
 from app.services.notifications import deliver_email, deliver_pending, generate_deadline_notifications, queue_notification
-from app.services.operations import change_checklist_status, change_task_status, decide_budget_line, decide_buddy_log, decide_document, decide_recruitment, instantiate_checklist, mark_attendance
+from app.services.operations import change_checklist_status, change_task_status, decide_budget_line, decide_buddy_log, decide_contribution, decide_document, decide_operational_request, decide_recruitment, instantiate_checklist, mark_attendance, moderate_feedback, session_conflicts
 from app.models.erp import BudgetLine
 from app.models.project import BuddyAssignment, BuddyLog
-from app.services.passwords import find_user_for_reset, issue_reset_token, send_reset_email, validate_password
+from app.services.passwords import enqueue_reset_email, find_user_for_reset, issue_reset_token, send_reset_email, validate_password
 from app.services.reporting import compile_project_snapshot, enqueue_report_job, execute_report_job, render_snapshot
 
 
@@ -90,16 +92,16 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.assertNotIn("project_id", response.json["data"][0])
         self.assertEqual(response.json["data"][0]["project_public_id"], self.project.public_id)
 
-    def test_generic_mutation_requires_current_version(self):
+    def test_generic_task_mutation_requires_dedicated_workflow(self):
         self.login()
         task = WorkTask(project_id=self.project.id, title="Prepare", status="Not Started")
         db.session.add(task)
         db.session.commit()
-        conflict = self.client.patch(f"/api/v1/tasks/{task.public_id}", json={"title": "Changed", "version": 0})
-        self.assertEqual(conflict.status_code, 409)
-        success = self.client.patch(f"/api/v1/tasks/{task.public_id}", json={"title": "Changed", "version": 1})
-        self.assertEqual(success.status_code, 200)
-        self.assertEqual(success.json["data"]["version"], 2)
+        response = self.client.patch(f"/api/v1/tasks/{task.public_id}", json={"title": "Changed", "version": 1})
+        self.assertEqual(response.status_code, 405)
+        db.session.refresh(task)
+        self.assertEqual(task.title, "Prepare")
+        self.assertEqual(task.version, 1)
 
     def test_generic_patch_cannot_bypass_waiver_workflow(self):
         self.login()
@@ -113,7 +115,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
             f"/api/v1/tasks/{task.public_id}",
             json={"waived": True, "waiver_reason": "sneaky", "mandatory_for_closure": False, "version": 1},
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 405)
         db.session.refresh(task)
         self.assertFalse(task.waived)
         self.assertIsNone(task.waiver_reason)
@@ -158,8 +160,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
             session["user_id"] = unprivileged.id
             session["session_version"] = unprivileged.session_version
         response = self.client.get("/api/v1/attendance")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["data"], [])
+        self.assertEqual(response.status_code, 403)
 
         # A user scoped only to `self.project` must not see the other project's
         # attendance rows, even though they hold `manage_projects`.
@@ -310,6 +311,22 @@ class ProductionCompletionTestCase(unittest.TestCase):
             self.assertTrue(validate_password("A-unique-policy-password-2026"))
             request_get.assert_called_once()
 
+    def test_password_policy_rejects_a_matching_breach_suffix(self):
+        password = "A-breached-but-long-password-2026"
+        digest = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()
+        breached = MagicMock(text=f"{digest[5:]}:42\n")
+        breached.raise_for_status.return_value = None
+        self.app.config["BREACHED_PASSWORD_CHECK_MODE"] = "live"
+        with patch("app.services.passwords.requests.get", return_value=breached), self.assertRaisesRegex(ValueError, "known breach"):
+            validate_password(password)
+
+    def test_reset_token_lookup_handles_missing_and_naive_expiry(self):
+        self.assertIsNone(find_user_for_reset("not-a-token"))
+        token = issue_reset_token(self.user)
+        self.user.password_reset_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+        db.session.commit()
+        self.assertEqual(find_user_for_reset(token).id, self.user.id)
+
     def test_reset_email_disabled_and_smtp_delivery(self):
         self.assertFalse(send_reset_email(self.user, "https://erp.example/reset/token"))
         self.app.config.update(NOTIFICATION_EMAIL_MODE="smtp", SMTP_FROM_ADDRESS="erp@example.org", SMTP_HOST="smtp.example.org", SMTP_PORT=587, SMTP_USE_TLS=True, SMTP_USERNAME="mailer", SMTP_PASSWORD="secret")
@@ -321,8 +338,34 @@ class ProductionCompletionTestCase(unittest.TestCase):
             smtp.login.assert_called_once()
             smtp.send_message.assert_called_once()
 
+    def test_async_reset_delivery_is_fail_closed_and_uses_config_snapshot(self):
+        self.app.config.update(
+            NOTIFICATION_EMAIL_MODE="smtp", SMTP_FROM_ADDRESS="erp@example.org",
+            SMTP_HOST="smtp.example.org", SMTP_PORT=25, SMTP_USE_TLS=False,
+            SMTP_USERNAME=None, SMTP_PASSWORD=None,
+        )
+        smtp = MagicMock()
+        smtp.__enter__.return_value = smtp
+        with patch("app.services.passwords.smtplib.SMTP", return_value=smtp), patch(
+            "app.services.passwords._RESET_DELIVERY_EXECUTOR.submit", side_effect=lambda deliver: deliver()
+        ):
+            self.assertTrue(enqueue_reset_email(self.user, "https://erp.example/reset/token"))
+        smtp.starttls.assert_not_called()
+        smtp.login.assert_not_called()
+        smtp.send_message.assert_called_once()
+
+        with patch("app.services.passwords.smtplib.SMTP", side_effect=OSError("offline")), patch(
+            "app.services.passwords._RESET_DELIVERY_EXECUTOR.submit", side_effect=lambda deliver: deliver()
+        ):
+            self.assertFalse(enqueue_reset_email(self.user, "https://erp.example/reset/token"))
+        no_recipient = MagicMock(email=None)
+        with patch(
+            "app.services.passwords._RESET_DELIVERY_EXECUTOR.submit", side_effect=lambda deliver: deliver()
+        ):
+            self.assertFalse(enqueue_reset_email(no_recipient, "https://erp.example/reset/token"))
+
     def test_forgot_password_persists_token_and_readiness_checks_database(self):
-        with patch("app.blueprints.auth.send_reset_email", return_value=True):
+        with patch("app.blueprints.auth.enqueue_reset_email", return_value=MagicMock()):
             response = self.client.post("/forgot-password", data={"identifier": self.user.email})
         self.assertEqual(response.status_code, 302)
         db.session.expire_all()
@@ -330,6 +373,48 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.assertIsNotNone(persisted.password_reset_token_hash)
         self.assertEqual(self.client.get("/healthz").status_code, 200)
         self.assertEqual(self.client.get("/readyz").status_code, 200)
+
+    def test_forgot_password_uniform_padding_has_no_timing_branch_signal(self):
+        self.app.config["PASSWORD_RESET_MIN_RESPONSE_MS"] = 150
+        totals = {"eligible": [], "missing": []}
+        processing_times = {
+            "eligible": [0.011, 0.018, 0.024, 0.015, 0.021, 0.013, 0.026, 0.019, 0.016, 0.022],
+            "missing": [0.027, 0.012, 0.020, 0.014, 0.023, 0.017, 0.025, 0.010, 0.019, 0.016],
+        }
+        with patch("app.blueprints.auth.enqueue_reset_email", return_value=MagicMock()):
+            for branch, identifier in (("eligible", self.user.email), ("missing", "absent@example.test")):
+                for elapsed in processing_times[branch]:
+                    sleeps = []
+                    with patch("app.blueprints.auth.time.monotonic", side_effect=[100.0, 100.0 + elapsed]), patch(
+                        "app.blueprints.auth.time.sleep", side_effect=lambda seconds: sleeps.append(seconds)
+                    ):
+                        response = self.client.post("/forgot-password", data={"identifier": identifier})
+                    self.assertEqual(response.status_code, 302)
+                    totals[branch].append(elapsed + sleeps[0])
+        self.assertLess(abs(statistics.mean(totals["eligible"]) - statistics.mean(totals["missing"])), 0.001)
+        self.assertTrue(all(abs(total - 0.150) < 0.001 for values in totals.values() for total in values))
+
+    def test_forgot_password_shows_identical_confirmation_screen_regardless_of_eligibility(self):
+        # See PLAN.md "ICC password reset" finding: forced reset/forgot-
+        # password lacked a dedicated confirmation screen and anti-
+        # enumeration must not leak through the destination page either.
+        with patch("app.blueprints.auth.enqueue_reset_email", return_value=MagicMock()):
+            eligible_response = self.client.post("/forgot-password", data={"identifier": self.user.email}, follow_redirects=True)
+            unknown_response = self.client.post("/forgot-password", data={"identifier": "nobody@example.test"}, follow_redirects=True)
+        self.assertIn(b"Check your email", eligible_response.data)
+        self.assertEqual(eligible_response.data, unknown_response.data)
+
+    def test_forced_reset_renders_onboarding_screen_with_visible_requirements(self):
+        with self.client.session_transaction() as session:
+            session["user_id"] = self.user.id
+            session["session_version"] = self.user.session_version
+        self.user.needs_password_reset = True
+        db.session.commit()
+        response = self.client.get("/reset-password")
+        html = response.get_data(as_text=True)
+        self.assertIn("Secure your account", html)
+        self.assertIn("At least 12 characters", html)
+        self.assertNotIn("Security Protocol", html)
 
     def test_live_drive_metadata_and_restricted_visibility_policy(self):
         self.app.config["DRIVE_VALIDATION_MODE"] = "live"
@@ -439,6 +524,69 @@ class ProductionCompletionTestCase(unittest.TestCase):
             decide_document(document, "Rejected", self.user, expected_version=1)
         decide_document(document, "Approved", self.user, expected_version=1)
         self.assertEqual(document.status, "Approved")
+
+    def test_operational_services_reject_unsupported_or_unjustified_decisions(self):
+        person = Person(first_name="Validation subject")
+        task = WorkTask(project_id=self.project.id, title="Validate task", version=1)
+        document = DocumentRecord(project_id=self.project.id, title="Validate document", category="Report", version=1)
+        request = OperationalRequest(
+            project_id=self.project.id, request_type="Equipment", title="Validate request",
+            created_by_id=self.user.id, version=1,
+        )
+        feedback_form = FeedbackForm(project_id=self.project.id, title="Validate feedback")
+        db.session.add_all([person, task, document, request, feedback_form])
+        db.session.flush()
+        contribution = ContributionRecord(
+            project_id=self.project.id, person_id=person.id, activity_type="Event support",
+            description="Validation", duration_hours=1, version=1,
+        )
+        feedback = FeedbackResponse(form_id=feedback_form.id, answers_json={})
+        application = RecruitmentApplication(
+            person_id=person.id, project_id=self.project.id, desired_role="Volunteer", version=1,
+        )
+        db.session.add_all([contribution, feedback, application])
+        db.session.commit()
+
+        for call in (
+            lambda: change_task_status(task, "Invented", self.user, expected_version=1),
+            lambda: change_task_status(task, "Rejected", self.user, expected_version=1),
+            lambda: change_task_status(task, "Approved", self.user, expected_version=1, waive=True),
+            lambda: decide_recruitment(application, "Invented", self.user, expected_version=1),
+            lambda: decide_recruitment(application, "Rejected", self.user, expected_version=1),
+            lambda: mark_attendance(MagicMock(), person, "Invented", self.user),
+            lambda: decide_document(document, "Invented", self.user, expected_version=1),
+            lambda: decide_document(document, "Rejected", self.user, expected_version=1),
+            lambda: decide_document(document, "Approved", self.user, expected_version=1, waive=True),
+            lambda: decide_contribution(contribution, "Pending", self.user, expected_version=1),
+            lambda: decide_contribution(contribution, "Rejected", self.user, expected_version=1),
+            lambda: decide_operational_request(request, "Approved", self.user, expected_version=1),
+            lambda: decide_operational_request(request, "Cancelled", self.user, expected_version=1),
+            lambda: moderate_feedback(feedback, "Invented", self.user),
+            lambda: moderate_feedback(feedback, "Hidden", self.user),
+        ):
+            with self.assertRaises(ValueError):
+                call()
+
+    def test_session_conflicts_report_both_venue_and_owner_once(self):
+        owner = Person(first_name="Session owner")
+        db.session.add(owner)
+        db.session.flush()
+        existing = ProjectSession(
+            project_id=self.project.id, code="EXISTING", title="Existing",
+            starts_at=datetime(2026, 8, 1, 9), ends_at=datetime(2026, 8, 1, 11),
+            venue="Main Hall", owner_person_id=owner.id,
+        )
+        db.session.add(existing)
+        db.session.commit()
+        proposed = ProjectSession(
+            project_id=self.project.id, code="PROPOSED", title="Proposed",
+            starts_at=datetime(2026, 8, 1, 10), ends_at=datetime(2026, 8, 1, 12),
+            venue=" main hall ", owner_person_id=owner.id,
+        )
+        conflicts = session_conflicts(proposed)
+        self.assertEqual(len(conflicts), 2)
+        self.assertTrue(any("Venue overlaps" in item for item in conflicts))
+        self.assertTrue(any("Session owner overlaps" in item for item in conflicts))
 
     def test_notification_delivery_preferences_retry_and_disabled_modes(self):
         notification, _ = queue_notification(user=self.user, event_type="task.status", title="Changed", body="Updated", idempotency_key="delivery-1")
@@ -661,7 +809,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
         template_item = ChecklistTemplateItem(template_id=template.id, code="ONE", title="API item")
         checklist = ChecklistInstance(project_id=self.project.id, template_id=template.id, name="API checklist")
         contribution = ContributionRecord(project_id=self.project.id, person_id=person.id, activity_type="Event", description="Supported delivery", duration_hours=2)
-        operational_request = OperationalRequest(project_id=self.project.id, request_type="Vehicle", title="Airport vehicle")
+        operational_request = OperationalRequest(project_id=self.project.id, request_type="Vehicle", title="Airport vehicle", created_by_id=self.user.id)
         feedback_form = FeedbackForm(project_id=self.project.id, title="Experience", is_open=True, public_token="api-feedback")
         db.session.add_all([template_item, checklist, contribution, operational_request, feedback_form])
         db.session.flush()
@@ -679,8 +827,21 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         response = self.client.post(f"/api/v1/operational-requests/{operational_request.public_id}/transition", json={"status": "Submitted", "version": 1})
         self.assertEqual(response.status_code, 200)
+        # The submitter cannot also approve their own request.
+        response = self.client.post(f"/api/v1/operational-requests/{operational_request.public_id}/transition", json={"status": "Approved", "version": 2, "official_reference": "FIN-2026-1"})
+        self.assertEqual(response.status_code, 403)
+        approver = User(username="approver", email="approver@example.com", role="Faculty", preferred_role="Faculty", status="Approved", needs_password_reset=False)
+        approver.set_password("A-secure-test-password-2026")
+        db.session.add(approver)
+        db.session.flush()
+        db.session.add(RoleAssignment(user_id=approver.id, role_code="OIA_FACULTY_ADMINISTRATOR", is_active=True))
+        db.session.commit()
+        with self.client.session_transaction() as session:
+            session["user_id"] = approver.id
+            session["session_version"] = approver.session_version
         response = self.client.post(f"/api/v1/operational-requests/{operational_request.public_id}/transition", json={"status": "Approved", "version": 2, "official_reference": "FIN-2026-1"})
         self.assertEqual(response.status_code, 200)
+        self.login()
         response = self.client.post(f"/api/v1/feedback-responses/{feedback_response.public_id}/moderate", json={"status": "Approved"})
         self.assertEqual(response.status_code, 200)
 
@@ -739,7 +900,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
             data={
                 "title": "Scoped form project",
                 "project_type": "ICC event",
-                "category": "Event",
+                "category": "Operational",
                 "campus_public_id": self.campus.public_id,
                 "program_type_public_id": self.program_type.public_id,
                 "academic_year_public_id": self.year.public_id,
@@ -905,7 +1066,7 @@ class ErpTabRoutesTestCase(unittest.TestCase):
             "rating": "5", "comments": "Great", "suggestions": "None",
         })
         response_row = FeedbackResponse.query.filter_by(form_id=form.id).one()
-        self.assertEqual(response_row.answers_json["rating"], "5")
+        self.assertEqual(response_row.answers_json["rating"], 5)
         moderate = self.client.post(f"/erp/projects/{self.project.public_id}/feedback-responses/{response_row.public_id}/moderate", data={"status": "Approved"})
         self.assertEqual(moderate.status_code, 302)
         db.session.refresh(response_row)
@@ -916,9 +1077,16 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         buddy_person = Person(first_name="Buddy", primary_email="buddyp@example.com", registration_number="REG-BUDDY", person_type="Student")
         student_person = Person(first_name="Student", primary_email="studentp@example.com", registration_number="REG-STUDENT", person_type="Student")
         db.session.add_all([buddy_person, student_person])
+        db.session.flush()
+        # Buddy selection only lists/accepts active project participants --
+        # see PLAN.md "IGP registration number" finding.
+        db.session.add_all([
+            TeamAssignment(person_id=buddy_person.id, project_id=self.project.id, assignment_type="IGP Program Team", status="Active"),
+            TeamAssignment(person_id=student_person.id, project_id=self.project.id, assignment_type="IGP Program Team", status="Active"),
+        ])
         db.session.commit()
         response = self.client.post(f"/erp/projects/{self.project.public_id}/buddy-assignments", data={
-            "buddy_registration_number": "REG-BUDDY", "exchange_student_registration_number": "REG-STUDENT",
+            "buddy_person_public_id": buddy_person.public_id, "exchange_student_person_public_id": student_person.public_id,
             "start_date": "2026-08-01", "end_date": "2026-08-10",
         })
         self.assertEqual(response.status_code, 302)
@@ -943,6 +1111,11 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         self.assertEqual(log.status, "Approved")
 
     def test_oversight_dashboard_gated_and_shows_pending_items(self):
+        # /erp/oversight now redirects into the merged home's decision queue
+        # (?queue=all) -- see
+        # in-the-operation-checklists-crystalline-dongarra.md Step 2. The
+        # 403 gate for non-approvers is preserved on the redirect route
+        # itself, load-bearing for e2e/auth-and-rbac and platform-matrix.
         task = WorkTask(project_id=self.project.id, title="Needs approval", status="Submitted", version=1)
         db.session.add(task)
         db.session.commit()
@@ -959,7 +1132,10 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         with self.client.session_transaction() as session:
             session["user_id"] = self.user.id
             session["session_version"] = self.user.session_version
-        response = self.client.get("/erp/oversight")
+        redirect_response = self.client.get("/erp/oversight")
+        self.assertEqual(redirect_response.status_code, 302)
+        self.assertIn("/?queue=all", redirect_response.headers["Location"])
+        response = self.client.get("/erp/oversight", follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Needs approval", response.data)
 
@@ -986,7 +1162,7 @@ class ErpTabRoutesTestCase(unittest.TestCase):
             "next": "setup", "template_public_id": template.public_id,
         })
         self.client.post(f"/erp/projects/{self.project.public_id}/documents", data={
-            "next": "setup", "title": "Schedule", "category": "Schedule", "drive_url": "", "permission_classification": "Internal",
+            "next": "setup", "title": "Schedule", "category": "Report", "drive_url": "", "permission_classification": "Internal",
         })
         self.client.post(f"/erp/projects/{self.project.public_id}/budgets", data={
             "next": "setup", "category": "Venue", "description": "Hall", "estimated_amount": "200",

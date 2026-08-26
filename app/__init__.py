@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
 
 from flask import Flask, g, jsonify, redirect, request, session, url_for
+from markupsafe import Markup
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -17,6 +19,21 @@ from app.database import csrf, db, limiter, login_manager, migrate
 def create_app(config_object=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object or select_config())
+    database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if database_uri.startswith(("postgresql://", "postgresql+")):
+        # PostgreSQL interprets a naive timestamp in the connection's session
+        # timezone before storing it as timestamptz. Force every application
+        # connection to UTC so legacy naive values and current aware values have
+        # identical semantics on developer machines, CI, Cloud SQL, and native
+        # deployments. SQLite has no equivalent connection option.
+        engine_options = dict(app.config.get("SQLALCHEMY_ENGINE_OPTIONS") or {})
+        connect_args = dict(engine_options.get("connect_args") or {})
+        existing_options = connect_args.get("options", "")
+        connect_args["options"] = f"{existing_options} -c timezone=UTC".strip()
+        engine_options["connect_args"] = connect_args
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
+    if app.config.get("TESTING"):
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     db.init_app(app)
@@ -67,16 +84,55 @@ def create_app(config_object=None):
             except (OSError, ValueError, TypeError):
                 return None
 
-        return {"ui_asset": ui_asset}
+        def ui_styles(entry: str):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                return [url_for("static", filename=f"ui/{filename}") for filename in manifest.get(entry, {}).get("css", [])]
+            except (OSError, ValueError, TypeError):
+                return []
+
+        def ui_inline_styles(entry: str):
+            """Inline the small, separately purged public stylesheet.
+
+            The content comes only from the trusted, build-generated manifest
+            and asset directory; no request or database value is interpolated
+            into it. Inlining removes the public landing page's only
+            render-blocking request and gives the mobile LCP gate useful
+            headroom instead of relying on measurement variance.
+            """
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                styles = []
+                asset_root = (Path(app.static_folder) / "ui").resolve()
+                for filename in manifest.get(entry, {}).get("css", []):
+                    stylesheet_path = (asset_root / filename).resolve()
+                    if asset_root not in stylesheet_path.parents:
+                        raise ValueError("UI stylesheet resolved outside the asset directory")
+                    styles.append(Markup(stylesheet_path.read_text(encoding="utf-8")))
+                return styles
+            except (OSError, ValueError, TypeError):
+                return []
+
+        return {
+            "ui_asset": ui_asset,
+            "ui_styles": ui_styles,
+            "ui_inline_styles": ui_inline_styles,
+        }
 
     @app.context_processor
     def authorization_helpers():
         """Expose has_permission to Jinja so navigation/page conditionals can
         gate on real scoped permissions instead of matching legacy role
         strings (base.html's nav previously did `g.user.role in [...]`)."""
-        from app.services.authorization import has_permission
+        from app.services.authorization import has_any_permission, has_permission
 
-        return {"has_permission": has_permission}
+        from app.services.vocabulary import vocabulary_display
+
+        return {
+            "has_permission": has_permission,
+            "has_any_permission": has_any_permission,
+            "vocabulary_display": vocabulary_display,
+        }
 
     @app.context_processor
     def current_academic_year_label():
@@ -84,6 +140,17 @@ def create_app(config_object=None):
 
         year = AcademicYear.query.filter_by(is_current=True).first()
         return {"current_academic_year_label": year.name if year else "—"}
+
+    @app.context_processor
+    def primary_navigation():
+        """Single server-side registry rendered by the sidebar, mobile
+        drawer, and command palette -- see PLAN.md "USC sidebar" finding."""
+        user = getattr(g, "user", None)
+        if not user:
+            return {"primary_nav": []}
+        from app.services.navigation import build_nav
+
+        return {"primary_nav": build_nav(user, request.endpoint, request.blueprint)}
 
     @app.context_processor
     def shell_notifications():
@@ -112,7 +179,7 @@ def create_app(config_object=None):
         if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")):
             return None
 
-        public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.recover_password"}
+        public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.forgot_password_sent", "auth.recover_password"}
         if not g.user and request.endpoint not in public:
             if request.path.startswith("/api/v1/"):
                 return _problem(401, "Authentication required")

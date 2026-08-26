@@ -94,7 +94,7 @@ class OIAPlatformTestCase(unittest.TestCase):
             'confirm_password': 'newpassword123'
         }, follow_redirects=True)
 
-        self.assertIn(b"Your password has been reset successfully", response.data)
+        self.assertIn(b"You're all set", response.data)
 
         # Verify database flag is cleared
         with self.app.app_context():

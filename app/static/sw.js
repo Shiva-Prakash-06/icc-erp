@@ -1,18 +1,6 @@
-const CACHE_NAME = 'icc-erp-sky-hub-v5';
+const CACHE_NAME = 'icc-erp-aurora-v6';
 const SHELL_ASSETS = [
-  '/static/css/tokens.css',
-  '/static/css/base.css',
-  '/static/css/icons.css',
-  '/static/css/layout.css',
-  '/static/css/components.css',
-  '/static/css/utilities.css',
-  '/static/js/app.js',
-  '/static/fonts/inter-400.woff2',
-  '/static/fonts/inter-600.woff2',
-  '/static/fonts/space-grotesk-500.woff2',
-  '/static/fonts/space-grotesk-700.woff2',
-  '/static/fonts/ibm-plex-mono-400.woff2',
-  '/static/fonts/ibm-plex-mono-600.woff2'
+  '/static/js/app.js'
 ];
 
 self.addEventListener('install', event => {

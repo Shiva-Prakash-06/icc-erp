@@ -2,8 +2,9 @@
 {% block title %}Event calendar{% endblock %}
 {% block content %}
 <header class="page-header"><div><div class="page-eyebrow">Public calendar</div><h1 class="page-title">ICC &amp; IGP events</h1><p class="page-subtitle">Upcoming and past events and programs open to public view.</p></div></header>
+{% if events %}
 <div class="aurora-card">
-  <div class="aurora-table-scroll">
+  <div class="aurora-table-scroll" tabindex="0">
     <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
       <thead><tr><th>Event</th><th>Program</th><th>Campus</th><th>Dates</th><th>Status</th></tr></thead>
       <tbody>
@@ -15,11 +16,15 @@
           <td data-label="Dates">{{ event.start_date }} – {{ event.end_date }}</td>
           <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ event.status|lower|replace(' ', '-') }}">{{ event.status }}</span></td>
         </tr>
-        {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-5">No published events yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% else %}
+<div class="aurora-card--padded empty-state">
+  <i class="ph ph-calendar-blank" aria-hidden="true"></i>
+  <p class="mb-0">No published events yet. Check back once new events are published.</p>
+</div>
+{% endif %}
 {% endblock %}

@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Report Preview{% endblock %}
+{% block mobile_title %}Report preview{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Report preview{% endblock %}
+{% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id) }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-start mb-4"><div><p class="text-info text-uppercase small fw-bold mb-1">Draft report snapshot v{{ report.version }}</p><h1 class="h2">{{ report.title }}</h1><p class="text-muted">Generated {{ report.created_at }} · human approval required before publication</p></div><span class="aurora-badge text-bg-warning fs-6">{{ report.approval_status }}</span></div>
 <div class="row g-3 mb-4">{% for label, value in snapshot.execution.items() %}{% if label != 'closure_blockers' %}<div class="col-6 col-lg"><div class="aurora-card h-100"><div class="aurora-card__body"><div class="small text-muted">{{ label.replace('_',' ')|title }}</div><div class="h2 mb-0">{{ value }}</div></div></div></div>{% endif %}{% endfor %}</div>
-<div class="aurora-card"><div class="aurora-card__header"><strong>Closure narrative</strong></div><div class="aurora-card__body"><p>{{ project.closure_summary or 'No approved closure narrative has been recorded.' }}</p><hr><div class="small text-muted">Source record: {{ project.public_id }} · Snapshot: {{ report.public_id }}</div></div></div>
+<div class="aurora-card"><div class="aurora-card__header"><strong>Closure narrative</strong></div><div class="aurora-card__body"><p>{{ project.closure_summary or 'No approved closure narrative has been recorded.' }}</p><hr><details><summary class="small text-muted">Technical details</summary><div class="small text-muted mt-2">Source record: <code>{{ project.public_id }}</code> · Snapshot: <code>{{ report.public_id }}</code></div></details></div></div>
 {% endblock %}

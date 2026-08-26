@@ -15,10 +15,31 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app" / "templates"
 UI_OUTPUT = ROOT / "app" / "static" / "ui"
 BASELINE = Path(__file__).with_name("ui_contract") / "baseline.json"
+ICONS_CSS = ROOT / "app" / "static" / "css" / "icons.css"
 
 
 def _template_source() -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in TEMPLATES.rglob("*.html"))
+
+
+def test_every_template_icon_class_has_a_mask_mapping():
+    """G-05: an unmapped `ph-*` class renders as a solid square placeholder.
+
+    Every icon class referenced by any template must have a corresponding
+    `--oia-icon` mapping in icons.css (kept in sync by
+    scripts/build-icon-assets.mjs).
+    """
+    mapped = set(re.findall(r"\.(ph-[a-z0-9-]+)\s*\{", ICONS_CSS.read_text(encoding="utf-8")))
+    used = set()
+    for path in TEMPLATES.rglob("*.html"):
+        source = path.read_text(encoding="utf-8")
+        for class_attr in re.findall(r'class="([^"]*)"', source):
+            classes = class_attr.split()
+            if "ph" in classes:
+                used.update(cls for cls in classes if cls.startswith("ph-"))
+
+    unmapped = sorted(used - mapped)
+    assert not unmapped, f"Unmapped icon classes render as solid squares: {unmapped}"
 
 
 def test_every_jinja_template_compiles():

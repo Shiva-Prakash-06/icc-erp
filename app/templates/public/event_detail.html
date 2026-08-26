@@ -7,28 +7,49 @@
   <span class="aurora-badge aurora-badge--status-{{ event.status|lower|replace(' ', '-') }} fs-6">{{ event.status }}</span>
 </header>
 
-<div class="aurora-card mb-4"><div class="aurora-card__body"><p class="mb-2">{{ event.description or 'No public description available.' }}</p><p class="text-muted mb-0">Venue: {{ event.venue or 'Not published' }}</p></div></div>
+<div class="aurora-card mb-4"><div class="aurora-card__body"><p class="text-muted mb-2">Venue: {{ event.venue or 'Not published' }}</p><p class="mb-0">{{ event.description or 'No public description available.' }}</p></div></div>
 
 {% if documents %}
 <div class="aurora-card mb-4">
   <div class="aurora-card__header"><strong>Photos &amp; posters</strong></div>
-  <div class="aurora-card__body"><ul class="mb-0">{% for document in documents %}<li><a href="{{ document.drive_url }}" target="_blank" rel="noopener noreferrer">{{ document.title }}</a> <span class="text-muted">({{ document.category }})</span></li>{% endfor %}</ul></div>
+  <div class="aurora-card__body">
+    <ul class="resource-list">
+      {% for document in documents %}
+      <li class="resource-list__item">
+        <span class="resource-list__icon"><i class="ph {{ 'ph-image' if document.category == 'Photo' else 'ph-file-dashed' }}" aria-hidden="true"></i></span>
+        <span class="resource-list__body">
+          <a class="resource-list__title" href="{{ document.drive_url }}" target="_blank" rel="noopener noreferrer">{{ document.title }}</a>
+          <span class="resource-list__meta">{{ document.category }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
 </div>
 {% endif %}
 
 <div class="aurora-card">
   <div class="aurora-card__header"><strong>Published reports</strong></div>
-  <div class="aurora-table-scroll">
-    <table class="aurora-table align-middle mb-0">
+  {% if reports %}
+  <div class="aurora-table-scroll" tabindex="0">
+    <table class="aurora-table--cards align-middle mb-0">
       <thead><tr><th>Report</th><th>Version</th><th>Reach</th></tr></thead>
       <tbody>
         {% for report in reports %}
-        <tr><td>{{ report.title }}</td><td>v{{ report.version }}</td><td>{{ report.actual_reach or '—' }}</td></tr>
-        {% else %}
-        <tr><td colspan="3" class="text-center text-muted py-4">No report has been published for this event yet.</td></tr>
+        <tr>
+          <td data-label="Report">{{ report.title }}</td>
+          <td data-label="Version">v{{ report.version }}</td>
+          <td data-label="Reach">{{ report.actual_reach or '—' }}</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="ph ph-notebook" aria-hidden="true"></i>
+    <p class="mb-0">No report has been published for this event yet.</p>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

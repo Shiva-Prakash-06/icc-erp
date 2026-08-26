@@ -16,12 +16,18 @@ services:
   web:
     build: .
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://icc_erp:local-development-only@db:5432/icc_erp
+      SECRET_KEY: local-development-only-change-me
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "5000:8080"
-    command: gunicorn --bind 0.0.0.0:8080 --reload --workers 2 --threads 4 run:app
+    command: >-
+      sh -c "flask --app run:app db upgrade &&
+      flask --app run:app bootstrap-reference-data &&
+      gunicorn --bind 0.0.0.0:8080 --reload --workers 2 --threads 4 run:app"
 
 volumes:
   postgres-data:

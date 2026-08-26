@@ -4,7 +4,7 @@
 project_id            = "christ-oia-erp-production"
 region                = "asia-south1"
 environment           = "production"
-image                 = "asia-south1-docker.pkg.dev/christ-oia-erp-production/icc-erp/icc-erp:RELEASE_SHA"
+image                 = "asia-south1-docker.pkg.dev/christ-oia-erp-production/icc-erp/icc-erp@sha256:REPLACE_WITH_64_HEX_CHARACTERS"
 database_tier         = "db-custom-2-7680"
 database_name         = "icc_erp"
 database_user         = "icc_erp"
@@ -17,3 +17,4 @@ notification_email_mode = "smtp"
 alert_email           = "oia-erp-operations@example.org"
 internal_job_base_url = "https://erp.example.org"
 min_instances         = 1
+redis_memory_size_gb  = 1

@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (trigger) drawerTrigger = trigger;
         drawer.classList.toggle('is-open', open);
         drawer.setAttribute('aria-hidden', String(!open));
+        drawer.toggleAttribute('inert', !open);
         if (drawerScrim) drawerScrim.classList.toggle('is-open', open);
         document.querySelectorAll('[data-ui-drawer-toggle]').forEach(function(button) { button.setAttribute('aria-expanded', String(open)); });
         document.body.style.overflow = open ? 'hidden' : '';
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (trigger) notificationTrigger = trigger;
         notificationPanel.classList.toggle('is-open', open);
         notificationPanel.setAttribute('aria-hidden', String(!open));
+        notificationPanel.toggleAttribute('inert', !open);
         if (notificationScrim) notificationScrim.classList.toggle('is-open', open);
         document.querySelectorAll('[data-notification-toggle]').forEach(function(button) { button.setAttribute('aria-expanded', String(open)); });
         if (open) {
@@ -125,6 +127,68 @@ document.addEventListener('DOMContentLoaded', function() {
             target.classList.toggle('is-open', !expanded);
             button.classList.toggle('is-collapsed', expanded);
             button.setAttribute('aria-expanded', String(!expanded));
+        });
+    });
+
+    // Accessible file-picker readout: shows the selected filename(s) next to
+    // the native <input type="file">. Purely additive -- the field remains a
+    // fully usable native control without this enhancement (G-08).
+    document.querySelectorAll('.aurora-file-field input[type="file"]').forEach(function(input) {
+        const wrapper = input.closest('.aurora-file-field');
+        const nameEl = wrapper && wrapper.querySelector('[data-file-field-name]');
+        if (!nameEl) return;
+        input.addEventListener('change', function() {
+            if (input.files && input.files.length > 1) {
+                nameEl.textContent = `${input.files.length} files selected`;
+            } else if (input.files && input.files.length === 1) {
+                nameEl.textContent = input.files[0].name;
+            } else {
+                nameEl.textContent = 'No file selected';
+            }
+        });
+    });
+
+    // Password reveal control: toggles a field's type between password/text.
+    document.querySelectorAll('[data-ui-toggle="password-reveal"]').forEach(function(button) {
+        const selector = button.getAttribute('data-ui-target');
+        const target = selector ? document.querySelector(selector) : null;
+        if (!target) return;
+        button.addEventListener('click', function() {
+            const revealed = target.type === 'text';
+            target.type = revealed ? 'password' : 'text';
+            button.setAttribute('aria-pressed', String(!revealed));
+            button.textContent = revealed ? 'Show' : 'Hide';
+        });
+    });
+
+    // Client-side filter over already-rendered, already-authorized rows.
+    // Never changes what the server sent or which rows exist -- only
+    // shows/hides rows already present in the DOM, for search convenience.
+    document.querySelectorAll('[data-audit-filter]').forEach(function(input) {
+        const table = document.getElementById('auditTable');
+        if (!table) return;
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        input.addEventListener('input', function() {
+            const query = input.value.trim().toLowerCase();
+            rows.forEach(function(row) {
+                const matches = !query || row.textContent.toLowerCase().includes(query);
+                row.classList.toggle('is-filtered-out', !matches);
+                row.style.display = matches ? '' : 'none';
+            });
+        });
+    });
+
+    // Pending-state feedback on submit: the form action, method, and fields
+    // are untouched -- this only disables the submit button and swaps its
+    // label while the (server-rendered) round trip completes.
+    document.querySelectorAll('form[data-ui-pending-submit]').forEach(function(form) {
+        form.addEventListener('submit', function() {
+            const submitButton = form.querySelector('button[type="submit"], button:not([type])');
+            if (!submitButton || submitButton.disabled) return;
+            const pendingLabel = form.getAttribute('data-ui-pending-label') || 'Saving…';
+            submitButton.dataset.originalLabel = submitButton.textContent;
+            submitButton.textContent = pendingLabel;
+            submitButton.disabled = true;
         });
     });
 
@@ -176,30 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
         progress.style.transform = `scaleX(${normalized / 100})`;
         progress.style.transformOrigin = 'left center';
     });
-
-    // Prototype-style project views use the same server-rendered records and
-    // introduce no route, mutation, or lifecycle behavior.
-    const projectViewKey = 'oia.ui.projects-view';
-    const viewButtons = document.querySelectorAll('[data-project-view]');
-    const views = document.querySelectorAll('[data-project-view-panel]');
-    function setProjectView(name) {
-        const allowed = ['cards', 'board', 'table'];
-        const next = allowed.includes(name) ? name : 'cards';
-        viewButtons.forEach(function(button) {
-            const active = button.getAttribute('data-project-view') === next;
-            button.classList.toggle('is-active', active);
-            button.setAttribute('aria-pressed', String(active));
-        });
-        views.forEach(function(view) { view.classList.toggle('is-active', view.getAttribute('data-project-view-panel') === next); });
-        try { window.localStorage.setItem(projectViewKey, next); } catch (_) { /* Preference persistence is optional. */ }
-        document.dispatchEvent(new CustomEvent('oia:project-view-change', {detail: {view: next}}));
-    }
-    if (viewButtons.length && views.length) {
-        let initialView = 'cards';
-        try { initialView = window.localStorage.getItem(projectViewKey) || 'cards'; } catch (_) { /* Use server-first card view. */ }
-        setProjectView(initialView);
-        viewButtons.forEach(function(button) { button.addEventListener('click', function() { setProjectView(button.getAttribute('data-project-view')); }); });
-    }
 
     // Cursor light and shallow tilt are decorative, desktop-only enhancements.
     const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');

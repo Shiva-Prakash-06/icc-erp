@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Complete Report{% endblock %}
+{% block mobile_title %}Complete report{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Complete report{% endblock %}
+{% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id) }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <p class="text-info text-uppercase small fw-bold mb-1">Complete PDF report</p>
+    <h1 class="h2">{{ project.title }}</h1>
+    <p class="text-muted">Assembled from the authoritative Event Report document plus testimonial and programme pages.</p>
+  </div>
+  {% if preflight.complete %}
+  <a class="aurora-button--primary" href="{{ url_for('erp.download_complete_report', public_id=project.public_id) }}">Download complete PDF report</a>
+  {% else %}
+  <a class="aurora-button--outline-primary" href="{{ url_for('erp.download_complete_report', public_id=project.public_id, allow_incomplete=1) }}">Download available report anyway</a>
+  {% endif %}
+</div>
+
+{% if not preflight.complete %}
+<div class="alert alert-warning">Some dependencies could not be included in the report. Downloading anyway acknowledges the gap below — it does not approve or resolve it. Missing items are never inserted into the PDF.</div>
+{% endif %}
+
+<div class="aurora-card mb-4">
+  <div class="aurora-card__header"><strong>Report dependencies</strong></div>
+  <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards mb-0"><thead><tr><th>Role</th><th>Document</th><th>Status</th></tr></thead><tbody>
+    {% for dependency in preflight.dependencies %}
+    <tr><td data-label="Role">{{ dependency.role.replace('_', ' ')|title }}</td><td data-label="Document">{{ dependency.title }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ dependency.status }}">{{ dependency.status|title }}</span></td></tr>
+    {% else %}
+    <tr><td colspan="3" class="text-center text-muted py-4">No authoritative report or appendix documents found yet — the download will use a generated summary.</td></tr>
+    {% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="aurora-card">
+  <div class="aurora-card__header"><strong>Other export formats</strong></div>
+  <div class="aurora-card__body d-flex gap-2 flex-wrap">
+    <a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.report_preview', public_id=project.public_id) }}">View flattened snapshot preview</a>
+    <span class="text-muted small align-self-center">XLSX, DOCX, and PDF snapshot exports also remain available for integrations that need them.</span>
+  </div>
+</div>
+{% endblock %}

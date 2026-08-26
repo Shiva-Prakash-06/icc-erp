@@ -6,19 +6,19 @@
 <div class="auth-card auth-card--wide mx-auto">
     <div class="auth-header">
         <div class="auth-logo">O</div>
-        <h3 class="auth-title">Create Command Account</h3>
+        <h1 class="auth-title">Create Command Account</h1>
         <p class="auth-subtitle">Register for project tracking access</p>
     </div>
     
     <form action="{{ url_for('auth.register') }}" method="POST">
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-12">
                 <div class="aurora-field">
                     <label for="username" class="aurora-label">Username</label>
                     <input type="text" id="username" name="username" class="aurora-input" placeholder="username" required>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-12">
                 <div class="aurora-field">
                     <label for="email" class="aurora-label">Email</label>
                     <input type="email" id="email" name="email" class="aurora-input" placeholder="email@christuniversity.in" required>
@@ -30,15 +30,22 @@
             <div class="col-md-6">
                 <div class="aurora-field">
                     <label for="password" class="aurora-label">Password</label>
-                    <input type="password" id="password" name="password" class="aurora-input" placeholder="At least 12 characters" minlength="12" required autocomplete="new-password">
+                    <div class="d-flex gap-2">
+                        <input type="password" id="password" name="password" class="aurora-input" placeholder="At least 12 characters" minlength="12" required autocomplete="new-password" aria-describedby="password-requirements">
+                        <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
+                    </div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="aurora-field">
                     <label for="confirm_password" class="aurora-label">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" class="aurora-input" placeholder="Repeat password" required autocomplete="new-password">
+                    <div class="d-flex gap-2">
+                        <input type="password" id="confirm_password" name="confirm_password" class="aurora-input" placeholder="Repeat password" required autocomplete="new-password">
+                        <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#confirm_password" aria-pressed="false">Show</button>
+                    </div>
                 </div>
             </div>
+            <p id="password-requirements" class="small text-muted mb-3">Use at least 12 characters. A mix of words, numbers, and symbols makes it stronger.</p>
         </div>
 
         <div class="row">

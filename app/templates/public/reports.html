@@ -2,8 +2,9 @@
 {% block title %}Published reports{% endblock %}
 {% block content %}
 <header class="page-header"><div><div class="page-eyebrow">Institutional memory</div><h1 class="page-title">Published reports</h1><p class="page-subtitle">Approved, published reports summarizing ICC and IGP activity.</p></div></header>
+{% if reports %}
 <div class="aurora-card">
-  <div class="aurora-table-scroll">
+  <div class="aurora-table-scroll" tabindex="0">
     <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
       <thead><tr><th>Report</th><th>Project</th><th>Version</th><th>Reach</th></tr></thead>
       <tbody>
@@ -14,11 +15,15 @@
           <td data-label="Version">v{{ report.version }}</td>
           <td data-label="Reach">{{ report.actual_reach or '—' }}</td>
         </tr>
-        {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-5">No reports have been published yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% else %}
+<div class="aurora-card--padded empty-state">
+  <i class="ph ph-notebook" aria-hidden="true"></i>
+  <p class="mb-0">No reports have been published yet.</p>
+</div>
+{% endif %}
 {% endblock %}

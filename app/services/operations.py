@@ -21,6 +21,7 @@ from app.models.erp import (
 from app.models.production import ApprovalEvent, AttendanceChangeEvent, ContributionRecord, RecruitmentApplication, TaskStatusEvent
 from app.models.project import BuddyLog
 from app.services.audit import record_audit
+from app.services.authorization import has_permission
 from app.services.notifications import queue_notification
 
 
@@ -204,7 +205,16 @@ def decide_contribution(contribution, status, actor, *, expected_version, reason
     return contribution
 
 
+OPERATIONAL_REQUEST_DECISION_STATUSES = {"Approved", "Rejected", "Completed"}
+
+
 def decide_operational_request(operational_request, status, actor, *, expected_version, reason=None, official_reference=None):
+    """Centralized Draft/Submitted/Approved/Rejected/Completed/Cancelled state
+    machine for OperationalRequest, shared by the HTML and API blueprints so
+    both enforce identical authorization -- see PLAN.md "USC operational
+    approvals" finding. Callers must not duplicate the permission or
+    self-approval checks below; both interfaces call only this function.
+    """
     _check_version(operational_request, expected_version)
     transitions = {
         "Draft": {"Submitted", "Cancelled"},
@@ -216,13 +226,28 @@ def decide_operational_request(operational_request, status, actor, *, expected_v
     }
     if status not in transitions.get(operational_request.status, set()):
         raise ValueError(f"Operational request cannot move from {operational_request.status} to {status}.")
+    if status in OPERATIONAL_REQUEST_DECISION_STATUSES:
+        if not has_permission(actor, "approve_operational_requests", operational_request.project):
+            raise PermissionError("You are not authorized to approve operational requests for this project.")
+        if operational_request.created_by_id is None or operational_request.submitted_by_id is None:
+            raise ValueError(
+                "This request has incomplete maker/submission history and must be returned to Draft and resubmitted before a decision."
+            )
+        creator_ids = {operational_request.created_by_id, operational_request.submitted_by_id}
+        if status == "Approved" and actor.id in creator_ids:
+            raise PermissionError("You cannot approve an operational request you created or submitted.")
+    elif not has_permission(actor, "manage_projects", operational_request.project):
+        raise PermissionError("You are not authorized to manage this operational request.")
     if status in {"Rejected", "Cancelled"} and not (reason or "").strip():
         raise ValueError(f"{status} operational requests require a reason.")
     previous = operational_request.status
     operational_request.status = status
+    if status == "Submitted":
+        operational_request.submitted_by_id = actor.id
     operational_request.decision_comment = reason
     operational_request.official_reference = official_reference or operational_request.official_reference
-    operational_request.approver_id = actor.id if status in {"Approved", "Rejected", "Completed", "Cancelled"} else None
+    if status in {"Approved", "Rejected"}:
+        operational_request.approver_id = actor.id
     operational_request.version += 1
     db.session.add(ApprovalEvent(entity_type="OperationalRequest", entity_public_id=operational_request.public_id, action=status, reason=reason, actor_user_id=actor.id))
     record_audit("operational_request.transition", operational_request, {"status": previous}, {"status": status, "version": operational_request.version}, actor)

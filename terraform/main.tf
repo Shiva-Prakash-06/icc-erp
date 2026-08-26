@@ -12,6 +12,8 @@ resource "google_project_service" "apis" {
     "monitoring.googleapis.com",
     "logging.googleapis.com",
     "artifactregistry.googleapis.com",
+    "compute.googleapis.com",
+    "redis.googleapis.com",
   ])
   service            = each.value
   disable_on_destroy = false
@@ -96,6 +98,49 @@ resource "google_secret_manager_secret_version" "secret_key" {
   secret_data = random_password.secret_key.result
 }
 
+# A private, authenticated shared limiter is mandatory for a horizontally
+# scaled Cloud Run service. Direct VPC egress avoids a connector bottleneck
+# and keeps Redis off the public internet.
+resource "google_compute_network" "runtime" {
+  name                    = "${local.name}-runtime"
+  auto_create_subnetworks = false
+  depends_on              = [google_project_service.apis]
+}
+
+resource "google_compute_subnetwork" "runtime" {
+  name          = "${local.name}-runtime"
+  region        = var.region
+  network       = google_compute_network.runtime.id
+  ip_cidr_range = "10.20.0.0/24"
+}
+
+resource "google_redis_instance" "rate_limit" {
+  name               = "${local.name}-rate-limit"
+  display_name       = "ICC ERP ${var.environment} shared rate limiter"
+  region             = var.region
+  tier               = var.environment == "production" ? "STANDARD_HA" : "BASIC"
+  memory_size_gb     = var.redis_memory_size_gb
+  redis_version      = "REDIS_7_2"
+  auth_enabled       = true
+  authorized_network = google_compute_network.runtime.id
+  connect_mode       = "DIRECT_PEERING"
+  reserved_ip_range  = "10.20.1.0/29"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret" "ratelimit_storage_uri" {
+  secret_id = "${local.name}-ratelimit-storage-uri"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "ratelimit_storage_uri" {
+  secret      = google_secret_manager_secret.ratelimit_storage_uri.id
+  secret_data = "redis://:${urlencode(google_redis_instance.rate_limit.auth_string)}@${google_redis_instance.rate_limit.host}:${google_redis_instance.rate_limit.port}/0"
+}
+
 resource "google_service_account" "runtime" {
   account_id   = replace(local.name, "_", "-")
   display_name = "ICC ERP ${var.environment} runtime"
@@ -124,12 +169,6 @@ resource "google_project_iam_member" "sql_client" {
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-resource "google_project_iam_member" "secret_accessor" {
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.runtime.email}"
-}
-
 resource "google_project_iam_member" "runtime_task_enqueuer" {
   project = var.project_id
   role    = "roles/cloudtasks.enqueuer"
@@ -139,12 +178,6 @@ resource "google_project_iam_member" "runtime_task_enqueuer" {
 resource "google_project_iam_member" "migration_sql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.migration.email}"
-}
-
-resource "google_project_iam_member" "migration_secret_accessor" {
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.migration.email}"
 }
 
@@ -172,6 +205,38 @@ resource "google_secret_manager_secret_version" "smtp_password" {
   secret_data = var.smtp_password
 }
 
+# Secret access is granted per secret instead of project-wide. The web runtime
+# receives only the five values injected into its container, while migration
+# and import jobs receive only the database, application key, and Drive
+# credential they consume.
+resource "google_secret_manager_secret_iam_member" "runtime_secret_accessor" {
+  for_each = {
+    database_url          = google_secret_manager_secret.database_url.secret_id
+    secret_key            = google_secret_manager_secret.secret_key.secret_id
+    drive_credentials     = google_secret_manager_secret.drive_credentials.secret_id
+    smtp_password         = google_secret_manager_secret.smtp_password.secret_id
+    ratelimit_storage_uri = google_secret_manager_secret.ratelimit_storage_uri.secret_id
+  }
+
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "migration_secret_accessor" {
+  for_each = {
+    database_url      = google_secret_manager_secret.database_url.secret_id
+    secret_key        = google_secret_manager_secret.secret_key.secret_id
+    drive_credentials = google_secret_manager_secret.drive_credentials.secret_id
+  }
+
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.migration.email}"
+}
+
 resource "google_cloud_run_v2_service" "web" {
   name     = local.name
   location = var.region
@@ -182,6 +247,15 @@ resource "google_cloud_run_v2_service" "web" {
     scaling {
       min_instance_count = var.environment == "production" ? var.min_instances : 0
       max_instance_count = 10
+    }
+
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = google_compute_network.runtime.id
+        subnetwork = google_compute_subnetwork.runtime.id
+        tags       = ["icc-erp-${var.environment}"]
+      }
     }
 
     containers {
@@ -297,6 +371,15 @@ resource "google_cloud_run_v2_service" "web" {
           }
         }
       }
+      env {
+        name = "RATELIMIT_STORAGE_URI"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.ratelimit_storage_uri.secret_id
+            version = "latest"
+          }
+        }
+      }
 
       volume_mounts {
         name       = "cloudsql"
@@ -328,7 +411,15 @@ resource "google_cloud_run_v2_service" "web" {
       }
     }
   }
-  depends_on = [google_project_service.apis]
+  depends_on = [
+    google_project_service.apis,
+    google_secret_manager_secret_iam_member.runtime_secret_accessor,
+    google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.drive_credentials,
+    google_secret_manager_secret_version.ratelimit_storage_uri,
+    google_secret_manager_secret_version.secret_key,
+    google_secret_manager_secret_version.smtp_password,
+  ]
 }
 
 # Cloud Run authenticates transport while the ERP enforces user authentication,
@@ -398,6 +489,11 @@ resource "google_cloud_run_v2_job" "migration" {
       timeout     = "1800s"
     }
   }
+  depends_on = [
+    google_secret_manager_secret_iam_member.migration_secret_accessor,
+    google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.secret_key,
+  ]
 }
 
 resource "google_cloud_run_v2_job" "import_commit" {
@@ -464,6 +560,12 @@ resource "google_cloud_run_v2_job" "import_commit" {
       timeout     = "3600s"
     }
   }
+  depends_on = [
+    google_secret_manager_secret_iam_member.migration_secret_accessor,
+    google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.drive_credentials,
+    google_secret_manager_secret_version.secret_key,
+  ]
 }
 
 resource "google_cloud_tasks_queue" "jobs" {
@@ -478,6 +580,7 @@ resource "google_cloud_tasks_queue" "jobs" {
     min_backoff  = "5s"
     max_backoff  = "300s"
   }
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_cloud_scheduler_job" "reminders" {
@@ -544,6 +647,7 @@ resource "google_monitoring_notification_channel" "email" {
   display_name = "ICC ERP operational alerts"
   type         = "email"
   labels       = { email_address = var.alert_email }
+  depends_on   = [google_project_service.apis]
 }
 
 resource "google_monitoring_alert_policy" "availability" {
@@ -582,4 +686,5 @@ resource "google_monitoring_uptime_check_config" "web" {
       host       = trimprefix(google_cloud_run_v2_service.web.uri, "https://")
     }
   }
+  depends_on = [google_project_service.apis]
 }

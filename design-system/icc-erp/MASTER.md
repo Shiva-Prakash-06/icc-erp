@@ -53,10 +53,11 @@ Purple and pink decorative gradients are excluded. Status is never conveyed by c
 - Primary cards: 16px radius; nested surfaces: 12px; buttons and inputs: 8px.
 - Controls and interactive icon hit areas are at least 44×44px where applicable.
 - Spacing follows the 4, 8, 12, 16, 20, 24, 32, 40, 48, and 64px scale.
+- Labelled page regions (`.page-section`) are separated by 40px desktop / 32px mobile; a region's heading block sits 24px above its content. Bento gaps remain 16px column / 20px row.
 
 ## Glass and depth
 
-Frosted surfaces use translucent white, 12–18px blur, a sky-tinted border, a subtle top highlight, and restrained blue shadows. The no-`backdrop-filter` fallback is opaque white. Glass may frame navigation and cards but must not reduce form, table, or long-text legibility.
+Work surfaces (tables, forms, list/KPI cards -- `.aurora-card`) are opaque, not translucent: this is a floor, not a suggestion. Glass is opt-in via `.aurora-card--glass` and is reserved for navigation-adjacent shell surfaces (rail, topbar, notification panel, command dialog). Frosted surfaces use translucent white, 12–18px blur, a sky-tinted border, a subtle top highlight, and restrained blue shadows. The no-`backdrop-filter` fallback is opaque white. Glass may frame navigation and cards but must not reduce form, table, or long-text legibility.
 
 Cursor spotlight and shallow perspective are limited to KPI cards on fine-pointer desktop devices. No WebGL dependency is permitted. Forms, tables, alerts, dialogs, and destructive controls do not tilt.
 
@@ -93,8 +94,8 @@ Reports, audit views, and structured project summaries print on white without sh
 - React/Framer Motion islands mount only over usable server-rendered fallbacks and accept minimal allowlisted props.
 - Tailwind, TanStack Router, Radix, shadcn, React Query, and Recharts are not production dependencies.
 - Chart.js remains the chart implementation.
-- Local storage is restricted to `oia.ui.rail-collapsed` and `oia.ui.projects-view`.
-- Route count, URL-map hash, form actions/methods/field names, CSRF/version fields, redirects, role navigation, downloads, and offline behavior may not change.
+- Local storage is restricted to `oia.ui.rail-collapsed` and `oia.ui.projects-view` (the latter reserved/unused — no view-switcher currently exists; do not remove the reservation without also removing this line).
+- Route count and URL-map hash may not change without a deliberate, documented and re-baselined update (`scripts/regen_ui_baseline.py`) recorded in `docs/UI_LEGACY_LEDGER.md`. Form actions/methods/field names, CSRF/version fields, and role navigation may not change. **Redirect endpoint and HTTP status may not change; the `tab` query argument on a project workspace redirect is presentation and may be re-pointed** (e.g. the `operations` → `delivery`/`contributions`/`finance` tab split), since query arguments are not part of the URL map. Downloads and offline behavior may not change.
 - Prototype mock data, fictional actions, appearance settings, synthetic system health, and simulated report progress are forbidden.
 
 ## Explicit anti-patterns

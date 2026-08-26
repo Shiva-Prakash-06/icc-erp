@@ -1,243 +1,127 @@
 {% extends "base.html" %}
-
-{% block title %}My Profile | Performance Portfolio{% endblock %}
-
+{% block title %}My Account & Activity{% endblock %}
+{% block mobile_title %}My account{% endblock %}
 {% block content %}
-<!-- ==========================================
-     DESKTOP LAYOUT (Unchanged)
-     ========================================== -->
-<div class="d-none d-lg-block">
-    <div class="page-header">
-        <div>
-            <div class="page-eyebrow">Identity and impact</div>
-            <h1 class="page-title">My performance portfolio</h1>
-            <p class="page-subtitle">Personal profile, volunteer details, and verified skills acquired through contributions.</p>
-        </div>
-    </div>
+<header class="page-header">
+  <div>
+    <div class="page-eyebrow">Identity and activity</div>
+    <h1 class="page-title">My Account &amp; Activity</h1>
+    <p class="page-subtitle">Your role assignments, scoped projects, recent activity, and account security.</p>
+  </div>
+</header>
 
-    <div class="row g-4">
-        <!-- Left Column: User details and skills -->
-        <div class="col-lg-4">
-            <!-- User Identity aurora-card -->
-            <div class="aurora-card--padded mb-4 text-center py-4">
-                <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-xl">
-                    <i class="ph ph-user-circle"></i>
-                </div>
-                <h4 class="fw-bold mb-1">{{ g.user.username }}</h4>
-                <p class="text-muted small mb-2"><i class="ph ph-envelope"></i> {{ g.user.email }}</p>
-                <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3">{{ g.user.role }}</span>
-                <div class="border-top border-secondary pt-3 mt-2 text-start px-3">
-                    <small class="text-muted d-block">Campus Assignment</small>
-                    <span class="fw-bold"><i class="ph ph-building-office"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
-                </div>
-            </div>
-
-            {% if volunteer_profile %}
-            <!-- Volunteer Profile Details -->
-            <div class="aurora-card--padded mb-4">
-                <h5 class="aurora-card__title mb-3"><i class="ph ph-tools text-primary"></i> Profile Skills & Interests</h5>
-                
-                <small class="text-muted d-block mb-2">Registered Skills</small>
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    {% if volunteer_profile.skills %}
-                        {% for skill in volunteer_profile.skills.split(',') %}
-                            <span class="aurora-badge bg-secondary py-1.5 px-3 rounded-pill text-xs">{{ skill.strip() }}</span>
-                        {% endfor %}
-                    {% else %}
-                        <span class="text-muted small">None registered.</span>
-                    {% endif %}
-                </div>
-                
-                <small class="text-muted d-block mb-2">Interests</small>
-                <div class="d-flex flex-wrap gap-2">
-                    {% if volunteer_profile.interests %}
-                        {% for interest in volunteer_profile.interests.split(',') %}
-                            <span class="aurora-badge bg-dark bg-opacity-50 border border-secondary text-light py-1.5 px-3 rounded-pill text-xs">{{ interest.strip() }}</span>
-                        {% endfor %}
-                    {% else %}
-                        <span class="text-muted small">None registered.</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Right Column -->
-        <div class="col-lg-8">
-            <!-- Acquired Skills -->
-            <div class="aurora-card--padded mb-4">
-                <h5 class="aurora-card__title mb-3"><i class="ph ph-award text-success"></i> Skills Acquired from Contributions</h5>
-                <p class="text-muted small mb-4">These skills are dynamically calculated and accumulated based on your verified log entries and approved contribution hours.</p>
-
-                {% if skills_hours %}
-                    <div class="d-flex flex-column gap-3">
-                        {% for skill, hours in skills_hours.items() %}
-                            <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold text-ui">{{ skill }}</span>
-                                    <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success">{{ hours }} hours logged</span>
-                                </div>
-                                <div class="progress-container-custom">
-                                    {% set percentage = min(100, (hours / 20 * 100) | int) %}
-                                    <div class="progress-bar-custom bg-success" data-progress="{{ percentage }}"></div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="ph ph-clock-counter-clockwise text-muted fs-2"></i>
-                        <p class="text-muted mt-2 small">No approved contribution hours logged yet. Contribute to active project workspaces to build your skills portfolio.</p>
-                    </div>
-                {% endif %}
-            </div>
-
-            <!-- Contributed Workspaces -->
-            <div class="aurora-card--padded">
-                <h5 class="aurora-card__title mb-3"><i class="ph ph-folder-simple text-primary"></i> My Contributed Workspaces</h5>
-                <p class="text-muted small mb-3">You are authorized to view and interact only with the following workspaces because you have verified contributions or participation history on them.</p>
-
-                {% if contributed_projects %}
-                    <div class="aurora-table-scroll">
-                        <table class="aurora-table">
-                            <thead>
-                                <tr>
-                                    <th>Project Workspace</th>
-                                    <th>Campus</th>
-                                    <th>Program</th>
-                                    <th>Timeline</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for p in contributed_projects %}
-                                <tr>
-                                    <td class="fw-bold">{{ p.title }}</td>
-                                    <td>{{ p.campus.name.replace(" Campus", "") }}</td>
-                                    <td><span class="aurora-badge bg-primary font-monospace text-caption">{{ p.program_type.name }}</span></td>
-                                    <td class="small">{{ p.start_date.strftime('%b %d, %Y') }}</td>
-                                    <td>
-                                        <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% elif p.status == 'Completed' %}aurora-badge--status-completed{% else %}aurora-badge--status-pending{% endif %}">
-                                            {{ p.status }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <a href="{{ url_for('erp.project_detail', public_id=p.public_id) }}" class="aurora-button--outline-info aurora-button--small rounded-pill px-3 py-1">Open Workspace</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="p-4 text-center text-muted small">You haven't contributed to any workspaces yet. Contact your campus administrator to register you to a project.</div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ==========================================
-     MOBILE LAYOUT (Redesigned)
-     ========================================== -->
-<div class="d-block d-lg-none">
-    <!-- Profile Headshot Card -->
+<div class="row g-4">
+  <div class="col-lg-4">
     <div class="aurora-card--padded mb-4 text-center py-4">
-        <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-lg">
-            <i class="ph ph-user-circle"></i>
-        </div>
-        <h4 class="fw-bold mb-1 text-xl">{{ g.user.username }}</h4>
-        <p class="text-muted small mb-2">{{ g.user.email }}</p>
-        <span class="aurora-badge bg-primary px-3 py-1.5 rounded-pill mb-3 text-xs">{{ g.user.role }}</span>
-        
-        <div class="border-top border-secondary pt-3 mt-2 text-start px-2">
-            <span class="text-muted small d-block text-caption">Campus Assignment</span>
-            <span class="fw-bold small"><i class="ph ph-building-office me-1 text-info"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
-        </div>
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-xl"><i class="ph ph-user-circle"></i></div>
+      <h4 class="fw-bold mb-1">{{ g.user.username }}</h4>
+      <p class="text-muted small mb-2"><i class="ph ph-envelope"></i> {{ g.user.email }}</p>
+      <div class="border-top border-secondary pt-3 mt-2 text-start px-3">
+        <small class="text-muted d-block">Campus</small>
+        <span class="fw-bold"><i class="ph ph-building-office"></i> {{ g.user.campus.name if g.user.campus else 'Unassigned' }}</span>
+      </div>
     </div>
 
-    <!-- Registered Skills & Interests -->
-    {% if volunteer_profile %}
     <div class="aurora-card--padded mb-4">
-        <h5 class="aurora-card__title mb-3"><i class="ph ph-tools text-primary me-2"></i>Skills & Interests</h5>
-        
-        <div class="mb-3">
-            <span class="text-muted small d-block mb-1.5 text-caption">Registered Skills</span>
-            <div class="d-flex flex-wrap gap-1.5">
-                {% if volunteer_profile.skills %}
-                    {% for skill in volunteer_profile.skills.split(',') %}
-                        <span class="aurora-badge bg-secondary py-1 px-2.5 rounded text-caption">{{ skill.strip() }}</span>
-                    {% endfor %}
-                {% else %}
-                    <span class="text-muted small">None registered.</span>
-                {% endif %}
-            </div>
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-shield-check text-primary"></i> Role assignments</h5>
+      {% if role_assignments %}
+      <div class="d-flex flex-column gap-3">
+        {% for assignment in role_assignments %}
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div><span class="fw-semibold">{{ assignment.role_label }}</span><div class="small text-muted">{{ assignment.scope_label }}</div></div>
+          <span class="aurora-badge {% if assignment.is_active %}aurora-badge--status-active{% else %}aurora-badge--status-inactive{% endif %}">{{ 'Active' if assignment.is_active else 'Inactive' }}</span>
         </div>
-        
-        <div>
-            <span class="text-muted small d-block mb-1.5 text-caption">Interests</span>
-            <div class="d-flex flex-wrap gap-1.5">
-                {% if volunteer_profile.interests %}
-                    {% for interest in volunteer_profile.interests.split(',') %}
-                        <span class="aurora-badge bg-dark bg-opacity-50 border border-secondary text-light py-1 px-2.5 rounded text-caption">{{ interest.strip() }}</span>
-                    {% endfor %}
-                {% else %}
-                    <span class="text-muted small">None registered.</span>
-                {% endif %}
-            </div>
-        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">No role assignments on record.</p>
+      {% endif %}
+    </div>
+
+    <div class="aurora-card--padded">
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-lock-key text-primary"></i> Account security</h5>
+      <dl class="row small mb-3">
+        <dt class="col-6">Last sign-in</dt><dd class="col-6">{{ g.user.last_login_at.strftime('%d %b %Y, %I:%M %p') if g.user.last_login_at else 'Not recorded' }}</dd>
+        <dt class="col-6">Password last changed</dt><dd class="col-6">{{ g.user.password_changed_at.strftime('%d %b %Y') if g.user.password_changed_at else 'Not recorded' }}</dd>
+      </dl>
+      {% if g.user.needs_password_reset %}<p class="small text-warning-emphasis mb-3"><i class="ph ph-warning"></i> Your password must be changed at next sign-in.</p>{% endif %}
+      <a class="aurora-button--secondary w-100" href="{{ url_for('auth.forgot_password') }}"><i class="ph ph-key" aria-hidden="true"></i>Send a password reset link</a>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    {% if assigned_projects %}
+    <div class="aurora-card--padded mb-4">
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-folder-simple text-primary"></i> My assigned projects</h5>
+      <div class="aurora-table-scroll" tabindex="0">
+        <table class="aurora-table">
+          <thead><tr><th>Project</th><th>Campus</th><th>Program</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for p in assigned_projects %}
+          <tr>
+            <td class="fw-bold">{{ p.title }}</td>
+            <td>{{ p.campus.name }}</td>
+            <td><span class="aurora-badge bg-primary font-monospace text-caption">{{ p.program_type.name }}</span></td>
+            <td><span class="aurora-badge aurora-badge--status-{{ p.status|lower }}">{{ p.status }}</span></td>
+            <td><a href="{{ url_for('erp.project_detail', public_id=p.public_id) }}" class="aurora-button--outline-info aurora-button--small">Open</a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
     {% endif %}
 
-    <!-- Dynamically Earned Skills Progress -->
+    {% if contribution_hours %}
     <div class="aurora-card--padded mb-4">
-        <h5 class="aurora-card__title mb-3"><i class="ph ph-award text-success me-2"></i>Contribution Acquired Skills</h5>
-        {% if skills_hours %}
-            <div class="d-flex flex-column gap-3.5">
-                {% for skill, hours in skills_hours.items() %}
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold small">{{ skill }}</span>
-                            <span class="aurora-badge bg-success bg-opacity-10 text-success border border-success text-2xs">{{ hours }} hrs</span>
-                        </div>
-                        <div class="progress-container-custom">
-                            {% set percentage = min(100, (hours / 20 * 100) | int) %}
-                            <div class="progress-bar-custom bg-success" data-progress="{{ percentage }}"></div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-4 text-muted small">
-                <i class="ph ph-clock-counter-clockwise fs-2 d-block mb-1"></i>
-                No approved contribution hours.
-            </div>
-        {% endif %}
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-award text-success"></i> Approved contribution hours</h5>
+      <div class="d-flex flex-column gap-3">
+        {% for skill, hours in contribution_hours.items() %}
+        <div>
+          <div class="d-flex justify-content-between align-items-center mb-1"><span class="fw-bold text-ui">{{ skill }}</span><span class="aurora-badge bg-success bg-opacity-10 text-success border border-success">{{ hours }} hours</span></div>
+          <div class="progress-container-custom">{% set percentage = 100 if hours >= 20 else (hours / 20 * 100) | int %}<div class="progress-bar-custom bg-success" data-progress="{{ percentage }}"></div></div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
 
-    <!-- Contributed Workspaces (Stacked cards) -->
-    <div class="aurora-card--padded">
-        <h5 class="aurora-card__title mb-3"><i class="ph ph-folder-simple text-primary me-2"></i>My Workspace Authorization</h5>
-        {% if contributed_projects %}
-            <div class="d-flex flex-column gap-3">
-                {% for p in contributed_projects %}
-                    <div class="aurora-card--padded">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="aurora-badge bg-primary font-monospace text-2xs">{{ p.program_type.name }}</span>
-                            <span class="aurora-badge {% if p.status == 'Active' %}aurora-badge--status-active{% elif p.status == 'Completed' %}aurora-badge--status-completed{% else %}aurora-badge--status-pending{% endif %} text-2xs">
-                                {{ p.status }}
-                            </span>
-                        </div>
-                        <h6 class="mb-2 fw-bold text-ui-lg">{{ p.title }}</h6>
-                        <div class="text-muted small mb-3"><i class="ph ph-building-office"></i> {{ p.campus.name }}</div>
-                        <a href="{{ url_for('erp.project_detail', public_id=p.public_id) }}" class="aurora-button--outline-info w-100 py-2 small">Open Workspace</a>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="p-4 text-center text-muted small">You haven't contributed to any workspaces yet.</div>
-        {% endif %}
+    {% if recent_requests %}
+    <div class="aurora-card--padded mb-4">
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-receipt text-primary"></i> My recent operational requests</h5>
+      <div class="aurora-list aurora-list--flush">
+        {% for item in recent_requests %}
+        <a class="aurora-list__item d-flex justify-content-between" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab='finance') }}#{{ item.public_id }}"><span>{{ item.title }}<div class="small text-muted">{{ item.project.title }}</div></span><span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span></a>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
+
+    {% if recent_contributions %}
+    <div class="aurora-card--padded mb-4">
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-hand-heart text-primary"></i> My recent contributions</h5>
+      <div class="aurora-list aurora-list--flush">
+        {% for contribution in recent_contributions %}
+        <div class="aurora-list__item d-flex justify-content-between"><span>{{ contribution.activity_type }}<div class="small text-muted">{{ contribution.description }}</div></span><span class="aurora-badge aurora-badge--status-{{ contribution.approval_status|lower }}">{{ contribution.approval_status }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if recent_notifications %}
+    <div class="aurora-card--padded">
+      <h5 class="aurora-card__heading mb-3"><i class="ph ph-bell text-primary"></i> Recent notifications</h5>
+      <div class="aurora-list aurora-list--flush">
+        {% for notification in recent_notifications %}
+        <div class="aurora-list__item{% if notification.read_at %} text-muted{% endif %}"><strong>{{ notification.title }}</strong><div class="small">{{ notification.body }}</div></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not assigned_projects and not contribution_hours and not recent_requests and not recent_contributions and not recent_notifications %}
+    <div class="aurora-card--padded text-center py-5 text-muted">No activity recorded yet. Activity from assigned projects, requests, and contributions will appear here.</div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

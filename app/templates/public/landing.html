@@ -8,11 +8,44 @@
   <article class="aurora-card--padded kpi-card col-span-6"><div class="aurora-card__title">Completed programs</div><div class="aurora-card__value mt-3">{{ total_completed }}</div></article>
 </section>
 
+{% if has_published_analytics %}
 <div class="row g-4">
-  <div class="col-md-6"><canvas id="campusChart" height="220"></canvas></div>
-  <div class="col-md-6"><canvas id="programChart" height="220"></canvas></div>
+  <div class="col-md-6"><h2 class="h5">Events by campus</h2><div class="public-chart-frame"><canvas id="campusChart" aria-hidden="true"></canvas></div></div>
+  <div class="col-md-6"><h2 class="h5">Programs by type</h2><div class="public-chart-frame"><canvas id="programChart" aria-hidden="true"></canvas></div></div>
 </div>
-<div class="mt-4"><canvas id="participationChart" height="200"></canvas></div>
+<h2 class="h5 mt-4">Participation by academic year</h2>
+<div class="public-chart-frame public-chart-frame--wide"><canvas id="participationChart" aria-hidden="true"></canvas></div>
+
+<details class="aurora-card--padded mt-4">
+  <summary class="fw-semibold">View analytics as data tables</summary>
+  <div class="aurora-table-scroll mt-3" tabindex="0">
+    <table class="aurora-table mb-0">
+      <caption>Published events by campus</caption>
+      <thead><tr><th scope="col">Campus</th><th scope="col">Events</th></tr></thead>
+      <tbody>{% for row in analytics.events_per_campus %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.value }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <div class="aurora-table-scroll mt-3" tabindex="0">
+    <table class="aurora-table mb-0">
+      <caption>Published programs by type</caption>
+      <thead><tr><th scope="col">Program type</th><th scope="col">Programs</th></tr></thead>
+      <tbody>{% for row in analytics.program_split %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.value }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <div class="aurora-table-scroll mt-3" tabindex="0">
+    <table class="aurora-table mb-0">
+      <caption>Published aggregate participation by academic year</caption>
+      <thead><tr><th scope="col">Academic year</th><th scope="col">Participants</th></tr></thead>
+      <tbody>{% for row in analytics.participation_trend %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.value }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</details>
+{% else %}
+<div class="aurora-card--padded empty-state mb-4">
+  <i class="ph ph-chart-bar" aria-hidden="true"></i>
+  <p class="mb-0"><strong>No published analytics yet.</strong> Charts will appear here once approved projects are explicitly published.</p>
+</div>
+{% endif %}
 
 <div class="d-flex gap-3 mt-4">
   <a class="aurora-button--primary" href="{{ url_for('public.events') }}">View event calendar</a>
@@ -20,6 +53,6 @@
 </div>
 
 {% endblock %}
-{% block scripts %}
+{% block scripts %}{% if has_published_analytics %}
 <script src="{{ url_for('static', filename='js/public-charts.js') }}" defer></script>
-{% endblock %}
+{% endif %}{% endblock %}

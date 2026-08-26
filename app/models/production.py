@@ -107,6 +107,9 @@ class RecruitmentApplication(PublicIdMixin, TimestampMixin, db.Model):
     consent_status = db.Column(db.String(30), nullable=False, default="Not Recorded")
     version = db.Column(db.Integer, nullable=False, default=1)
 
+    person = db.relationship("Person")
+    project = db.relationship("Project")
+
     __table_args__ = (
         db.UniqueConstraint("person_id", "project_id", "desired_role", name="uq_recruitment_application"),
     )

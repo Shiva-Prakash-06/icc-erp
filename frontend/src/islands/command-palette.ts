@@ -1,5 +1,3 @@
-import { animate } from "framer-motion/dom";
-
 type Command = {
   name: string;
   url: string;
@@ -110,12 +108,11 @@ export function mountCommandPalette(commands: Command[], initialTrigger: HTMLEle
   }
 
   function close() {
-    const duration = reduced.matches ? 0 : 0.12;
-    const controls = animate(scrim, { opacity: [1, 0] }, { duration });
-    void controls.then(() => {
+    const animation = scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced.matches ? 0 : 120, easing: "ease-out", fill: "both" });
+    void animation.finished.then(() => {
       scrim.hidden = true;
       trigger?.focus();
-    });
+    }).catch(() => undefined);
   }
 
   function open(nextTrigger: HTMLElement | null) {
@@ -125,9 +122,14 @@ export function mountCommandPalette(commands: Command[], initialTrigger: HTMLEle
     active = 0;
     render();
     scrim.hidden = false;
-    const duration = reduced.matches ? 0 : 0.2;
-    animate(scrim, { opacity: [0, 1] }, { duration: Math.min(duration, 0.16), ease: "easeOut" });
-    animate(dialog, reduced.matches ? { opacity: [0, 1] } : { opacity: [0, 1], y: [-12, 0], scale: [0.98, 1] }, { duration, ease: [0.16, 1, 0.3, 1] });
+    const duration = reduced.matches ? 0 : 200;
+    scrim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: Math.min(duration, 160), easing: "ease-out", fill: "both" });
+    dialog.animate(
+      reduced.matches
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [{ opacity: 0, transform: "translateY(-12px) scale(.98)" }, { opacity: 1, transform: "none" }],
+      { duration, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" },
+    );
     window.setTimeout(() => input.focus(), 0);
   }
 

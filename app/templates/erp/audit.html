@@ -3,5 +3,47 @@
 {% block mobile_title %}Audit history{% endblock %}
 {% block content %}
 <header class="page-header"><div><div class="page-eyebrow">Immutable operations ledger</div><h1 class="page-title">Audit history</h1><p class="page-subtitle">Append-only record of permissions, imports, lifecycle decisions, and operational changes.</p></div><span class="aurora-badge">Latest {{ events|length }} events</span></header>
-<div class="aurora-card"><div class="aurora-card__header"><div><span class="page-eyebrow">Recorded sequence</span><strong>Operational events</strong></div><i class="ph ph-shield-check text-primary" aria-hidden="true"></i></div><div class="aurora-table-scroll"><table class="aurora-table align-middle mb-0"><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Request</th></tr></thead><tbody>{% for event in events %}<tr><td class="font-monospace text-xs">{{ event.occurred_at }}</td><td>{{ event.actor_user_id or 'System' }}</td><td class="font-monospace">{{ event.action }}</td><td>{{ event.entity_type }}<div class="small text-muted font-monospace">{{ event.entity_public_id or '—' }}</div></td><td class="small font-monospace">{{ event.request_id or '—' }}</td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted py-5">No audit events recorded.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="aurora-card">
+  <div class="aurora-card__header">
+    <div><div class="page-eyebrow">Recorded sequence</div><div class="aurora-card__heading">Operational events</div></div>
+    <span class="d-flex align-items-center gap-3">
+      <span class="aurora-field mb-0"><label class="visually-hidden" for="auditSearch">Search audit events</label><input class="aurora-input aurora-input--small" type="search" id="auditSearch" placeholder="Filter loaded events…" data-audit-filter></span>
+      <i class="ph ph-shield-check text-primary" aria-hidden="true"></i>
+    </span>
+  </div>
+  <div class="aurora-table-scroll" tabindex="0">
+    <table class="aurora-table--cards align-middle mb-0" id="auditTable">
+      <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Request</th></tr></thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td data-label="Time" class="font-monospace text-xs">{{ event.occurred_at }}</td>
+          <td data-label="Actor">
+            {% if event.actor_user_id and actors.get(event.actor_user_id) %}
+              <span>{{ actors.get(event.actor_user_id) }}</span>
+            {% elif event.actor_user_id %}
+              <span class="small font-monospace text-muted" title="Raw actor id">Actor #{{ event.actor_user_id }}</span>
+            {% else %}
+              <span class="text-muted">System</span>
+            {% endif %}
+          </td>
+          <td data-label="Action">
+            {{ event.action.replace('.', ' ').replace('_', ' ')|title }}
+            <details class="mt-1"><summary class="small text-muted">Raw value</summary><code class="small aurora-wrap-anywhere">{{ event.action }}</code></details>
+          </td>
+          <td data-label="Entity" class="aurora-wrap-anywhere">
+            {{ event.entity_type }}
+            {% if event.entity_public_id %}<details class="mt-1"><summary class="small text-muted">Record id</summary><code class="small aurora-wrap-anywhere">{{ event.entity_public_id }}</code></details>{% endif %}
+          </td>
+          <td data-label="Request" class="aurora-wrap-anywhere">
+            {% if event.request_id %}<details><summary class="small text-muted">Request id</summary><code class="small aurora-wrap-anywhere">{{ event.request_id }}</code></details>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-5">No audit events recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

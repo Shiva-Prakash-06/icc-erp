@@ -51,12 +51,15 @@ from app.models.production import (
 )
 from app.models.project import AcademicYear, Campus, Project
 from app.models.project import BuddyAssignment, BuddyLog
-from app.services.authorization import can_view_project, has_permission
+from app.services.authorization import can_view_project, has_any_permission, has_permission
 from app.services.audit import record_audit, record_sensitive_access
 from app.services.buddy import validate_buddy_assignment
 from app.services.drive import refresh_document_metadata, validate_drive_link
 from app.services.imports import STANDARD_IMPORTS, build_import_template, commit_batch, stage_supplied_source, stage_uploaded_source
 from app.services.lifecycle import closure_blockers, transition_project
+from app.services.people import create_and_enroll_participant
+from app.services.publication import decide_project_publication, submit_project_publication
+from app.services.vocabulary import resolve_vocabulary_value
 from app.services.notifications import queue_notification
 from app.services.operations import (
     change_checklist_status,
@@ -120,18 +123,36 @@ RESOURCE_MODELS = {
 
 
 PERMISSION_BY_RESOURCE = {
+    # Shared reference data has no project_id and therefore cannot be safely
+    # authorized with a generic project-manager check. Keep its generic API
+    # behind governance permission; project workflows consume it read-only
+    # through their dedicated, scoped routes.
+    "organizations": "manage_governance",
+    "partners": "manage_governance",
+    "campuses": "manage_governance",
+    "academic-years": "manage_governance",
+    "checklist-templates": "manage_governance",
+    "checklist-template-items": "manage_governance",
     "role-assignments": "manage_users",
     "vocabularies": "manage_governance",
     "checklist-templates": "manage_governance",
     "checklist-template-items": "manage_governance",
     "positions": "manage_governance",
     "governance-terms": "manage_governance",
-    "people": "manage_people",
+    # The generic collection endpoints below return/accept every column with
+    # no project scoping (Person has no project_id), so listing/reading/
+    # writing people through them is restricted to platform administrators.
+    # Project-scoped lookups must use the dedicated people-search endpoint
+    # instead, which returns only public_id/display_name/registration_number/
+    # membership_state. See PLAN.md "Additional release blockers" finding.
+    "people": "platform_admin",
     "applications": "manage_people",
     "imports": "manage_imports",
     "audit-events": "audit",
     "feedback-responses": "report",
     "budgets": "manage_projects",
+    "attendance": "manage_projects",
+    "checklist-items": "manage_projects",
     "operational-requests": "manage_projects",
     "report-definitions": "manage_governance",
     "report-jobs": "report",
@@ -203,10 +224,11 @@ def _serialize(item):
             continue
         value = getattr(item, column.name)
         if column.name == "drive_file_id" and getattr(item, "permission_classification", None) == "Restricted":
-            if not has_permission(g.user, "sensitive_links", sensitive=True):
+            project = _project_for_item(item)
+            if not has_permission(g.user, "sensitive_links", project, sensitive=True):
                 value = None
             elif value:
-                record_sensitive_access(item, request.headers.get("X-Access-Purpose", "Operational document access"), g.user, getattr(item, "project", None))
+                record_sensitive_access(item, request.headers.get("X-Access-Purpose", "Operational document access"), g.user, project)
         data[column.name] = _value(value)
     return data
 
@@ -241,14 +263,23 @@ def _authorize_item(item, permission="manage_projects"):
 PROTECTED_MUTATION_FIELDS = {
     "id", "public_id", "created_at", "updated_at", "approved_by_id", "approved_at",
     "waived_by_id", "committed_by_id", "committed_at", "decided_by_id", "decided_at",
+    "approver_id", "created_by_id", "submitted_by_id",
     "generated_by_id", "published_at", "password_hash", "password_reset_token_hash",
     "delivery_status", "drive_permission_metadata", "drive_validated_at", "drive_validation_status",
     "status", "decision", "approval_status", "publication_status", "cancellation_reason", "archived_at",
+    "publication_requested_by_id", "publication_approved_by_id", "withdrawn_at",
     # Waiver/closure fields must only change through the dedicated workflow
     # endpoints (change_task_status/change_checklist_status), which enforce the
     # "waive" permission and a mandatory justification comment. A raw PATCH must
     # never be able to silently waive a closure requirement.
     "waived", "waiver_reason", "mandatory_for_closure",
+    # Checklist evidence links must only change through
+    # checklist_item_attach_document/checklist_item_detach_document (or the
+    # matching HTML routes), which enforce the checklist item's own
+    # project scope and restricted-document masking. Before this was added,
+    # a generic PATCH/create with `checklist_status_public_id` could set
+    # this FK with no cross-project check at all.
+    "checklist_status_id",
 }
 
 
@@ -325,6 +356,36 @@ def _apply_payload(item, payload, *, creating=False):
     return item
 
 
+CONTROLLED_PAYLOAD_FIELDS = {
+    Project: (("category", "project_category", "category_other"), ("project_type", "project_type", "project_type_other")),
+    ProjectSession: (("session_type", "session_type", "session_type_other"),),
+    TeamAssignment: (("role_label", "assignment_role", "role_label_other"),),
+    ContributionRecord: (("activity_type", "contribution_activity", "activity_type_other"),),
+    DocumentRecord: (("category", "document_category", "category_other"),),
+    BudgetLine: (("category", "budget_category", "category_other"),),
+    OperationalRequest: (("request_type", "operational_request_type", "request_type_other"),),
+}
+
+
+def _validate_controlled_payload(model, payload, existing=None):
+    payload = dict(payload)
+    for field, domain, other_field in CONTROLLED_PAYLOAD_FIELDS.get(model, ()):
+        other_detail = payload.pop(other_field, None)
+        if field not in payload:
+            if other_detail is not None:
+                raise ValueError(f"{other_field} requires {field} to be Other.")
+            continue
+        if field == "role_label" and not (payload.get(field) or "").strip():
+            continue
+        payload[field] = resolve_vocabulary_value(
+            payload[field],
+            other_detail,
+            domain=domain,
+            legacy_value=getattr(existing, field, None),
+        )
+    return payload
+
+
 @api_v1_bp.get("/meta")
 def meta():
     return {
@@ -368,7 +429,7 @@ def list_resource(resource):
     if not model:
         return _problem(404, "Unknown resource")
     required_permission = PERMISSION_BY_RESOURCE.get(resource)
-    if required_permission and not has_permission(g.user, required_permission):
+    if required_permission and not has_any_permission(g.user, required_permission):
         return _problem(403, "Access denied")
     try:
         limit = min(max(int(request.args.get("limit", 50)), 1), 200)
@@ -383,7 +444,13 @@ def list_resource(resource):
         if key in request.args:
             query = query.filter(getattr(model, key) == request.args[key])
     visible_project_ids = [
-        project.id for project in Project.query.order_by(Project.id).all() if can_view_project(g.user, project)
+        project.id
+        for project in Project.query.order_by(Project.id).all()
+        if (
+            has_permission(g.user, required_permission, project)
+            if required_permission
+            else can_view_project(g.user, project)
+        )
     ]
     if hasattr(model, "project_id"):
         query = query.filter(model.project_id.in_(visible_project_ids or [-1]))
@@ -422,16 +489,22 @@ def create_resource(resource):
     if resource in READ_ONLY_RESOURCES or model is FeedbackResponse:
         return _problem(405, "Resource is not created through this endpoint")
     permission = PERMISSION_BY_RESOURCE.get(resource, "manage_projects")
-    if not has_permission(g.user, permission):
+    if not has_any_permission(g.user, permission):
         return _problem(403, "Access denied")
     payload = request.get_json(silent=True) or {}
     buddy_override = _boolean_value(payload.pop("overlap_override", False)) if model is BuddyAssignment else False
     warnings = []
     try:
+        payload = _validate_controlled_payload(model, payload)
         item = _apply_payload(model(), payload, creating=True)
         if isinstance(item, Project):
             item.status = "Draft"
             item.version = 1
+        if isinstance(item, OperationalRequest):
+            item.status = "Draft"
+            item.created_by_id = g.user.id
+            if item.owner_person_id is None:
+                item.owner_person_id = g.user.person_id
         project = _project_for_item(item)
         if project and not has_permission(g.user, permission, project):
             return _problem(403, "Access denied")
@@ -477,10 +550,12 @@ def get_resource(resource, public_id):
     if not item:
         return _problem(404, "Resource not found")
     permission = PERMISSION_BY_RESOURCE.get(resource)
-    if permission and not has_permission(g.user, permission):
-        return _problem(403, "Access denied")
     project = _project_for_item(item)
-    if project and not can_view_project(g.user, project):
+    if project and not (
+        has_permission(g.user, permission, project) if permission else can_view_project(g.user, project)
+    ):
+        return _problem(403, "Access denied")
+    if permission and not project and not has_permission(g.user, permission):
         return _problem(403, "Access denied")
     if isinstance(item, Notification) and item.user_id != g.user.id:
         return _problem(403, "Access denied")
@@ -499,6 +574,7 @@ def patch_resource(resource, public_id):
         return _problem(404, "Unknown resource")
     if resource in READ_ONLY_RESOURCES or model in {
         FeedbackResponse, DocumentRecord, RecruitmentApplication, SessionAttendance,
+        WorkTask, ChecklistItemStatus, OperationalRequest,
     }:
         return _problem(405, "Use the resource-specific workflow endpoint")
     item = model.query.filter_by(public_id=public_id).first() if hasattr(model, "public_id") else None
@@ -513,7 +589,7 @@ def patch_resource(resource, public_id):
         # Project has its own dedicated PATCH route (update_project) which
         # Flask/Werkzeug always prefers over this generic one, so `item` is
         # never a Project here.
-        _apply_payload(item, payload)
+        _apply_payload(item, _validate_controlled_payload(model, payload, existing=item))
         record_audit(f"{resource}.update", item, before=before, after=_serialize(item), actor=g.user)
         db.session.commit()
     except RuntimeError as error:
@@ -603,6 +679,132 @@ def project_transition(public_id):
     return {"data": _serialize(project)}
 
 
+@api_v1_bp.post("/projects/<string:public_id>/publication/submit")
+def project_publication_submit(public_id):
+    project = Project.query.filter_by(public_id=public_id).first()
+    if not project:
+        return _problem(404, "Project not found")
+    payload = request.get_json(silent=True) or {}
+    try:
+        submit_project_publication(project, g.user, expected_version=payload.get("version"))
+    except PermissionError as error:
+        return _problem(403, "Access denied", str(error))
+    except ValueError as error:
+        return _problem(409 if "Concurrent" in str(error) else 422, "Publication request rejected", str(error))
+    return {"data": _serialize(project)}
+
+
+@api_v1_bp.post("/projects/<string:public_id>/publication/decision")
+def project_publication_decision(public_id):
+    project = Project.query.filter_by(public_id=public_id).first()
+    if not project:
+        return _problem(404, "Project not found")
+    payload = request.get_json(silent=True) or {}
+    try:
+        decide_project_publication(project, payload.get("decision"), g.user, expected_version=payload.get("version"), reason=payload.get("reason"))
+    except PermissionError as error:
+        return _problem(403, "Access denied", str(error))
+    except ValueError as error:
+        return _problem(409 if "Concurrent" in str(error) else 422, "Publication decision rejected", str(error))
+    return {"data": _serialize(project)}
+
+
+@api_v1_bp.get("/projects/<string:public_id>/people-search")
+def project_people_search(public_id):
+    """Scoped alternative to the platform-admin-only /people collection --
+    returns only the fields a project manager needs to enroll or pair
+    someone: public id, display name, optional registration number, and
+    whether they're already an active team member of this project."""
+    project = Project.query.filter_by(public_id=public_id).first()
+    if not project:
+        return _problem(404, "Project not found")
+    if not (has_permission(g.user, "manage_projects", project) or has_permission(g.user, "manage_people", project)):
+        return _problem(403, "Access denied")
+    term = (request.args.get("q") or "").strip()
+    if len(term) < 2:
+        return {"data": []}
+    like = f"%{term}%"
+    matches = (
+        Person.query.filter(
+            Person.is_archived.is_(False),
+            db.or_(
+                Person.first_name.ilike(like),
+                Person.last_name.ilike(like),
+                Person.preferred_name.ilike(like),
+                Person.primary_email.ilike(like),
+                Person.registration_number.ilike(like),
+            ),
+        )
+        .order_by(Person.first_name, Person.last_name)
+        .limit(20)
+        .all()
+    )
+    member_person_ids = {
+        row.person_id
+        for row in TeamAssignment.query.filter_by(project_id=project.id, status="Active").with_entities(TeamAssignment.person_id).all()
+    }
+    return {
+        "data": [
+            {
+                "public_id": person.public_id,
+                "display_name": person.display_name,
+                "registration_number": person.registration_number,
+                "membership_state": "Active member" if person.id in member_person_ids else "Not a member",
+            }
+            for person in matches
+        ]
+    }
+
+
+@api_v1_bp.post("/projects/<string:public_id>/participants")
+def create_project_participant(public_id):
+    """Create or find a person and enroll them atomically without requiring
+    a registration number. The project version makes concurrent roster edits
+    explicit instead of silently overwriting each other."""
+    project = Project.query.filter_by(public_id=public_id).first()
+    if not project:
+        return _problem(404, "Project not found")
+    if not (has_permission(g.user, "manage_projects", project) or has_permission(g.user, "manage_people", project)):
+        return _problem(403, "Access denied")
+    payload = request.get_json(silent=True) or {}
+    if payload.get("version") is None:
+        return _problem(422, "Validation failed", "Project version is required.")
+    try:
+        role_label = payload.get("role_label")
+        if role_label:
+            role_label = resolve_vocabulary_value(
+                role_label,
+                payload.get("role_label_other"),
+                domain="assignment_role",
+            )
+        person, assignment, created = create_and_enroll_participant(
+            project,
+            g.user,
+            first_name=payload.get("first_name"),
+            last_name=payload.get("last_name"),
+            email=payload.get("email"),
+            registration_number=payload.get("registration_number"),
+            assignment_type=payload.get("assignment_type") or "Project Team",
+            role_label=role_label,
+            expected_project_version=payload.get("version"),
+        )
+    except (ValueError, TypeError) as error:
+        db.session.rollback()
+        return _problem(409 if "Concurrent" in str(error) else 422, "Participant enrollment rejected", str(error))
+    return {
+        "data": {
+            "person": {
+                "public_id": person.public_id,
+                "display_name": person.display_name,
+                "registration_number": person.registration_number,
+            },
+            "assignment": {"public_id": assignment.public_id, "status": assignment.status},
+            "person_created": created,
+            "project_version": project.version,
+        }
+    }, 201
+
+
 @api_v1_bp.get("/projects/<string:public_id>/components")
 def project_components(public_id):
     project = Project.query.filter_by(public_id=public_id).first()
@@ -615,6 +817,8 @@ def project_components(public_id):
 
 @api_v1_bp.post("/documents/validate-drive-link")
 def validate_document_link():
+    if not has_any_permission(g.user, "manage_projects"):
+        return _problem(403, "Access denied")
     payload = request.get_json(silent=True) or {}
     result = validate_drive_link(payload.get("url"), payload.get("classification", "Internal"))
     return ({"data": result}, 200 if result.get("valid") else 422)
@@ -787,6 +991,63 @@ def checklist_item_status(public_id):
     return {"data": _serialize(item)}
 
 
+def _checklist_item_and_project_for_api(public_id):
+    item = ChecklistItemStatus.query.filter_by(public_id=public_id).first()
+    if not item:
+        return None, None
+    return item, item.checklist.project
+
+
+def _can_edit_checklist_item_for_api(g_user, item, project):
+    owner_update = g_user.person_id and item.owner_person_id == g_user.person_id and has_permission(g_user, "contribute", project)
+    return bool(owner_update or has_permission(g_user, "manage_projects", project))
+
+
+@api_v1_bp.post("/checklist-items/<string:public_id>/documents")
+def checklist_item_attach_document(public_id):
+    """JSON twin of erp.attach_checklist_document. Generic PATCH stays 405
+    for both ChecklistItemStatus and DocumentRecord, so this workflow
+    endpoint is the JSON path for linking evidence."""
+    item, project = _checklist_item_and_project_for_api(public_id)
+    if not item:
+        return _problem(404, "Checklist requirement not found")
+    if not _can_edit_checklist_item_for_api(g.user, item, project):
+        return _problem(403, "Access denied")
+    payload = request.get_json(silent=True) or {}
+    document_public_id = payload.get("document_public_id")
+    if not document_public_id:
+        return _problem(422, "document_public_id is required")
+    document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id).first()
+    if not document:
+        return _problem(404, "Document not found")
+    if document.permission_classification == "Restricted" and not has_permission(g.user, "sensitive_links", project, sensitive=True):
+        return _problem(404, "Document not found")
+    if document.checklist_status_id is not None and document.checklist_status_id != item.id and not has_permission(g.user, "manage_projects", project):
+        return _problem(422, "Document is linked to another requirement")
+    document.checklist_status_id = item.id
+    record_audit("document.link_checklist", document, after={"checklist_status": item.public_id, "project": project.public_id}, actor=g.user)
+    db.session.commit()
+    return {"data": _serialize(document)}
+
+
+@api_v1_bp.delete("/checklist-items/<string:public_id>/documents/<string:document_public_id>")
+def checklist_item_detach_document(public_id, document_public_id):
+    """JSON twin of erp.detach_checklist_document. Never deletes the
+    document -- only nulls the FK."""
+    item, project = _checklist_item_and_project_for_api(public_id)
+    if not item:
+        return _problem(404, "Checklist requirement not found")
+    if not _can_edit_checklist_item_for_api(g.user, item, project):
+        return _problem(403, "Access denied")
+    document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id, checklist_status_id=item.id).first()
+    if not document:
+        return _problem(404, "Document not found")
+    document.checklist_status_id = None
+    record_audit("document.unlink_checklist", document, before={"checklist_status": item.public_id}, after={"checklist_status": None}, actor=g.user)
+    db.session.commit()
+    return {"data": _serialize(document)}
+
+
 @api_v1_bp.post("/contributions/<string:public_id>/decision")
 def contribution_decision(public_id):
     contribution = ContributionRecord.query.filter_by(public_id=public_id).first()
@@ -808,12 +1069,8 @@ def operational_request_transition(public_id):
     operational_request = OperationalRequest.query.filter_by(public_id=public_id).first()
     if not operational_request:
         return _problem(404, "Operational request not found")
-    project = db.session.get(Project, operational_request.project_id)
     payload = request.get_json(silent=True) or {}
     target = payload.get("status")
-    permission = "approve" if target in {"Approved", "Rejected", "Completed", "Cancelled"} else "manage_projects"
-    if not has_permission(g.user, permission, project):
-        return _problem(403, "Access denied")
     try:
         decide_operational_request(
             operational_request,
@@ -823,6 +1080,8 @@ def operational_request_transition(public_id):
             reason=payload.get("reason"),
             official_reference=payload.get("official_reference"),
         )
+    except PermissionError as error:
+        return _problem(403, "Access denied", str(error))
     except ValueError as error:
         return _problem(409 if "Concurrent" in str(error) else 422, "Operational request transition rejected", str(error))
     return {"data": _serialize(operational_request)}
@@ -1043,6 +1302,9 @@ def openapi_document():
     paths.update({
         "/api/v1/me": {"get": {"summary": "Return the signed-in account and personal profile", "responses": {"200": {"description": "Personal profile"}}}},
         "/api/v1/projects/{public_id}/transition": {"post": {"summary": "Transition a project", "responses": {"200": {"description": "Transition applied"}, "422": {"description": "Lifecycle rule rejected"}}}},
+        "/api/v1/projects/{public_id}/publication/submit": {"post": {"summary": "Request public disclosure review", "responses": {"200": {"description": "Review requested"}, "409": {"description": "Optimistic concurrency conflict"}}}},
+        "/api/v1/projects/{public_id}/publication/decision": {"post": {"summary": "Publish, reject, or withdraw public disclosure", "responses": {"200": {"description": "Decision applied"}, "403": {"description": "Maker/checker or scope rejected"}}}},
+        "/api/v1/projects/{public_id}/participants": {"post": {"summary": "Create or find and enroll a participant without requiring a registration number", "responses": {"201": {"description": "Participant enrolled"}, "409": {"description": "Optimistic concurrency conflict"}, "422": {"description": "Identity or input validation failed"}}}},
         "/api/v1/tasks/{public_id}/status": {"post": {"summary": "Apply a task workflow decision", "responses": {"200": {"description": "Status applied"}, "409": {"description": "Optimistic concurrency conflict"}}}},
         "/api/v1/checklist-items/{public_id}/status": {"post": {"summary": "Apply a checklist workflow decision", "responses": {"200": {"description": "Status applied"}, "409": {"description": "Optimistic concurrency conflict"}}}},
         "/api/v1/documents/{public_id}/decision": {"post": {"summary": "Approve, reject, or waive document metadata", "responses": {"200": {"description": "Decision applied"}}}},

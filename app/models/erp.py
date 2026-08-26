@@ -28,6 +28,24 @@ class PublicIdMixin:
     public_id = db.Column(db.String(36), unique=True, nullable=False, default=new_uuid)
 
 
+class LegacyMigrationReconciliation(db.Model):
+    """Durable, non-domain evidence for pre-consolidation row migration."""
+    __tablename__ = "legacy_migration_reconciliation"
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_table = db.Column(db.String(80), nullable=False)
+    source_id = db.Column(db.String(120), nullable=False)
+    source_fingerprint = db.Column(db.String(64), nullable=False)
+    target_table = db.Column(db.String(80), nullable=False)
+    target_id = db.Column(db.Integer, nullable=False)
+    metadata_json = db.Column(db.JSON, nullable=False, default=dict)
+    reconciled_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("source_table", "source_fingerprint", name="uq_legacy_reconciliation_fingerprint"),
+    )
+
+
 class OperatingUnit(PublicIdMixin, TimestampMixin, db.Model):
     __tablename__ = "operating_units"
 
@@ -136,6 +154,31 @@ class ProjectComponent(PublicIdMixin, TimestampMixin, db.Model):
     __table_args__ = (db.UniqueConstraint("project_id", "code", name="uq_component_project_code"),)
 
 
+class ItineraryRevision(PublicIdMixin, TimestampMixin, db.Model):
+    """One imported revision of a project's day-by-day itinerary.
+
+    Re-importing an itinerary file creates a new revision rather than
+    mutating the previous one; only one revision per project is `is_active`
+    at a time. Sessions carry a `source_key` that is stable across revisions
+    so a re-import can match, update, or deactivate existing `ProjectSession`
+    rows instead of duplicating them.
+    """
+    __tablename__ = "itinerary_revisions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    import_batch_id = db.Column(db.Integer, db.ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True)
+    source_document = db.Column(db.String(500), nullable=False)
+    source_sha256 = db.Column(db.String(64), nullable=False)
+    parser_version = db.Column(db.String(30), nullable=False, default="1")
+    inferred_metadata = db.Column(db.JSON, nullable=False, default=dict)
+    warnings = db.Column(db.JSON, nullable=False, default=list)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    project = db.relationship("Project", backref=db.backref("itinerary_revisions", cascade="all, delete-orphan"))
+
+
 class ProjectSession(PublicIdMixin, TimestampMixin, db.Model):
     __tablename__ = "project_sessions"
 
@@ -152,8 +195,16 @@ class ProjectSession(PublicIdMixin, TimestampMixin, db.Model):
     capacity = db.Column(db.Integer, nullable=True)
     programme_sequence = db.Column(db.Text, nullable=True)
     participant_group = db.Column(db.String(120), nullable=True)
+    itinerary_revision_id = db.Column(
+        db.Integer, db.ForeignKey("itinerary_revisions.id", ondelete="SET NULL"), nullable=True
+    )
+    source_key = db.Column(db.String(120), nullable=True)
+    is_all_day = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    import_batch_id = db.Column(db.Integer, db.ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True)
 
     project = db.relationship("Project", backref=db.backref("sessions", cascade="all, delete-orphan"))
+    itinerary_revision = db.relationship("ItineraryRevision", backref="sessions")
     __table_args__ = (
         db.UniqueConstraint("project_id", "code", name="uq_session_project_code"),
         db.CheckConstraint("ends_at >= starts_at", name="ck_session_date_order"),
@@ -257,6 +308,20 @@ class ChecklistItemStatus(PublicIdMixin, TimestampMixin, db.Model):
 
     checklist = db.relationship("ChecklistInstance", backref=db.backref("item_statuses", cascade="all, delete-orphan"))
     template_item = db.relationship("ChecklistTemplateItem")
+    # DocumentRecord.checklist_status_id has existed since the baseline
+    # migration but was never read or written anywhere, and had no
+    # relationship defined. This wires it up so a checklist requirement can
+    # link one or more repository documents as evidence. No migration
+    # needed. Deliberately no cascade="all, delete-orphan": ChecklistInstance
+    # already cascades item_statuses on delete, and delete-orphan here would
+    # destroy repository documents (not just unlink them) when a project is
+    # deleted. See in-the-operation-checklists-crystalline-dongarra.md Step 3.
+    evidence_documents = db.relationship(
+        "DocumentRecord",
+        foreign_keys="DocumentRecord.checklist_status_id",
+        backref=db.backref("checklist_status", foreign_keys="DocumentRecord.checklist_status_id"),
+        order_by="DocumentRecord.title",
+    )
     __table_args__ = (
         db.UniqueConstraint("checklist_instance_id", "template_item_id", name="uq_checklist_status_item"),
     )
@@ -334,6 +399,8 @@ class DocumentRecord(PublicIdMixin, TimestampMixin, db.Model):
     waived_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     rejection_reason = db.Column(db.Text, nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
+    checksum_sha256 = db.Column(db.String(64), nullable=True)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     project = db.relationship("Project", backref=db.backref("document_records", cascade="all, delete-orphan"))
 
@@ -376,6 +443,8 @@ class OperationalRequest(PublicIdMixin, TimestampMixin, db.Model):
     status = db.Column(db.String(30), nullable=False, default="Draft")
     owner_person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     approver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    submitted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     official_reference = db.Column(db.String(120), nullable=True)
     currency = db.Column(db.String(3), nullable=False, default="INR")
     decision_comment = db.Column(db.Text, nullable=True)
@@ -439,6 +508,10 @@ class ImportBatch(PublicIdMixin, TimestampMixin, db.Model):
     committed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     importer_version = db.Column(db.String(30), nullable=False, default="2")
     mapping_version = db.Column(db.String(30), nullable=False, default="1")
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    source_document_id = db.Column(db.Integer, db.ForeignKey("document_records.id", ondelete="SET NULL"), nullable=True)
+
+    project = db.relationship("Project", backref="import_batches")
 
 
 class ImportRow(PublicIdMixin, TimestampMixin, db.Model):
@@ -491,3 +564,32 @@ class ReportSnapshot(PublicIdMixin, TimestampMixin, db.Model):
     approved_at = db.Column(db.DateTime(timezone=True), nullable=True)
     publication_status = db.Column(db.String(30), nullable=False, default="Unpublished")
     published_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+
+class ReimbursementEntry(PublicIdMixin, TimestampMixin, db.Model):
+    """A lightweight, project-scoped expense line.
+
+    Deliberately not a governance/payment-ledger workflow: `status` is free
+    text carried through from import or set by the coordinator, with no
+    approval routing. `S. No` is never stored -- ordering is derived from
+    `date` then `id` at display/export time.
+    """
+    __tablename__ = "reimbursement_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    party_name = db.Column(db.String(255), nullable=False)
+    bill_number = db.Column(db.String(120), nullable=True)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    currency = db.Column(db.String(3), nullable=False, default="INR")
+    particular = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(30), nullable=False, default="Pending")
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    source_import_row_id = db.Column(db.Integer, db.ForeignKey("import_rows.id", ondelete="SET NULL"), nullable=True)
+
+    project = db.relationship("Project", backref=db.backref("reimbursement_entries", cascade="all, delete-orphan"))
+
+    __table_args__ = (
+        db.CheckConstraint("amount >= 0", name="ck_reimbursement_amount_nonnegative"),
+    )

@@ -1,9 +1,11 @@
 # Production Acceptance Record
 
-Release identifier:  
-Container digest:  
-Migration revision: `9b70b9a2c001`  
-Release date:  
+Release identifier:
+
+Release artifact SHA-256 or container digest:
+
+Migration revision: _(fill in from `flask --app run:app db heads` against the released commit -- do not carry forward a value from a prior release record)_
+Release date:
 
 | Gate | Required evidence | Result/reference | Blocking |
 |---|---|---|---:|

@@ -65,6 +65,15 @@ class Project(db.Model):
     cancellation_reason = db.Column(db.Text, nullable=True)
     closure_summary = db.Column(db.Text, nullable=True)
     archived_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    # Publication is deliberately separate from workflow `status`: a project
+    # can be Completed and still never have been reviewed for public
+    # disclosure. Nothing is grandfathered -- every row defaults Private.
+    # See PLAN.md "Additional release blockers" / publication gate.
+    publication_status = db.Column(db.String(20), default='Private', nullable=False)
+    publication_requested_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    publication_approved_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    published_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    withdrawn_at = db.Column(db.DateTime(timezone=True), nullable=True)
     version = db.Column(db.Integer, default=1, nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
@@ -80,6 +89,8 @@ class Project(db.Model):
     campus = db.relationship('Campus', back_populates='projects')
     program_type = db.relationship('ProgramType', back_populates='projects')
     academic_year = db.relationship('AcademicYear', back_populates='projects')
+    operating_unit = db.relationship('OperatingUnit', foreign_keys=[operating_unit_id])
+    wing = db.relationship('Wing', foreign_keys=[wing_id])
     buddy_assignments = db.relationship('BuddyAssignment', back_populates='project', cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -113,6 +124,7 @@ class BuddyAssignment(db.Model):
     overlap_override_reason = db.Column(db.Text, nullable=True)
     overlap_approved_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL', name='fk_buddy_overlap_approver'), nullable=True)
     version = db.Column(db.Integer, default=1, nullable=False)
+    source_import_row_id = db.Column(db.Integer, db.ForeignKey('import_rows.id', ondelete='SET NULL'), nullable=True)
 
     __table_args__ = (
         db.CheckConstraint('end_date >= start_date', name='ck_buddy_assignment_dates'),

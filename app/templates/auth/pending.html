@@ -2,6 +2,7 @@
 {% set hide_sidebar = True %}
 
 {% block title %}Pending Approval - OIA Project Intelligence{% endblock %}
+{% block auth_stage_class %} auth-stage--compact{% endblock %}
 
 {% block auth_content %}
 <div class="auth-card mx-auto text-center">
@@ -9,19 +10,19 @@
         <i class="ph ph-clock-counter-clockwise display-icon-xl"></i>
     </div>
     
-    <h3 class="auth-title">Registration Pending</h3>
+    <h1 class="auth-title">Registration Pending</h1>
     <p class="text-light mt-3">
         Thank you for registering, <strong>{{ g.user.username }}</strong>!
     </p>
     <p class="text-muted small">
-        Your account is currently undergoing evaluation. A Faculty or ICC Core Committee administrator must approve your account and assign your official platform role before you can access dashboards.
+        Your account is currently undergoing evaluation. A Faculty or ICC Core Committee administrator must approve your account and assign your official platform role before you can access dashboards. There's nothing further to do while you wait — you'll be able to sign in as soon as it's approved.
     </p>
-    
+
     <hr class="my-4 border-token">
-    
+
     <div class="d-flex flex-column gap-2">
-        <a href="{{ url_for('auth.login') }}" class="aurora-button--primary">Check Status (Refresh)</a>
-        <a href="{{ url_for('auth.logout') }}" class="aurora-button--secondary">Log Out</a>
+        <a href="{{ url_for('auth.login') }}" class="aurora-button--primary">Check approval status</a>
+        <a href="{{ url_for('auth.logout') }}" class="aurora-button--secondary">Log out</a>
     </div>
 </div>
 {% endblock %}

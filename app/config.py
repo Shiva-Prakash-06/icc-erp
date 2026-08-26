@@ -77,6 +77,7 @@ class BaseConfig:
     SMTP_FROM_ADDRESS = os.getenv("SMTP_FROM_ADDRESS")
     SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     NOTIFICATION_EMAIL_MODE = os.getenv("NOTIFICATION_EMAIL_MODE", "disabled")
+    PASSWORD_RESET_MIN_RESPONSE_MS = int(os.getenv("PASSWORD_RESET_MIN_RESPONSE_MS", "150"))
     BREACHED_PASSWORD_CHECK_MODE = os.getenv("BREACHED_PASSWORD_CHECK_MODE", "disabled")
     OPERATIONAL_RETENTION_DAYS = int(os.getenv("OPERATIONAL_RETENTION_DAYS", "2555"))
     AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "2555"))
@@ -84,6 +85,11 @@ class BaseConfig:
     OFFLINE_SNAPSHOT_TTL_SECONDS = int(os.getenv("OFFLINE_SNAPSHOT_TTL_SECONDS", "28800"))
     DEMONSTRATOR = os.getenv("DEMONSTRATOR", "true").lower() == "true"
     SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
+    GOOGLE_DRIVE_REPOSITORY_ROOT_ID = os.getenv("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
+    AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD = os.getenv("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD")
+    UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
+    UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
+    UPLOAD_MAX_TOTAL_BYTES = int(os.getenv("UPLOAD_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)))
 
 
 class DevelopmentConfig(BaseConfig):
@@ -108,11 +114,18 @@ class ProductionConfig(BaseConfig):
     @classmethod
     def validate(cls) -> None:
         missing = []
+        migration_only = os.getenv("MIGRATION_ONLY", "false").lower() == "true"
         if not os.getenv("SECRET_KEY"):
             missing.append("SECRET_KEY")
         if not os.getenv("DATABASE_URL"):
             missing.append("DATABASE_URL")
-        if os.getenv("MIGRATION_ONLY", "false").lower() != "true":
+        # An in-memory limiter only rate-limits within a single process, so
+        # it silently stops enforcing anything once Cloud Run scales past one
+        # instance. Production must use a shared store (managed Redis).
+        # See PLAN.md "Additional release blockers" finding.
+        if not migration_only and os.getenv("RATELIMIT_STORAGE_URI", "memory://").startswith("memory://"):
+            missing.append("RATELIMIT_STORAGE_URI (must not be memory:// in production)")
+        if not migration_only:
             if os.getenv("DRIVE_VALIDATION_MODE", "live") != "live":
                 missing.append("DRIVE_VALIDATION_MODE=live")
             if not (os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")):
@@ -121,6 +134,8 @@ class ProductionConfig(BaseConfig):
                 missing.append("INTERNAL_JOB_AUDIENCE")
             if not os.getenv("SCHEDULER_SERVICE_ACCOUNT"):
                 missing.append("SCHEDULER_SERVICE_ACCOUNT")
+            if not os.getenv("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD"):
+                missing.append("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD")
             for name in ("TASKS_SERVICE_ACCOUNT", "GCP_PROJECT_ID", "CLOUD_TASKS_QUEUE", "INTERNAL_JOB_BASE_URL"):
                 if not os.getenv(name):
                     missing.append(name)

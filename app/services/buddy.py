@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.database import db
 from app.models.project import BuddyAssignment
 from app.models.user import User
 
@@ -8,7 +9,7 @@ def _resolve_person_id(user_id, person_id):
     if person_id:
         return person_id
     if user_id:
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         return getattr(user, "person_id", None)
     return None
 

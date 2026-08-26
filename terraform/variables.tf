@@ -16,7 +16,22 @@ variable "environment" {
 }
 
 variable "image" {
-  type = string
+  type        = string
+  description = "Immutable Artifact Registry image reference including @sha256:<64 hex characters>."
+  validation {
+    condition     = can(regex("@sha256:[0-9a-fA-F]{64}$", var.image))
+    error_message = "image must be an immutable registry reference ending in @sha256:<64 hexadecimal characters>."
+  }
+}
+
+variable "redis_memory_size_gb" {
+  type        = number
+  default     = 1
+  description = "Memorystore capacity for the shared application rate limiter."
+  validation {
+    condition     = var.redis_memory_size_gb >= 1
+    error_message = "redis_memory_size_gb must be at least 1."
+  }
 }
 
 variable "database_tier" {

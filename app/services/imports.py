@@ -35,23 +35,41 @@ from app.models.erp import (
 )
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.production import ControlledVocabulary, Position, ReportDefinition
+from app.services.vocabulary import DEFAULT_VOCABULARY
 from app.services.audit import record_audit
 from app.services.drive import validate_drive_link
 
 
 IST = ZoneInfo("Asia/Kolkata")
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _resolve_source_path(filename: str) -> Path:
+    direct = ROOT / filename
+    if direct.exists():
+        return direct
+    ref = ROOT / "references" / filename
+    if ref.exists():
+        return ref
+    return direct
+
+
 SOURCE_PATHS = {
-    "events_summary": ROOT / "2026 ICC EVENTS REPORT SUMMARY.xlsx",
-    "coffee_meet": ROOT / "COFFEE MEET & GREET",
-    "summer_school": ROOT / "_Summer School- Check List.xlsx",
+    "events_summary": _resolve_source_path("2026 ICC EVENTS REPORT SUMMARY.xlsx"),
+    "coffee_meet": _resolve_source_path("COFFEE MEET & GREET"),
+    "summer_school": _resolve_source_path("_Summer School- Check List.xlsx"),
 }
 IMPORT_SCHEMA_VERSION = 2
 
 STANDARD_IMPORTS = {
     "people": (["registration_number", "first_name", "last_name", "email", "phone", "campus_code", "person_type", "nationality"], ["first_name"]),
     "icc_roster": (["registration_number", "email", "wing_code", "role_label", "academic_year"], ["wing_code", "role_label", "academic_year"]),
-    "projects": (["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date", "project_type", "category", "unit_code", "wing_code"], ["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date"]),
+    # Project rows are the source of truth for a single-session event/program.
+    # The importer derives the MAIN ProjectSession from these values, avoiding
+    # duplicate entry of title, dates, times, venue, and audience on a sessions
+    # sheet. The first eleven fields retain backward compatibility with prior
+    # project templates; the remaining fields are optional enrichment.
+    "projects": (["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date", "project_type", "category", "unit_code", "wing_code", "venue", "target_audience", "start_time", "end_time", "status", "actual_reach", "closure_summary"], ["code", "title", "campus_code", "program_type", "academic_year", "start_date", "end_date"]),
     "participants": (["project_code", "registration_number", "email", "participant_type"], ["project_code", "participant_type"]),
     "attendance": (["project_code", "session_code", "registration_number", "email", "status"], ["project_code", "session_code", "status"]),
     "checklists": (["project_code", "template_code", "item_code", "title", "category", "mandatory", "owner"], ["project_code", "template_code", "item_code", "title"]),
@@ -417,6 +435,7 @@ def _reference_data():
         "task_status": ["Not Started", "In Progress", "Blocked", "Submitted", "Approved", "Rejected", "Waived", "Completed"],
         "document_classification": ["Public", "Internal", "Restricted"],
         "attendance_status": ["Present", "Absent", "Excused", "Late"],
+        **DEFAULT_VOCABULARY,
     }
     for domain, values in vocabulary.items():
         for sort_order, label in enumerate(values):
@@ -455,6 +474,26 @@ def _parse_time_range(text):
             hour = 0
         parsed.append(time(hour, minute))
     return parsed if len(parsed) == 2 else [time(9), time(17)]
+
+
+def _parse_single_time(value, fallback):
+    if isinstance(value, datetime):
+        return value.time()
+    if isinstance(value, time):
+        return value
+    match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", str(value or "").lower())
+    if not match:
+        return fallback
+    hour, minute, marker = match.groups()
+    hour, minute = int(hour), int(minute or 0)
+    if marker == "pm" and hour < 12:
+        hour += 12
+    if marker == "am" and hour == 12:
+        hour = 0
+    try:
+        return time(hour, minute)
+    except ValueError:
+        return fallback
 
 
 def _code(prefix, sequence):
@@ -500,8 +539,30 @@ def _commit_standard_rows(batch, valid_rows, defaults):
             if not all((target_campus, target_type, target_year, unit)):
                 raise ValueError(f"Project row {row.source_row} references unknown controlled data.")
             if not target:
-                target = Project(code=data["code"], title=data["title"], campus_id=target_campus.id, program_type_id=target_type.id, academic_year_id=target_year.id, operating_unit_id=unit.id, wing_id=getattr(wing, "id", None), project_type=data.get("project_type") or "Operational", category=data.get("category") or "Operational", status="Draft", start_date=_parse_date(data["start_date"]), end_date=_parse_date(data["end_date"]))
+                start_date = _parse_date(data["start_date"])
+                end_date = _parse_date(data["end_date"])
+                target = Project(
+                    code=data["code"], title=data["title"], campus_id=target_campus.id,
+                    program_type_id=target_type.id, academic_year_id=target_year.id,
+                    operating_unit_id=unit.id, wing_id=getattr(wing, "id", None),
+                    project_type=data.get("project_type") or "Operational",
+                    category=data.get("category") or "Operational",
+                    status=data.get("status") or "Draft", start_date=start_date, end_date=end_date,
+                    venue=data.get("venue") or None, target_audience=data.get("target_audience") or None,
+                    actual_reach=data.get("actual_reach") or None,
+                    closure_summary=data.get("closure_summary") or None,
+                )
                 db.session.add(target)
+                db.session.flush()
+                start_time = _parse_single_time(data.get("start_time"), time(9))
+                end_time = _parse_single_time(data.get("end_time"), time(17))
+                db.session.add(ProjectSession(
+                    project_id=target.id, code="MAIN", title=target.title,
+                    session_type="Event" if str(data.get("program_type")).upper() == "ICC" else "Program",
+                    starts_at=datetime.combine(start_date, start_time, tzinfo=IST),
+                    ends_at=datetime.combine(end_date, end_time, tzinfo=IST),
+                    venue=target.venue, participant_group=target.target_audience,
+                ))
         elif batch.import_type == "icc_roster":
             person = _person_for_import(data)
             target_year = AcademicYear.query.filter_by(name=data["academic_year"]).first()

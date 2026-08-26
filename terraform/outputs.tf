@@ -25,3 +25,7 @@ output "import_commit_job_name" {
 output "artifact_repository" {
   value = google_artifact_registry_repository.application.name
 }
+
+output "ratelimit_storage_secret" {
+  value = google_secret_manager_secret.ratelimit_storage_uri.secret_id
+}

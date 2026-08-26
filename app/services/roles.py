@@ -23,8 +23,6 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
     role_code = LEGACY_ROLE_MAP.get(legacy_role)
     if not role_code:
         raise ValueError("Selected role is not supported by scoped authorization.")
-    for assignment in RoleAssignment.query.filter_by(user_id=user.id, is_active=True):
-        assignment.is_active = False
     unit = wing = None
     if role_code.startswith("ICC_"):
         unit = OperatingUnit.query.filter_by(code="ICC").first()
@@ -69,6 +67,11 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
     sensitive_allowed = role_code in {"OIA_FACULTY_ADMINISTRATOR", "IGP_HEAD"}
     if sensitive_requested and (not sensitive_allowed or not has_permission(actor, "sensitive_links", sensitive=True)):
         raise ValueError("The selected role or approving user cannot grant restricted-reference access.")
+    # Resolve and validate the complete replacement before touching the current
+    # grants.  A rejected form submission must never leave an account with its
+    # valid assignment deactivated in the still-live SQLAlchemy transaction.
+    for existing_assignment in RoleAssignment.query.filter_by(user_id=user.id, is_active=True):
+        existing_assignment.is_active = False
     assignment = RoleAssignment(
         user_id=user.id,
         role_code=role_code,

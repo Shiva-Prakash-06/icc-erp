@@ -1,6 +1,13 @@
 .ph { display: inline-block; width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -.125em; background: currentColor; -webkit-mask: var(--oia-icon) center / contain no-repeat; mask: var(--oia-icon) center / contain no-repeat; }
 .ph::before { content: none !important; }
 .ph-star-fill, .ph-check-square-fill, .ph-chat-heart-fill { filter: drop-shadow(0 0 6px currentColor); }
+.ph-airplane-tilt { --oia-icon: url("../icons/plane.svg"); }
+.ph-envelope-simple-open { --oia-icon: url("../icons/mail-open.svg"); }
+.ph-hand-heart { --oia-icon: url("../icons/heart-handshake.svg"); }
+.ph-key { --oia-icon: url("../icons/key-round.svg"); }
+.ph-lock-key { --oia-icon: url("../icons/lock-keyhole.svg"); }
+.ph-receipt { --oia-icon: url("../icons/receipt-text.svg"); }
+.ph-sign-in { --oia-icon: url("../icons/log-in.svg"); }
 .ph-activity { --oia-icon: url("../icons/activity.svg"); }
 .ph-arrow-left { --oia-icon: url("../icons/arrow-left.svg"); }
 .ph-arrow-right { --oia-icon: url("../icons/arrow-right.svg"); }
@@ -52,6 +59,7 @@
 .ph-globe-hemisphere-west { --oia-icon: url("../icons/globe-2.svg"); }
 .ph-heartbeat { --oia-icon: url("../icons/heart-pulse.svg"); }
 .ph-identification-badge { --oia-icon: url("../icons/badge.svg"); }
+.ph-image { --oia-icon: url("../icons/image.svg"); }
 .ph-info { --oia-icon: url("../icons/circle-alert.svg"); }
 .ph-kanban { --oia-icon: url("../icons/kanban.svg"); }
 .ph-link { --oia-icon: url("../icons/link.svg"); }

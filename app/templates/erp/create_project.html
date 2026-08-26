@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}New Project{% endblock %}
+{% block mobile_title %}Create project{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Projects</a> <span aria-hidden="true">/</span> New{% endblock %}
+{% block back_url %}{{ url_for('erp.projects') }}{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-eyebrow">Start from a source</div>
+    <h1 class="page-title">Create a project</h1>
+    <p class="page-subtitle">Confirm what's inferred from your upload instead of retyping it. Pick the action that matches what you already have.</p>
+  </div>
+</header>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="aurora-card--padded">
+      <h2 class="aurora-card__heading"><i class="ph ph-calendar-check" aria-hidden="true"></i> Import ICC event summary</h2>
+      <p class="text-muted">Stage the campus-wide ICC events spreadsheet; each row becomes its own event project with a session, documents, and audience already filled in.</p>
+      <a class="aurora-button--primary" href="{{ url_for('erp.imports') }}">Go to imports</a>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="aurora-card--padded">
+      <h2 class="aurora-card__heading"><i class="ph ph-airplane-tilt" aria-hidden="true"></i> Create IGP from itinerary</h2>
+      <p class="text-muted">Upload a day-by-day itinerary (.xlsx or .csv). The program title and dates are inferred from the file, and every session is imported immediately.</p>
+      <form method="POST" action="{{ url_for('erp.quick_create_from_itinerary') }}" enctype="multipart/form-data">
+        <div class="aurora-file-field mb-3">
+          <label class="aurora-label" for="itinerary_source_file">Itinerary file</label>
+          <input id="itinerary_source_file" class="aurora-input" type="file" name="source_file" accept=".xlsx,.csv" required data-ui-toggle="file-field" data-ui-target="#itinerary_source_file_name">
+          <span class="aurora-file-field__hint">Accepted formats: .xlsx or .csv, up to 16MB.</span>
+          <span class="aurora-file-field__name" id="itinerary_source_file_name" data-empty="true">No file selected</span>
+        </div>
+        <button class="aurora-button--primary w-100">Create IGP project</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="aurora-card--padded">
+      <h2 class="aurora-card__heading"><i class="ph ph-file-arrow-up" aria-hidden="true"></i> Upload program/event documents</h2>
+      <p class="text-muted">Give the project a title and dates, then upload its documents in one step — each file is automatically classified and stored.</p>
+      <form method="POST" action="{{ url_for('erp.quick_create_with_documents') }}" enctype="multipart/form-data" class="aurora-form-groups">
+        <fieldset class="aurora-fieldset">
+          <legend class="aurora-fieldset__legend">Project details</legend>
+          <div class="row g-2">
+            <div class="col-md-6"><label class="aurora-label" for="doc_program_type">Program</label><select id="doc_program_type" class="aurora-select" name="program_type_name" required>{% for program in program_types %}<option value="{{ program.name }}">{{ program.name }}</option>{% endfor %}</select></div>
+            <div class="col-md-6"><label class="aurora-label" for="doc_title">Title <span aria-hidden="true">*</span></label><input id="doc_title" class="aurora-input" name="title" required></div>
+            <div class="col-md-6"><label class="aurora-label" for="doc_start">Start <span aria-hidden="true">*</span></label><input id="doc_start" type="date" class="aurora-input" name="start_date" required></div>
+            <div class="col-md-6"><label class="aurora-label" for="doc_end">End <span aria-hidden="true">*</span></label><input id="doc_end" type="date" class="aurora-input" name="end_date" required></div>
+          </div>
+        </fieldset>
+        <fieldset class="aurora-fieldset">
+          <legend class="aurora-fieldset__legend">Documents</legend>
+          <div class="aurora-file-field">
+            <label class="aurora-label" for="doc_files">Documents</label>
+            <input id="doc_files" class="aurora-input" type="file" name="source_files" multiple required data-ui-toggle="file-field" data-ui-target="#doc_files_name">
+            <span class="aurora-file-field__hint">Select one or more files; each is classified automatically. Up to 16MB per upload.</span>
+            <span class="aurora-file-field__name" id="doc_files_name" data-empty="true">No file selected</span>
+          </div>
+        </fieldset>
+        <button class="aurora-button--primary w-100">Create &amp; upload</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="aurora-card--padded">
+      <h2 class="aurora-card__heading"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Create manually</h2>
+      <p class="text-muted">Only a title and dates are required. Campus, academic year, owner, code, and status are inferred automatically.</p>
+      <form method="POST" action="{{ url_for('erp.quick_create_project') }}" class="aurora-form-groups">
+        <fieldset class="aurora-fieldset">
+          <legend class="aurora-fieldset__legend">Project details</legend>
+          <div class="row g-2">
+            <div class="col-md-6"><label class="aurora-label" for="manual_program_type">Program</label><select id="manual_program_type" class="aurora-select" name="program_type_name" required>{% for program in program_types %}<option value="{{ program.name }}">{{ program.name }}</option>{% endfor %}</select></div>
+            <div class="col-md-6"><label class="aurora-label" for="manual_title">Title <span aria-hidden="true">*</span></label><input id="manual_title" class="aurora-input" name="title" required></div>
+            <div class="col-md-6"><label class="aurora-label" for="manual_start">Start <span aria-hidden="true">*</span></label><input id="manual_start" type="date" class="aurora-input" name="start_date" required></div>
+            <div class="col-md-6"><label class="aurora-label" for="manual_end">End <span aria-hidden="true">*</span></label><input id="manual_end" type="date" class="aurora-input" name="end_date" required></div>
+          </div>
+        </fieldset>
+        <div class="aurora-disclosure" id="moreDetailsDisclosure">
+          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseMoreDetails" aria-expanded="false" aria-controls="collapseMoreDetails">More details (optional)</button>
+          <div id="collapseMoreDetails" class="aurora-collapse" data-ui-parent="#moreDetailsDisclosure">
+            <div class="row g-2 mt-2">
+              <div class="col-md-6"><label class="aurora-label" for="manual_venue">Venue</label><input id="manual_venue" class="aurora-input" name="venue"></div>
+              <div class="col-md-6"><label class="aurora-label" for="manual_audience">Target audience</label><input id="manual_audience" class="aurora-input" name="target_audience"></div>
+            </div>
+          </div>
+        </div>
+        <button class="aurora-button--primary w-100">Create project</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,3 +1,5 @@
+import "../aurora.css";
+
 type Command = {
   name: string;
   url: string;

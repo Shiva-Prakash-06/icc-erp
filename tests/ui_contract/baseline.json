@@ -3,8 +3,8 @@
   "captured_at": "2026-07-17",
   "contract": "presentation-only Aurora migration",
   "url_map": {
-    "route_count": 98,
-    "sha256": "e10484ece05a44e37694c3051d2f26b2744b304a2ff0b599692a794572686fb5",
+    "route_count": 133,
+    "sha256": "f0fd6d4d5fec2321680a56e3fae034b5087c164adaae9126bce02fb42a4e4a56",
     "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
     "includes_parameter_converters": true
   },
@@ -49,21 +49,31 @@
         "confirm_password"
       ]
     },
-    "/erp/projects": {
+    "/erp/projects/quick-create": {
       "method": "POST",
       "names": [
+        "program_type_name",
         "title",
-        "description",
-        "project_type",
-        "category",
-        "campus_public_id",
-        "program_type_public_id",
-        "academic_year_public_id",
-        "wing_public_id",
         "start_date",
         "end_date",
         "venue",
         "target_audience"
+      ]
+    },
+    "/erp/projects/quick-create-from-itinerary": {
+      "method": "POST",
+      "names": [
+        "source_file"
+      ]
+    },
+    "/erp/projects/quick-create-with-documents": {
+      "method": "POST",
+      "names": [
+        "program_type_name",
+        "title",
+        "start_date",
+        "end_date",
+        "source_files"
       ]
     },
     "/erp/projects/<public_id>/transition": {
@@ -123,6 +133,21 @@
         "platform_scope",
         "can_view_sensitive_links"
       ]
+    },
+    "/erp/projects/<public_id>/checklist-items/<item_public_id>/documents": {
+      "method": "POST",
+      "names": [
+        "document_public_id"
+      ]
+    },
+    "/erp/projects/<public_id>/checklist-items/<item_public_id>/documents/upload": {
+      "method": "POST",
+      "names": [
+        "source_file",
+        "category",
+        "category_other",
+        "permission_classification"
+      ]
     }
   },
   "dynamic_form_names": [
@@ -144,7 +169,6 @@
       "auth.logout"
     ],
     "erp_authorized": [
-      "erp.hub",
       "erp.projects",
       "erp.imports",
       "erp.notifications",

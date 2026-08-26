@@ -184,6 +184,38 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_buddy_assignment(self.igp_project, buddy.id, student_two.id, date(2026, 7, 5), date(2026, 7, 12))
 
+    def test_every_new_project_tab_renders(self):
+        # See in-the-operation-checklists-crystalline-dongarra.md Step 8:
+        # the old single "operations" tab was split into delivery/
+        # contributions/finance.
+        self.login()
+        for tab in ("overview", "people", "delivery", "contributions", "finance", "insights", "resources"):
+            response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab={tab}")
+            self.assertEqual(response.status_code, 200, tab)
+
+    def test_operations_tab_alias_renders_delivery_panel(self):
+        self.login()
+        response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab=operations")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="panel-delivery"', html)
+        self.assertIn('class="aurora-tab active"', html)
+
+    def test_saving_task_or_checklist_status_returns_to_delivery_not_overview(self):
+        # Pre-existing bug: these three handlers used to redirect to the
+        # bare project URL with no `tab`, throwing the user back to
+        # Overview after every save.
+        task = WorkTask(project_id=self.icc_project.id, title="Book venue", status="Not Started", version=1)
+        db.session.add(task)
+        db.session.commit()
+        self.login()
+        response = self.client.post(
+            f"/erp/projects/{self.icc_project.public_id}/tasks/{task.public_id}/status",
+            data={"version": 1, "status": "In Progress"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("tab=delivery", response.headers["Location"])
+
 
 class SuppliedImportTestCase(unittest.TestCase):
     def setUp(self):

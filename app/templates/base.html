@@ -8,27 +8,15 @@
   <meta name="theme-color" content="#f0f9ff">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
   <title>{% block title %}OIA Project Intelligence{% endblock %} | Christ University</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/utilities.css') }}">
+  {% for stylesheet in ui_styles('frontend/src/entries/aurora.tsx') %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
 </head>
 <body>
+  <!-- {% block back_url %}{% endblock %} -->
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <div id="aurora-atmosphere-root" aria-hidden="true">
-    <div class="aurora-atmosphere">
-      <span class="aurora-orb aurora-orb--teal"></span>
-      <span class="aurora-orb aurora-orb--indigo"></span>
-      <span class="aurora-grid"></span>
-    </div>
-  </div>
-
   {% if config.DEMONSTRATOR %}
-  <div class="alert alert-warning rounded-0 border-0 text-center fw-bold py-2 mb-0" role="status">
+  <div class="environment-banner{% if g.user and not hide_sidebar %} environment-banner--authenticated{% endif %} alert alert-warning rounded-0 border-0 text-center fw-bold py-2 mb-0" role="status">
     <i class="ph ph-warning" aria-hidden="true"></i>
-    <span>Demonstrator—Not Production · Sample data environment</span>
+    <span>Demo environment—data may be reset; do not enter sensitive or personal data.</span>
   </div>
   {% endif %}
 
@@ -42,22 +30,11 @@
 
       <nav class="flex-grow-1">
         <ul class="nav-list">
-          <li class="nav-group-label">Command</li>
-          <li><a href="{{ url_for('dashboard.index') }}" class="app-nav-link" {% if request.endpoint == 'dashboard.index' %}aria-current="page"{% endif %}><i class="ph ph-gauge" aria-hidden="true"></i><span>Mission Control</span></a></li>
-          <li><a href="{{ url_for('dashboard.profile') }}" class="app-nav-link" {% if request.endpoint == 'dashboard.profile' %}aria-current="page"{% endif %}><i class="ph ph-user-circle" aria-hidden="true"></i><span>My profile</span></a></li>
-          <li><a href="{{ url_for('erp.hub') }}" class="app-nav-link" {% if request.blueprint == 'erp' and request.endpoint != 'erp.notifications' %}aria-current="page"{% endif %}><i class="ph ph-tree-structure" aria-hidden="true"></i><span>ERP operations</span></a></li>
-          <li><a href="{{ url_for('erp.notifications') }}" class="app-nav-link" {% if request.endpoint == 'erp.notifications' %}aria-current="page"{% endif %}><i class="ph ph-bell" aria-hidden="true"></i><span>Notifications</span></a></li>
-          {% if has_permission(g.user, 'approve') %}
-          <li><a href="{{ url_for('erp.oversight') }}" class="app-nav-link" {% if request.endpoint == 'erp.oversight' %}aria-current="page"{% endif %}><i class="ph ph-shield-check" aria-hidden="true"></i><span>Oversight</span></a></li>
-          {% endif %}
-
-          <li class="nav-group-label">Reporting</li>
-          <li><a href="{{ url_for('public.reports') }}" class="app-nav-link" {% if request.endpoint == 'public.reports' %}aria-current="page"{% endif %}><i class="ph ph-chart-bar" aria-hidden="true"></i><span>Published reports</span></a></li>
-
-          {% if has_permission(g.user, 'manage_users') %}
-          <li class="nav-group-label">Administration</li>
-          <li><a href="{{ url_for('dashboard.admin_users') }}" class="app-nav-link" {% if request.endpoint == 'dashboard.admin_users' %}aria-current="page"{% endif %}><i class="ph ph-shield-check" aria-hidden="true"></i><span>Users and approvals</span></a></li>
-          {% endif %}
+          {% set ns = namespace(current_group=None) %}
+          {% for item in primary_nav if item.rail %}
+          {% if item.group != ns.current_group %}{% if not loop.first %}<li class="nav-group-label">{{ item.group }}</li>{% endif %}{% set ns.current_group = item.group %}{% endif %}
+          <li><a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span></a></li>
+          {% endfor %}
         </ul>
       </nav>
 
@@ -81,17 +58,17 @@
           {% if request.endpoint == 'dashboard.index' %}
           <button class="mobile-header-back-btn" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false" aria-label="Open navigation"><i class="ph ph-list" aria-hidden="true"></i></button>
           {% else %}
-          {% set back_url = url_for('dashboard.index') %}
-          <a class="mobile-header-back-btn" href="{{ back_url }}" aria-label="Back"><i class="ph ph-caret-left" aria-hidden="true"></i></a>
+          {% set back_url = self.back_url()|trim %}
+          <a class="mobile-header-back-btn" href="{{ back_url or url_for('dashboard.index') }}" aria-label="Back"><i class="ph ph-caret-left" aria-hidden="true"></i></a>
           {% endif %}
-          <div class="ms-2"><h2 class="mobile-header-title">{% block mobile_title %}OIA command{% endblock %}</h2><span class="mobile-header-subtitle">Christ University</span></div>
+          <div class="ms-2"><h2 class="mobile-header-title">{% block mobile_title %}Home{% endblock %}</h2><span class="mobile-header-subtitle">Christ University</span></div>
         </div>
         <button class="icon-action" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false" aria-label="Open navigation"><i class="ph ph-squares-four" aria-hidden="true"></i></button>
       </header>
 
       <header class="app-topbar">
         <div class="app-topbar__context">
-          <span class="topbar-crumb">OIA <span aria-hidden="true">/</span> <strong>{{ (request.endpoint or 'command')|replace('.', ' / ')|replace('_', ' ')|title }}</strong></span>
+          <span class="topbar-crumb">OIA <span aria-hidden="true">/</span> <strong>{% block crumb %}{{ self.mobile_title() }}{% endblock %}</strong></span>
         </div>
         <div class="topbar-actions">
           <button class="command-trigger" type="button" data-command-open><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Command palette</span><kbd>⌘ K</kbd></button>
@@ -126,24 +103,22 @@
     </div>
 
     <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
-      <a href="{{ url_for('dashboard.index') }}" class="mobile-nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}"><i class="ph ph-gauge" aria-hidden="true"></i><span>Dashboard</span></a>
-      <a href="{{ url_for('dashboard.profile') }}" class="mobile-nav-link {% if request.endpoint == 'dashboard.profile' %}active{% endif %}"><i class="ph ph-user-circle" aria-hidden="true"></i><span>Profile</span></a>
-      <a href="{{ url_for('erp.hub') }}" class="mobile-nav-link {% if request.blueprint == 'erp' %}active{% endif %}"><i class="ph ph-tree-structure" aria-hidden="true"></i><span>ERP</span></a>
+      {% for item in primary_nav if item.bottom_nav %}
+      <a href="{{ url_for(item.endpoint) }}" class="mobile-nav-link{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i><span>{{ item.mobile_label }}</span></a>
+      {% endfor %}
       <button class="mobile-nav-link" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false"><i class="ph ph-list" aria-hidden="true"></i><span>Menu</span></button>
     </nav>
 
     <div class="drawer-scrim" data-ui-drawer-close></div>
-    <aside class="mobile-drawer" id="mobileNavDrawer" aria-label="Mobile navigation drawer" aria-hidden="true">
+    <aside class="mobile-drawer" id="mobileNavDrawer" aria-label="Mobile navigation drawer" aria-hidden="true" inert>
       <div class="d-flex align-items-center justify-content-between mb-4"><div><span class="aurora-badge">Navigation</span><h2 class="h4 mb-0 mt-2">OIA command</h2></div><button class="icon-action" type="button" data-ui-drawer-close aria-label="Close navigation"><i class="ph ph-x" aria-hidden="true"></i></button></div>
       <nav class="flex-grow-1">
         <div class="nav-list">
-          <a href="{{ url_for('dashboard.index') }}" class="app-nav-link"><i class="ph ph-gauge" aria-hidden="true"></i>Mission Control</a>
-          <a href="{{ url_for('dashboard.profile') }}" class="app-nav-link"><i class="ph ph-user-circle" aria-hidden="true"></i>My profile</a>
-          <a href="{{ url_for('erp.hub') }}" class="app-nav-link"><i class="ph ph-tree-structure" aria-hidden="true"></i>ERP operations</a>
-          <a href="{{ url_for('erp.notifications') }}" class="app-nav-link"><i class="ph ph-bell" aria-hidden="true"></i>Notifications</a>
-          {% if has_permission(g.user, 'approve') %}<a href="{{ url_for('erp.oversight') }}" class="app-nav-link"><i class="ph ph-shield-check" aria-hidden="true"></i>Oversight</a>{% endif %}
-          <a href="{{ url_for('public.reports') }}" class="app-nav-link"><i class="ph ph-chart-bar" aria-hidden="true"></i>Published reports</a>
-          {% if has_permission(g.user, 'manage_users') %}<a href="{{ url_for('dashboard.admin_users') }}" class="app-nav-link"><i class="ph ph-shield-check" aria-hidden="true"></i>Users and approvals</a>{% endif %}
+          {% set ns = namespace(current_group=None) %}
+          {% for item in primary_nav %}
+          {% if item.group != ns.current_group %}{% if not loop.first %}<div class="nav-group-label">{{ item.group }}</div>{% endif %}{% set ns.current_group = item.group %}{% endif %}
+          <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</a>
+          {% endfor %}
         </div>
       </nav>
       <button class="aurora-button--secondary w-100" type="button" data-command-open><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Open command palette</button>
@@ -151,7 +126,7 @@
     </aside>
 
     <div class="notification-scrim" data-notification-close></div>
-    <aside class="notification-panel" id="notificationPanel" aria-labelledby="notificationPanelTitle" aria-hidden="true">
+    <aside class="notification-panel" id="notificationPanel" aria-labelledby="notificationPanelTitle" aria-hidden="true" inert>
       <div class="notification-panel__header">
         <div><span class="page-eyebrow">Latest activity</span><h2 id="notificationPanelTitle">Notifications</h2></div>
         <button class="icon-action" type="button" data-notification-close aria-label="Close notifications"><i class="ph ph-x" aria-hidden="true"></i></button>
@@ -171,9 +146,9 @@
   </div>
   {% else %}
   <main id="main-content" class="auth-wrapper" tabindex="-1">
-    <div class="auth-stage">
+    <div class="auth-stage{% block auth_stage_class %}{% endblock %}">
       <aside class="auth-intro" aria-label="OIA Project Intelligence">
-        <div><span class="brand-mark" aria-hidden="true">OI</span><div class="page-eyebrow mt-4">Christ University · OIA</div><h1>Project intelligence, in one operational view.</h1><p>Coordinate programs, people, evidence and reporting through an access-controlled institutional record.</p></div>
+        <div><span class="brand-mark" aria-hidden="true">OI</span><div class="page-eyebrow mt-4">Christ University · OIA</div><p class="auth-intro__title">Project intelligence, in one operational view.</p><p>Coordinate programs, people, evidence and reporting through an access-controlled institutional record.</p></div>
         <div class="auth-intro__flow" aria-hidden="true"><span>Projects</span><i class="ph ph-arrow-right"></i><span>Delivery</span><i class="ph ph-arrow-right"></i><span>Evidence</span><i class="ph ph-arrow-right"></i><span>Reports</span></div>
       </aside>
       <div class="auth-form-column">
@@ -189,13 +164,7 @@
   {% if g.user %}
   <div id="aurora-command-root"></div>
   <script id="aurora-command-data" type="application/json">[
-    {"name":"Mission Control","url":{{ url_for('dashboard.index')|tojson }},"category":"Command","keywords":"dashboard overview"},
-    {"name":"ERP operations","url":{{ url_for('erp.hub')|tojson }},"category":"Command","keywords":"projects tasks imports"},
-    {"name":"My profile","url":{{ url_for('dashboard.profile')|tojson }},"category":"Command","keywords":"performance portfolio"},
-    {"name":"Notifications","url":{{ url_for('erp.notifications')|tojson }},"category":"Command","keywords":"alerts preferences"}
-    {% if has_permission(g.user, 'approve') %},{"name":"Oversight","url":{{ url_for('erp.oversight')|tojson }},"category":"Command","keywords":"approvals pending faculty"}{% endif %}
-    ,{"name":"Published reports","url":{{ url_for('public.reports')|tojson }},"category":"Reporting","keywords":"exports history"}
-    {% if has_permission(g.user, 'manage_users') %},{"name":"Users and approvals","url":{{ url_for('dashboard.admin_users')|tojson }},"category":"Administration","keywords":"roles accounts"}{% endif %}
+    {% for item in primary_nav %}{"name":{{ item.label|tojson }},"url":{{ url_for(item.endpoint)|tojson }},"category":{{ item.group|tojson }},"keywords":""}{% if not loop.last %},{% endif %}{% endfor %}
   ]</script>
   {% endif %}
 

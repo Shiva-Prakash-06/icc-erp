@@ -53,8 +53,12 @@ def _feedback_summary(project_ids):
     for response in responses:
         answers = response.answers_json or {}
         rating = answers.get("rating") if isinstance(answers, dict) else None
-        if isinstance(rating, (int, float)):
-            ratings.append(float(rating))
+        try:
+            numeric_rating = float(rating)
+        except (TypeError, ValueError):
+            continue
+        if numeric_rating.is_integer() and 1 <= numeric_rating <= 5:
+            ratings.append(numeric_rating)
     return {
         "response_count": len(responses),
         "average_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,

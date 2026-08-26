@@ -1,7 +1,10 @@
-"""Google Drive metadata validation without changing sharing permissions."""
+"""Google Drive metadata validation, plus upload/download/export, without
+ever changing an existing file's sharing permissions."""
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import re
 from datetime import datetime, timezone
@@ -11,6 +14,7 @@ from flask import current_app
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 
 DRIVE_ID_PATTERNS = [
@@ -18,7 +22,16 @@ DRIVE_ID_PATTERNS = [
     re.compile(r"[?&]id=([a-zA-Z0-9_-]+)"),
     re.compile(r"/folders/([a-zA-Z0-9_-]+)"),
 ]
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+# Upgraded from metadata-only to the minimum read/write scopes needed to
+# upload/download files the app creates (`drive.file`) and to read/export
+# content of arbitrary pre-existing shared items pasted as links
+# (`drive.readonly`) -- never the unrestricted `drive` scope, and this never
+# changes an existing file's sharing permissions. See PLAN.md "IGP repository
+# documents".
+DRIVE_SCOPES = [
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 
 
 def extract_drive_id(url):
@@ -112,6 +125,71 @@ def validate_drive_link(url, classification="Internal"):
         "visibility": visibility,
         "permissions": safe_permissions,
     }
+
+
+def get_drive_service():
+    return build("drive", "v3", credentials=_credentials(), cache_discovery=False)
+
+
+def ensure_project_folder(project):
+    """Return the Drive folder ID for `project`, creating one under
+    `GOOGLE_DRIVE_REPOSITORY_ROOT_ID` if it doesn't exist yet. Mock mode
+    returns a deterministic synthetic ID without calling the Drive API, so
+    development/tests never require live credentials."""
+    if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
+        return f"mock-folder-{project.public_id}"
+    root_id = current_app.config.get("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
+    if not root_id:
+        raise RuntimeError("GOOGLE_DRIVE_REPOSITORY_ROOT_ID is not configured.")
+    service = get_drive_service()
+    folder_name = project.code or project.public_id
+    escaped_name = folder_name.replace("'", "\\'")
+    query = (
+        f"'{root_id}' in parents and name = '{escaped_name}' and "
+        "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    )
+    response = service.files().list(q=query, fields="files(id,name)", spaces="drive").execute()
+    files = response.get("files", [])
+    if files:
+        return files[0]["id"]
+    metadata = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder", "parents": [root_id]}
+    created = service.files().create(body=metadata, fields="id").execute()
+    return created["id"]
+
+
+def upload_file_to_drive(project, filename, content: bytes, mime_type: str):
+    """Upload `content` as a new file inside the project's Drive folder.
+    Mock mode fabricates a stable synthetic file ID instead of calling the
+    Drive API, so upload flows are fully testable offline."""
+    if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
+        fake_id = "mock-" + hashlib.sha256(f"{project.public_id}:{filename}:{len(content)}".encode()).hexdigest()[:24]
+        return {"file_id": fake_id, "name": filename, "web_view_link": f"https://drive.google.com/file/d/{fake_id}/view"}
+    folder_id = ensure_project_folder(project)
+    service = get_drive_service()
+    media = MediaIoBaseUpload(io.BytesIO(content), mimetype=mime_type, resumable=True)
+    metadata = {"name": filename, "parents": [folder_id]}
+    created = service.files().create(body=metadata, media_body=media, fields="id,name,webViewLink").execute()
+    return {"file_id": created["id"], "name": created.get("name"), "web_view_link": created.get("webViewLink")}
+
+
+def download_drive_file(file_id: str, *, export_mime_type: str | None = None) -> bytes:
+    """Fetch a Drive file's bytes into memory. Native Google Docs/Slides
+    files must be exported to a concrete `export_mime_type`; ordinary
+    binary files (PDF, DOCX, images) are fetched as-is."""
+    if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
+        raise RuntimeError("Cannot download real Drive content while DRIVE_VALIDATION_MODE=mock.")
+    service = get_drive_service()
+    request = (
+        service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+        if export_mime_type else service.files().get_media(fileId=file_id)
+    )
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    buffer.seek(0)
+    return buffer.read()
 
 
 def refresh_document_metadata(document):

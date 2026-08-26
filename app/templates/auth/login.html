@@ -6,7 +6,7 @@
 <div class="auth-card mx-auto">
     <div class="auth-header">
         <div class="auth-logo">O</div>
-        <h3 class="auth-title">OIA Project Intelligence</h3>
+        <h1 class="auth-title">OIA Project Intelligence</h1>
         <p class="auth-subtitle">Command Portal | Office of International Affairs</p>
     </div>
     
@@ -18,7 +18,10 @@
         
         <div class="aurora-field">
             <label for="password" class="aurora-label">Password</label>
-            <input type="password" id="password" name="password" class="aurora-input" placeholder="Enter password" required autocomplete="current-password">
+            <div class="d-flex gap-2">
+                <input type="password" id="password" name="password" class="aurora-input" placeholder="Enter password" required autocomplete="current-password">
+                <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
+            </div>
         </div>
         
         <button type="submit" class="aurora-button--primary w-100 mt-2 py-2.5">Access Platform</button>

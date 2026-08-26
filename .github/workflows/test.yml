@@ -41,6 +41,11 @@ jobs:
         with:
           terraform_version: "1.9.8"
       - run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
       - name: Validate production infrastructure
         working-directory: terraform
         run: |
@@ -55,18 +60,51 @@ jobs:
           flask --app run:app db upgrade
           flask --app run:app db check
       - name: Unit and integration tests with service coverage
-        run: coverage run --source=app/services -m unittest discover -s tests -p '*test.py' -v
+        run: coverage run --branch --source=app/services -m pytest -q
       - run: coverage report --fail-under=80
+      - name: UI type, build, and raw asset budgets
+        run: |
+          npm run typecheck
+          npm run build:ui
+          npm run check:assets
+          npm audit --audit-level=high
+      - name: Install acceptance browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Full browser acceptance twice on fresh PostgreSQL databases
+        env:
+          E2E_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/icc_erp_test
+          ACCEPTANCE_RESET_POSTGRES: "1"
+        run: npm run test:e2e:twice
+      - name: Lighthouse quality gates
+        run: npm run test:lighthouse
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-quality-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
       - run: pip check
       - run: bandit -q -r app -lll
       - run: pip-audit --local
       - name: Assert no committed environment or database files
         run: test -z "$(git ls-files | grep -E '(^|/)(\.env$|instance/.*\.(db|sqlite)|__pycache__)' || true)"
-      - name: Build production container
-        run: docker build -t icc-erp:${{ github.sha }} .
-      - uses: aquasecurity/trivy-action@0.29.0
+      - name: Build and inspect Docker-free production artifact
+        env:
+          SKIP_UI_BUILD: "1"
+        run: |
+          bash scripts/build-native-release.sh dist/icc-erp-native.tar.gz
+          bash scripts/verify-native-release.sh dist/icc-erp-native.tar.gz
+      - name: Generate native dependency SBOM
+        run: pip-audit --local --format cyclonedx-json --output dist/icc-erp-native-sbom.cdx.json
+      - name: Upload release security evidence
+        uses: actions/upload-artifact@v4
         with:
-          image-ref: icc-erp:${{ github.sha }}
-          format: table
-          exit-code: "1"
-          severity: CRITICAL,HIGH
+          name: release-security-evidence
+          path: |
+            dist/icc-erp-native.tar.gz
+            dist/icc-erp-native.tar.gz.sha256
+            dist/icc-erp-native-sbom.cdx.json
+          retention-days: 90

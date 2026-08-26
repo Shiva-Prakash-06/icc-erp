@@ -1,36 +1,35 @@
 # Production Deployment, Canary, and Recovery Runbook
 
-This runbook is executable only after every blocking row in `PRODUCTION_ACCEPTANCE_RECORD.md` has evidence. Production uses a fresh database, immutable image digest, Terraform 1.7+, and four-party release approval.
+This runbook is executable only after every blocking row in `PRODUCTION_ACCEPTANCE_RECORD.md` has evidence. Production uses a fresh database, a checksum-pinned native artifact or immutable remotely built image, and four-party release approval.
 
 ## 1. Operator inputs
 
-Record these values in the release ticket without copying credentials into it:
+Record these values for every deployment in the release ticket without copying credentials into it:
 
-- Release Git SHA and signed container digest.
-- GCP project, region, Artifact Registry path, Cloud Run service, migration job, import job, and Cloud SQL instance.
-- GCS Terraform state bucket/prefix with versioning, retention, uniform access, and an approved operator group.
+- Release Git SHA and native artifact SHA-256, or the immutable image digest for Cloud Run.
 - Stable HTTPS ERP hostname used for `internal_job_base_url` and OIDC audience.
-- Secret Manager versions for Drive credentials, SMTP password, database URL, and Flask signing key.
-- On-demand pre-release backup identifier and the previously serving Cloud Run revision.
+- Approved secret-store versions for Drive credentials, SMTP password, database URL, and Flask signing key.
+- On-demand pre-release database backup identifier and the previously serving release identifier.
 
-Copy `terraform/production.tfvars.example` to the ignored `production.tfvars`. Supply `TF_VAR_drive_credentials_json` and `TF_VAR_smtp_password` through the approved secret-aware deployment environment; never save them in shell history or a tracked file.
+For a native deployment, also record the target host or managed platform, service-manager unit, PostgreSQL and Redis endpoints, reverse-proxy/load-balancer configuration, versioned release directory, prior release directory, and the identities used for serving, migrations, scheduled jobs, and imports. Keep secrets in the platform secret manager or a mode-0600 service environment file.
 
-## 2. Build and immutable-image gate
+For Cloud Run, also record the GCP project, region, Artifact Registry path, Cloud Run service, migration job, import job, Cloud SQL instance, and secured GCS Terraform state bucket/prefix. Copy `terraform/production.tfvars.example` to the ignored `production.tfvars`. Supply `TF_VAR_drive_credentials_json` and `TF_VAR_smtp_password` through the approved secret-aware deployment environment; never save them in shell history or a tracked file.
+
+## 2. Build and immutable-artifact gate
 
 From the release SHA:
 
 ```bash
-docker build --pull --no-cache -t "$REGION-docker.pkg.dev/$PROJECT_ID/icc-erp/icc-erp:$RELEASE_SHA" .
-docker run --rm "$REGION-docker.pkg.dev/$PROJECT_ID/icc-erp/icc-erp:$RELEASE_SHA" python -m compileall -q app
-docker push "$REGION-docker.pkg.dev/$PROJECT_ID/icc-erp/icc-erp:$RELEASE_SHA"
-gcloud artifacts docker images describe "$REGION-docker.pkg.dev/$PROJECT_ID/icc-erp/icc-erp:$RELEASE_SHA" --format='value(image_summary.digest)'
+bash scripts/build-native-release.sh dist/icc-erp-native.tar.gz
+bash scripts/verify-native-release.sh dist/icc-erp-native.tar.gz
+.venv/bin/pip-audit --local --format cyclonedx-json --output dist/icc-erp-native-sbom.cdx.json
 ```
 
-CI must already show: 100% passing tests, service-layer coverage at or above 80%, migration smoke/drift checks, dependency audit with no known vulnerability, Bandit with no high finding, Terraform validation, container build, and no critical/high Trivy finding. Put the resulting digest—not a mutable tag—in `production.tfvars`.
+CI must show: 100% passing tests, service-layer coverage at or above 80%, PostgreSQL migration and twice-run browser acceptance, dependency audits with no known vulnerability, Bandit with no high finding, a verified runtime allow-list, portable SHA-256, stored SBOM, and Terraform validation when Cloud Run infrastructure is selected. Docker is not required for the native path. For Cloud Run, submit `cloudbuild.yaml` to remote Cloud Build, retain the provider vulnerability scan, and put the resulting immutable digest—not a mutable tag—in `production.tfvars`.
 
-## 3. Terraform plan and apply
+## 3. Terraform plan and apply (Cloud Run path only)
 
-Initialize the secured GCS backend and create a saved plan:
+Native operators follow `NATIVE_DEPLOYMENT.md` and skip this section. Cloud Run operators initialize the secured GCS backend and create a saved plan:
 
 ```bash
 terraform -chdir=terraform init -reconfigure \
@@ -60,11 +59,13 @@ gcloud run jobs execute "$MIGRATION_JOB" --region="$REGION" --project="$PROJECT_
 gcloud run jobs executions list --job="$MIGRATION_JOB" --region="$REGION" --project="$PROJECT_ID" --limit=1
 ```
 
-The job runs `flask --app run:app db upgrade` with `MIGRATION_ONLY=true`. A nonzero result blocks deployment. Confirm migration head `9b70b9a2c001` in the job logs. Never run `db.create_all()` in staging or production.
+For a native deployment, create the equivalent PostgreSQL backup through the managed database provider, then run the release virtual environment's migration commands from `NATIVE_DEPLOYMENT.md` under the one-shot deployment identity.
+
+The Cloud Run job or native one-shot process runs `flask --app run:app db upgrade` with `MIGRATION_ONLY=true`. A nonzero result blocks deployment. Do not hard-code a migration revision here as the confirmation target. Run `flask --app run:app db heads` against the release commit immediately before deploying and confirm the migration logs show that exact revision. Never run `db.create_all()` in staging or production.
 
 ## 5. No-traffic revision and smoke checks
 
-Terraform deploys the reviewed image. Before general traffic, identify the new revision and keep the prior revision recorded for rollback. Run authenticated smoke journeys against the no-traffic revision or an access-restricted staging equivalent:
+Start the reviewed native artifact under its service manager, or deploy the reviewed Cloud Run image. Before general traffic, record the new and prior release identifiers. Run authenticated smoke journeys against a no-traffic instance or access-restricted staging equivalent:
 
 1. `/healthz` returns 200 and `/readyz` returns 200 after its database query succeeds.
 2. Production startup confirms `DEMONSTRATOR=false`; no default/synthetic account exists.
@@ -79,7 +80,7 @@ Delete only the smoke-test draft records through the approved data-correction pr
 
 ## 6. Canary promotion
 
-Route 5% of traffic to the new revision for at least 30 minutes, then 25% for at least 30 minutes, then 100% only with the release technical owner’s approval:
+Route 5% of traffic to the new native backend or Cloud Run revision for at least 30 minutes, then 25% for at least two hours, then 100% only with the release technical owner’s approval. The commands below apply to Cloud Run; native operators use equivalent load-balancer backend weights:
 
 ```bash
 gcloud run services update-traffic "$SERVICE" --region="$REGION" --project="$PROJECT_ID" --to-revisions="$NEW_REVISION=5,$OLD_REVISION=95"
@@ -87,11 +88,11 @@ gcloud run services update-traffic "$SERVICE" --region="$REGION" --project="$PRO
 gcloud run services update-traffic "$SERVICE" --region="$REGION" --project="$PROJECT_ID" --to-revisions="$NEW_REVISION=100"
 ```
 
-At each gate inspect p50/p95 latency, 4xx/5xx rate, instance restarts, database connections/locks, task failures/retries, SMTP failures, Drive validation, audit writes, and uptime alerts. Any unexplained error increase, data mismatch, authorization failure, or sensitive-data exposure stops promotion.
+At each gate inspect p50/p95 latency, 4xx/5xx rate, instance restarts, database connections/locks, task failures/retries, SMTP failures, Drive validation, audit writes, and uptime alerts. Immediately route 100% back to the previous revision if 5xx responses exceed 1%, p95 latency exceeds two seconds for ten minutes, an authentication/publication smoke test fails, any authorization failure occurs, or sensitive data is exposed. Any other unexplained error increase or data mismatch stops promotion pending investigation.
 
 ## 7. Signed production import
 
-Only stage source files whose checksums and mapping versions match the twice-rehearsed staging set. Preview and reconcile before commit. Execute a staged batch as a Cloud Run Job by overriding its required environment variable:
+Only stage source files whose checksums and mapping versions match the twice-rehearsed staging set. Preview and reconcile before commit. Execute a staged batch as a Cloud Run Job or equivalent supervised native one-shot process. The Cloud Run commands are:
 
 ```bash
 gcloud run jobs update "$IMPORT_JOB" --region="$REGION" --project="$PROJECT_ID" --update-env-vars="IMPORT_BATCH_PUBLIC_ID=$BATCH_PUBLIC_ID"
@@ -102,7 +103,7 @@ Reconcile events, people, rosters, participants, sessions, attendance, documents
 
 ## 8. Application rollback
 
-If the database remains compatible, route all traffic to the recorded prior revision:
+If the database remains compatible, route all traffic to the recorded prior native backend/release or Cloud Run revision:
 
 ```bash
 gcloud run services update-traffic "$SERVICE" --region="$REGION" --project="$PROJECT_ID" --to-revisions="$OLD_REVISION=100"
@@ -116,4 +117,4 @@ For corruption, isolate writes and restore the selected backup/PITR point to a n
 
 ## 10. Closure evidence
 
-Attach image digest, Terraform plan/apply, migration execution, backup identifier, smoke results, canary metrics, rollback rehearsal, signed reconciliation, accessibility/performance/security results, training attendance, and all four approvals. Start seven-day hypercare using `INCIDENT_RECOVERY_AND_HYPERCARE.md`.
+Attach the native artifact SHA-256 or image digest, SBOM, runtime inventory, infrastructure evidence, migration execution, backup identifier, smoke results, canary metrics, rollback rehearsal, signed reconciliation, accessibility/performance/security results, training attendance, and all four approvals. Start seven-day hypercare using `INCIDENT_RECOVERY_AND_HYPERCARE.md`.

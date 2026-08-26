@@ -2,29 +2,29 @@
 
 This repository upgrades `icc-platform-2` into the modular Flask demonstrator defined by the authoritative [production PRD](../ICC_ERP_Production_PRD_and_Implementation_Plan.md).
 
-> **Status:** Demonstrator—Not Production. Do not use it for live operational or sensitive IGP data until the PRD's security, migration, pilot, recovery, and four-approver release gates have passed.
+> **Status:** Production release candidate; institutional production approval is pending. The repository quality gates are documented in `docs/FINAL_IMPLEMENTATION_AUDIT.md`. Do not use live operational or sensitive IGP data until the staging, pilot, recovery, security-review, and four-approver gates in `docs/PRODUCTION_ACCEPTANCE_RECORD.md` are signed.
 
 ## What is implemented
 
 - Environment-driven Flask application factory; no account or password is created at startup.
 - SQLAlchemy 2.x-compatible modular domain model and Alembic migrations.
-- PostgreSQL configuration, local SQLite test/demo isolation, Docker, Cloud Build, and Terraform scaffolding for Cloud Run and Cloud SQL.
+- PostgreSQL configuration, local SQLite test/demo isolation, a Docker-free native release artifact, and optional Cloud Build/Terraform scaffolding for Cloud Run and Cloud SQL.
 - Separate people and accounts; organization units, wings, scoped/effective role assignments, projects, components, sessions, teams, tasks, checklists, documents, budgets, feedback, imports, audits, and report snapshots.
 - Lifecycle rules with optimistic concurrency and closure blockers.
 - Staged, checksum-idempotent imports for the supplied event summary, Coffee Meet & Greet folder, and Summer School checklist.
 - `/api/v1` JSON resources with cursor pagination, RFC 7807 errors, project scoping, workflow decisions, Drive-link validation, report exports, and moderated public token feedback.
 - Production completion domains for governance, recruitment, cohorts, risks, immutable decision histories, aggregate attendance, notifications, report jobs, and sensitive-access audit.
 - OIDC-protected Scheduler/Tasks endpoints, live Drive metadata mode, SMTP delivery attempts, account recovery, and encrypted read-only offline snapshots.
-- Local Bootstrap, icons, and Chart.js assets; CSRF, request limits, login throttling/lockout, security headers, and a safe static-only service worker.
+- Local UI assets and accessible public analytics; CSRF, request limits, login throttling/lockout, security headers, and a safe static-only service worker.
 
 ## Local setup
 
+The easiest local start is one command. It creates `.venv` and `.env` when
+needed, installs Python dependencies, applies migrations, loads reference
+data, and starts the development server at <http://127.0.0.1:5000>:
+
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-cp .env.example .env
-.venv/bin/flask --app run:app db upgrade
-.venv/bin/flask --app run:app bootstrap-reference-data
+./scripts/start.sh
 ```
 
 Create the first administrator explicitly; values are supplied through the environment and are never committed:
@@ -36,11 +36,13 @@ BOOTSTRAP_ADMIN_PASSWORD='a-long-one-time-password' \
 .venv/bin/flask --app run:app bootstrap-admin
 ```
 
-Start the app:
+To use Docker Compose instead, copy `.env.example` to `.env` and run:
 
 ```bash
-.venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --threads 4 run:app
+docker compose up --build
 ```
+
+Docker is not required. For a checksum-verifiable native production artifact and PostgreSQL/Redis/Gunicorn deployment, follow [Native Deployment Without Docker](docs/NATIVE_DEPLOYMENT.md).
 
 ## Supplied-data demonstrator
 
@@ -61,11 +63,18 @@ The import sequence is intentionally fixed: events summary → Coffee Meet folde
 ```bash
 .venv/bin/python -m pytest -q
 .venv/bin/pip check
-.venv/bin/coverage run --source=app/services -m unittest discover -s tests -p '*test.py' -v
+.venv/bin/coverage run --branch --source=app/services -m pytest -q
 .venv/bin/coverage report --fail-under=80
-terraform fmt -check -recursive
+terraform -chdir=terraform fmt -check -recursive
 terraform -chdir=terraform init -backend=false
 terraform -chdir=terraform validate
+npm run typecheck
+npm run build:ui
+npm run check:assets
+npm run test:e2e:twice
+npm run test:lighthouse
+bash scripts/build-native-release.sh dist/icc-erp-native.tar.gz
+bash scripts/verify-native-release.sh dist/icc-erp-native.tar.gz
 ```
 
 The production Terraform configuration requires Terraform 1.7 or newer.

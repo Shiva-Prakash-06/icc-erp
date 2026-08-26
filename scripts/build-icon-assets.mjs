@@ -7,6 +7,13 @@ const source = join(root, "node_modules", "lucide-static", "icons");
 const target = join(root, "app", "static", "icons");
 
 const icons = {
+  "ph-airplane-tilt": "plane",
+  "ph-envelope-simple-open": "mail-open",
+  "ph-hand-heart": "heart-handshake",
+  "ph-key": "key-round",
+  "ph-lock-key": "lock-keyhole",
+  "ph-receipt": "receipt-text",
+  "ph-sign-in": "log-in",
   "ph-activity": "activity",
   "ph-arrow-left": "arrow-left",
   "ph-arrow-right": "arrow-right",
@@ -58,6 +65,7 @@ const icons = {
   "ph-globe-hemisphere-west": "globe-2",
   "ph-heartbeat": "heart-pulse",
   "ph-identification-badge": "badge",
+  "ph-image": "image",
   "ph-info": "circle-alert",
   "ph-kanban": "kanban",
   "ph-link": "link",

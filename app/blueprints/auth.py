@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session, g
+from flask import Blueprint, current_app, render_template, redirect, url_for, request, flash, session, g
 from app.database import db
 from app.database import limiter
 from app.models.user import User
@@ -12,7 +12,7 @@ from app.models.erp import Person
 from app.models.project import Campus
 from app.services.audit import record_audit
 from app.services.identity import InternalPasswordIdentityProvider
-from app.services.passwords import find_user_for_reset, issue_reset_token, send_reset_email, validate_password
+from app.services.passwords import enqueue_reset_email, find_user_for_reset, issue_reset_token, validate_password
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -61,7 +61,6 @@ def login():
             db.session.commit()
             
             if user.needs_password_reset:
-                flash("Please reset your password before continuing.", "warning")
                 return redirect(url_for('auth.reset_password'))
 
             if user.status == 'Pending':
@@ -171,12 +170,16 @@ def reset_password():
         try:
             validate_password(new_password)
         except Exception as error:
-            flash(str(error), "danger")
-            return render_template('auth/reset_password.html')
+            return render_template(
+                'auth/reset_password.html',
+                field_errors={"new_password": str(error)},
+            ), 422
 
         if new_password != confirm_password:
-            flash("Passwords do not match.", "danger")
-            return render_template('auth/reset_password.html')
+            return render_template(
+                'auth/reset_password.html',
+                field_errors={"confirm_password": "Passwords do not match."},
+            ), 422
 
         g.user.set_password(new_password)
         g.user.needs_password_reset = False
@@ -186,20 +189,29 @@ def reset_password():
         record_audit("account.password_changed", g.user, actor=g.user)
         db.session.commit()
 
-        flash("Your password has been reset successfully. Access granted.", "success")
-        
         if g.user.status == 'Pending':
+            flash("Your password has been saved.", "success")
             return redirect(url_for('auth.pending_approval'))
-            
-        return redirect(url_for('dashboard.index'))
+
+        return redirect(url_for('auth.reset_password_success'))
 
     return render_template('auth/reset_password.html')
+
+
+@auth_bp.route('/reset-password/success')
+@login_required
+def reset_password_success():
+    """Dedicated confirmation screen after a forced reset, replacing a bare
+    redirect straight into the product with no acknowledgement. See
+    PLAN.md "ICC password reset" finding."""
+    return render_template('auth/reset_password_success.html')
 
 
 @auth_bp.route('/forgot-password', methods=['GET', 'POST'])
 @limiter.limit("5 per hour", methods=["POST"])
 def forgot_password():
     if request.method == "POST":
+        started_at = time.monotonic()
         identifier = (request.form.get("identifier") or "").strip().lower()
         user = User.query.filter((db.func.lower(User.username) == identifier) | (db.func.lower(User.email) == identifier)).first()
         eligible = bool(user and user.status == "Approved" and not user.is_archived and user.identity_provider == "internal")
@@ -212,21 +224,30 @@ def forgot_password():
             record_audit("account.password_reset_requested", user, actor=user)
             db.session.commit()
         else:
-            secrets.token_urlsafe(32)
+            decoy_token = secrets.token_urlsafe(32)
+            digest = __import__("hashlib").sha256(decoy_token.encode("utf-8")).hexdigest()
+            User.query.filter_by(password_reset_token_hash=digest).first()
             db.session.commit()
-        try:
-            if eligible:
-                send_reset_email(
-                    user,
-                    url_for("auth.recover_password", token=token, _external=True, _scheme="https" if request.is_secure else "http"),
-                )
-            else:
-                time.sleep(0.05)
-        except (OSError, smtplib.SMTPException):
-            pass
-        flash("If an eligible account exists, a reset link has been sent.", "info")
-        return redirect(url_for("auth.login"))
+        reset_url = url_for(
+            "auth.recover_password", token=token if eligible else decoy_token,
+            _external=True, _scheme="https" if request.is_secure else "http",
+        )
+        enqueue_reset_email(user if eligible else None, reset_url)
+        minimum_seconds = current_app.config.get("PASSWORD_RESET_MIN_RESPONSE_MS", 150) / 1000
+        remaining = minimum_seconds - (time.monotonic() - started_at)
+        if remaining > 0:
+            time.sleep(remaining)
+        return redirect(url_for("auth.forgot_password_sent"))
     return render_template("auth/forgot_password.html")
+
+
+@auth_bp.route('/forgot-password/sent')
+def forgot_password_sent():
+    """Identical confirmation screen regardless of whether the submitted
+    identifier matched an eligible account -- preserves anti-enumeration
+    while giving a real dedicated screen instead of a login-page flash. See
+    PLAN.md "ICC password reset" finding."""
+    return render_template("auth/forgot_password_sent.html")
 
 
 @auth_bp.route('/recover-password/<token>', methods=['GET', 'POST'])

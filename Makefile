@@ -1,4 +1,4 @@
-.PHONY: install test lint db-upgrade demo-import run
+.PHONY: install test lint db-upgrade demo-import start run
 
 install:
 	python -m pip install -r requirements.txt
@@ -9,8 +9,10 @@ test:
 db-upgrade:
 	flask --app run:app db upgrade
 
-run:
-	flask --app run:app run --debug
+start:
+	bash scripts/start.sh
+
+run: start
 
 demo-import:
 	flask --app run:app demo-import-supplied

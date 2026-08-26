@@ -14,20 +14,27 @@ ROLE_PERMISSIONS = {
         "platform_admin", "manage_users", "manage_governance", "manage_projects",
         "manage_people", "manage_imports", "approve", "waive", "report", "audit",
     },
-    "OIA_FACULTY_ADMINISTRATOR": {"manage_users", "manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "waive", "report", "audit", "sensitive_links"},
-    "FACULTY_COORDINATOR": {"manage_projects", "manage_people", "manage_imports", "approve", "waive", "report"},
-    "ICC_SECRETARY_USC": {"manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "report"},
-    "ICC_EVENTS_HEAD": {"manage_projects", "manage_people", "approve", "report"},
-    "ICC_MEDIA_HEAD": {"manage_projects", "manage_people", "approve", "report"},
-    "ICC_CULTURALS_HEAD": {"manage_projects", "manage_people", "approve", "report"},
+    "OIA_FACULTY_ADMINISTRATOR": {"manage_users", "manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report", "audit", "sensitive_links"},
+    "FACULTY_COORDINATOR": {"manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report"},
+    "ICC_SECRETARY_USC": {"manage_governance", "manage_projects", "manage_people", "manage_imports", "report"},
+    "ICC_EVENTS_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
+    "ICC_MEDIA_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
+    "ICC_CULTURALS_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
     "ICC_ASSOCIATE": {"contribute", "view_assigned"},
-    "IGP_HEAD": {"manage_projects", "manage_people", "manage_imports", "approve", "waive", "report", "sensitive_links"},
+    "IGP_HEAD": {"manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report", "sensitive_links"},
     "IGP_PROGRAM_LEAD": {"manage_projects", "manage_people", "approve", "report"},
     "VOLUNTEER": {"contribute", "view_assigned"},
     "BUDDY": {"contribute", "view_assigned"},
     "PARTICIPANT": {"view_personal"},
     "AUDITOR": {"report", "audit"},
 }
+
+# Business approval of operational (expenditure/logistics) requests is deliberately
+# narrower than the general "approve" permission: USC (ICC_SECRETARY_USC), IGP
+# Program Lead, and System Administrator hold "approve" for other workflows
+# (documents, reports, budgets) but must NOT be able to approve operational
+# requests on scope or technical-admin status alone -- see PLAN.md "USC operational
+# approvals" finding.
 
 # Permissions that are inherently platform-wide (not tied to any single project's
 # campus/wing/operating-unit scope). Only these may be granted by an assignment
@@ -120,6 +127,22 @@ def has_permission(user, permission, project=None, sensitive=False):
             continue
         return True
     return False
+
+
+def has_any_permission(user, permission, sensitive=False):
+    """Return whether an approved user holds ``permission`` in any active scope.
+
+    This helper is only suitable for navigation and entry-point checks. Callers
+    must still use :func:`has_permission` with the concrete project before
+    reading or mutating project-owned data.
+    """
+    if not user or user.status != "Approved":
+        return False
+    return any(
+        permission in ROLE_PERMISSIONS.get(assignment.role_code, set())
+        and (not sensitive or assignment.can_view_sensitive_links)
+        for assignment in _active_assignments(user)
+    )
 
 
 def can_view_project(user, project):

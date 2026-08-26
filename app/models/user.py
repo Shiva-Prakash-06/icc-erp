@@ -9,7 +9,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(36), unique=True, nullable=False, default=new_uuid)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(50), default='Pending', nullable=False)  # 'Faculty', 'ICC Core Committee', 'Volunteer', 'Buddy', 'Exchange Student', 'Pending'
     preferred_role = db.Column(db.String(50), nullable=True)            # Role requested during signup

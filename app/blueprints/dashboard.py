@@ -2,10 +2,11 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from app.database import db
 from app.models.user import User
 from app.models.project import AcademicYear, Campus, Project
-from app.models.erp import Person, ProjectSession, RoleAssignment, SessionAttendance, TeamAssignment, Wing
-from app.models.production import ContributionRecord
+from app.models.erp import Person, RoleAssignment, Wing
 from app.services.audit import record_audit
-from app.services.authorization import has_permission
+from app.services.account import build_account_activity
+from app.services.authorization import has_any_permission, has_permission
+from app.services.home import build_home
 from app.services.roles import replace_scoped_assignment
 from app.blueprints.auth import login_required
 from datetime import datetime, timezone
@@ -34,16 +35,20 @@ ACCOUNT_ROLE_OPTIONS = [
 @dashboard_bp.route('/')
 @login_required
 def index():
-    """The personalized per-role home dashboard has been retired in favor
-    of the production-schema ERP surface: Faculty/approvers land on the
-    oversight dashboard (cross-project KPIs and a pending-approval action
-    queue); everyone else lands on the ERP hub (their in-scope projects).
-    Both replacements cover everything the legacy dashboard showed, backed
-    by the scoped RoleAssignment model rather than free-text role strings.
+    """The single home page: role-aware, absorbing what used to be Mission
+    Control, the ERP hub, and Oversight (see PLAN.md "USC dashboard/Mission
+    Control" finding, and in-the-operation-checklists-crystalline-dongarra.md
+    Step 2). USC and other scoped roles see their own projects, sessions,
+    tasks, and requests; anyone holding the `approve` permission
+    additionally sees portfolio metrics and the full decision queue; IGP
+    roles see participant/buddy/closure indicators.
+
+    ``?queue=all`` is a mode switch, not an expansion: it renders the full
+    decision queue in place of the KPI/projects/sessions regions rather
+    than appending to them, so the page never shows everything at once.
     """
-    if has_permission(g.user, "approve"):
-        return redirect(url_for('erp.oversight'))
-    return redirect(url_for('erp.hub'))
+    show_all_queue = request.args.get("queue") == "all"
+    return render_template('dashboard/home.html', **build_home(g.user, show_all_queue=show_all_queue))
 
 
 @dashboard_bp.route('/admin/users', methods=['GET', 'POST'])
@@ -151,32 +156,8 @@ def modify_user_role(user_id):
 @dashboard_bp.route('/profile')
 @login_required
 def profile():
-    person = g.user.person
-    contribution_hours = {}
-    contributed_project_ids = set()
-
-    if person:
-        for contribution in ContributionRecord.query.filter_by(person_id=person.id, approval_status='Approved').all():
-            contribution_hours[contribution.activity_type] = contribution_hours.get(contribution.activity_type, 0) + float(contribution.duration_hours)
-        contributed_project_ids.update(
-            t.project_id for t in TeamAssignment.query.filter_by(person_id=person.id).all() if t.project_id
-        )
-        contributed_project_ids.update(
-            c.project_id for c in ContributionRecord.query.filter_by(person_id=person.id).all()
-        )
-        session_ids = [a.session_id for a in SessionAttendance.query.filter_by(person_id=person.id).all()]
-        if session_ids:
-            contributed_project_ids.update(
-                s.project_id for s in ProjectSession.query.filter(ProjectSession.id.in_(session_ids)).all()
-            )
-
-    contributed_projects = []
-    if contributed_project_ids:
-        contributed_projects = Project.query.filter(Project.id.in_(contributed_project_ids)).order_by(Project.start_date.desc()).all()
-
-    return render_template(
-        'dashboard/profile.html',
-        volunteer_profile=person,
-        skills_hours=contribution_hours,
-        contributed_projects=contributed_projects,
-    )
+    """My Account & Activity: role assignments with human-readable scope,
+    assigned projects, recent requests/contributions, notifications, and
+    password-security actions -- replaces the volunteer-oriented, commonly-
+    empty "My Profile" page. See PLAN.md "USC My Profile" finding."""
+    return render_template('dashboard/profile.html', person=g.user.person, **build_account_activity(g.user))

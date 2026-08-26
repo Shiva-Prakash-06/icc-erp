@@ -8,8 +8,10 @@ __pycache__/
 .coverage
 htmlcov/
 instance/*.db
+instance/*.db.*
 instance/*.sqlite*
 instance/dev_secret_key
+instance/UAT_CREDENTIALS.txt
 !instance/.gitkeep
 .terraform/
 *.tfstate
@@ -18,3 +20,4 @@ crash.log
 *.tfvars
 test-results/
 playwright-report/
+dist/

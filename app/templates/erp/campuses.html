@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Campuses{% endblock %}
+{% block mobile_title %}Campuses{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-eyebrow">Read-only</div>
+    <h1 class="page-title">Campuses</h1>
+    <p class="page-subtitle">Campuses derived from the projects visible in your assigned scope.</p>
+  </div>
+</header>
+
+<div class="page-stack">
+  <section class="page-section page-section--narrow" aria-labelledby="campuses-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="campuses-title">Campus directory</h2>
+        <p class="page-section__hint">Every campus with at least one project in your assigned scope.</p>
+      </div>
+    </div>
+    <ul class="summary-row">
+      <li class="summary-row__item"><span class="summary-row__value">{{ rows|length }}</span> campus{{ 'es' if rows|length != 1 else '' }} in scope</li>
+      <li class="summary-row__item"><span class="summary-row__value">{{ rows|sum(attribute='project_count') }}</span> projects total</li>
+      <li class="summary-row__item"><span class="summary-row__value">{{ rows|sum(attribute='active_count') }}</span> active</li>
+    </ul>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0">
+        <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+          <thead><tr><th>Campus</th><th>Code</th><th>Projects in scope</th><th>Active</th><th></th></tr></thead>
+          <tbody>
+          {% for row in rows %}
+          <tr>
+            <td data-label="Campus" class="fw-semibold">{{ row.campus.name }}</td>
+            <td data-label="Code" class="font-monospace">{{ row.campus.code or 'Not set' }}</td>
+            <td data-label="Projects in scope">{{ row.project_count }}</td>
+            <td data-label="Active">{{ row.active_count }}</td>
+            <td><a class="aurora-button--outline-info aurora-button--small" href="{{ url_for('erp.campus_detail', public_id=row.campus.public_id) }}">Open</a></td>
+          </tr>
+          {% else %}<tr><td colspan="5" class="text-center text-muted py-4">No campuses are visible in your assigned scope.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

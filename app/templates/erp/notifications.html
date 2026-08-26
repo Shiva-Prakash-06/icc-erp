@@ -1,16 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Notifications{% endblock %}
+{% block mobile_title %}Notifications{% endblock %}
 {% block content %}
 <div class="container-fluid">
-  <header class="page-header"><div><div class="page-eyebrow">Personal activity stream</div><h1 class="page-title">Notifications</h1><p class="page-subtitle">Assignments, decisions, deadlines, and operational alerts.</p></div><span class="aurora-badge">{{ notifications|length }} records</span></header>
+  <header class="page-header"><div><div class="page-eyebrow">Personal activity stream</div><div class="d-flex align-items-center gap-3 flex-wrap"><h1 class="page-title">Notifications</h1><span class="aurora-badge">{{ notifications|length }} records</span></div><p class="page-subtitle">Assignments, decisions, deadlines, and operational alerts.</p></div></header>
   <div class="aurora-card mb-4">
     <div class="aurora-card__header"><strong>Delivery preference</strong></div>
     <div class="aurora-card__body">
-      <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-end">
-        <div class="col-md-5"><label class="aurora-label" for="event_type">Event type</label><select class="aurora-select" id="event_type" name="event_type"><option value="task.deadline">Task deadlines</option><option value="checklist.deadline">Checklist deadlines</option><option value="task.status">Task decisions</option></select></div>
-        <div class="col-md-2 aurora-choice"><input class="aurora-choice__input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="aurora-choice__label" for="email_enabled">Email</label></div>
-        <div class="col-md-2 aurora-choice"><input class="aurora-choice__input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="aurora-choice__label" for="in_app_enabled">In app</label></div>
-        <div class="col-md-3"><button class="aurora-button--primary w-100">Save preference</button></div>
+      <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-start" data-ui-pending-submit data-ui-pending-label="Saving…">
+        <div class="col-md-5">
+          <label class="aurora-label" for="event_type">Event type</label>
+          <select class="aurora-select" id="event_type" name="event_type"><option value="task.deadline">Task deadlines</option><option value="checklist.deadline">Checklist deadlines</option><option value="task.status">Task decisions</option></select>
+          <small class="aurora-file-field__hint">Delivery settings below apply to this alert category.</small>
+        </div>
+        <div class="col-md-4" role="group" aria-label="Delivery channels">
+          <span class="aurora-label d-block">Delivery channels</span>
+          <div class="d-flex gap-3 flex-wrap">
+            <div class="aurora-choice"><input class="aurora-choice__input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="aurora-choice__label" for="email_enabled">Email</label></div>
+            <div class="aurora-choice"><input class="aurora-choice__input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="aurora-choice__label" for="in_app_enabled">In app</label></div>
+          </div>
+          <small class="aurora-file-field__hint">Critical security and direct-assignment alerts always stay enabled.</small>
+        </div>
+        <div class="col-md-3"><button class="aurora-button--primary w-100" type="submit">Save preference</button></div>
       </form>
     </div>
   </div>

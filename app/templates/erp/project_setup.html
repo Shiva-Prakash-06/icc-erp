@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Set up — {{ project.title }}{% endblock %}
+{% block mobile_title %}{{ project.code }} setup{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Setup{% endblock %}
+{% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id) }}{% endblock %}
 {% block content %}
 <nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item" aria-current="page">{{ project.code }} setup</li></ol></nav>
 <header class="page-header">
@@ -7,19 +10,33 @@
   <a class="aurora-button--secondary" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Skip to full project page</a>
 </header>
 
-<ol class="aurora-breadcrumb mb-4" aria-label="Setup progress">
+<ol class="aurora-stepper mb-4" aria-label="Setup progress">
   {% for step_key in steps %}
-  {% if not is_igp and step_key == 'team' %}{% endif %}
-  <li class="aurora-breadcrumb__item{% if step_key == step %} fw-bold{% endif %}">
-    <a href="{{ url_for('erp.project_setup', public_id=project.public_id, step=step_key) }}">
-      {% if completed[step_key] %}<i class="ph ph-check-circle" aria-hidden="true"></i>{% endif %}
+  <li class="aurora-stepper__item{% if step_key == step %} aurora-stepper__item--current{% elif completed[step_key] %} aurora-stepper__item--complete{% endif %}">
+    <a class="aurora-stepper__link" href="{{ url_for('erp.project_setup', public_id=project.public_id, step=step_key) }}"{% if step_key == step %} aria-current="step"{% endif %}>
+      <span class="aurora-stepper__index" aria-hidden="true">{% if completed[step_key] %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}{{ loop.index }}{% endif %}</span>
       {{ step_key|replace('_', ' ')|title }}
     </a>
   </li>
   {% endfor %}
 </ol>
+<p class="page-section__hint mb-4">Step {{ steps.index(step) + 1 }} of {{ steps|length }}{% if completed[step] %} · already completed — you can revise it below{% endif %}.</p>
 
-{% if step == 'sessions' %}
+{% if step == 'basics' %}
+<div class="aurora-card--padded">
+  <h2 class="h4 mb-2">Project basics</h2>
+  <p class="text-muted mb-3">Review the project identity and delivery dates before adding operational records.</p>
+  <form method="POST" action="{{ url_for('erp.update_project_basics', public_id=project.public_id) }}" class="row g-3">
+    <div class="col-md-8"><label class="aurora-label" for="basic-title">Title <span aria-hidden="true">*</span></label><input id="basic-title" class="aurora-input" name="title" value="{{ project.title }}" required></div>
+    <div class="col-md-2"><label class="aurora-label" for="basic-start">Start <span aria-hidden="true">*</span></label><input id="basic-start" type="date" class="aurora-input" name="start_date" value="{{ project.start_date }}" required></div>
+    <div class="col-md-2"><label class="aurora-label" for="basic-end">End <span aria-hidden="true">*</span></label><input id="basic-end" type="date" class="aurora-input" name="end_date" value="{{ project.end_date }}" required></div>
+    <div class="col-md-6"><label class="aurora-label" for="basic-venue">Venue</label><input id="basic-venue" class="aurora-input" name="venue" value="{{ project.venue or '' }}"></div>
+    <div class="col-md-6"><label class="aurora-label" for="basic-audience">Target audience</label><input id="basic-audience" class="aurora-input" name="target_audience" value="{{ project.target_audience or '' }}"></div>
+    <div class="col-12"><label class="aurora-label" for="basic-description">Description</label><textarea id="basic-description" class="aurora-input" name="description" rows="3">{{ project.description or '' }}</textarea></div>
+    <div class="col-12"><button class="aurora-button--primary">Save and continue to sessions</button></div>
+  </form>
+</div>
+{% elif step == 'sessions' %}
 <div class="aurora-card--padded">
   <h2 class="h4 mb-2">Sessions &amp; schedule</h2>
   <p class="text-muted mb-3">Add every scheduled segment of this project (e.g. orientation, main event, closing). You can add more than one.</p>
@@ -29,7 +46,8 @@
   <form method="POST" action="{{ url_for('erp.add_session', public_id=project.public_id) }}" class="row g-2">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-4"><label class="aurora-label" for="s_title">Session title</label><input id="s_title" class="aurora-input" name="title" required></div>
-    <div class="col-md-2"><label class="aurora-label" for="s_type">Type</label><input id="s_type" class="aurora-input" name="session_type" placeholder="e.g. Orientation"></div>
+    <div class="col-md-2"><label class="aurora-label" for="s_type">Type</label><select id="s_type" class="aurora-select" name="session_type">{% for option in session_type_options %}<option>{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="aurora-label" for="s_type_other">If "Other", specify</label><input id="s_type_other" class="aurora-input" name="session_type_other"></div>
     <div class="col-md-3"><label class="aurora-label" for="s_start">Starts</label><input id="s_start" type="datetime-local" class="aurora-input" name="starts_at" required></div>
     <div class="col-md-3"><label class="aurora-label" for="s_end">Ends</label><input id="s_end" type="datetime-local" class="aurora-input" name="ends_at" required></div>
     <div class="col-12"><button class="aurora-button--primary">Add session</button></div>
@@ -38,16 +56,41 @@
 {% elif step == 'team' %}
 <div class="aurora-card--padded">
   <h2 class="h4 mb-2">Team &amp; roster</h2>
-  <p class="text-muted mb-3">Enroll people onto the project team by their registration number.</p>
+  <p class="text-muted mb-3">Search for an existing person, or add a new participant below. A registration number is not required.</p>
   {% if project.team_assignments %}
   <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Name</th><th>Role</th></tr></thead><tbody>{% for assignment in project.team_assignments %}<tr><td>{{ assignment.person.display_name }}</td><td>{{ assignment.role_label or assignment.assignment_type }}</td></tr>{% endfor %}</tbody></table></div>
   {% endif %}
-  <form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="row g-2">
+  <form method="GET" class="row g-2 mb-3"><input type="hidden" name="step" value="team"><div class="col-md-9"><label class="aurora-label" for="people_q">Search people by name, email, or registration number</label><input id="people_q" class="aurora-input" name="people_q" value="{{ people_query }}" placeholder="Start typing at least 2 characters…"></div><div class="col-md-3 align-self-end"><button class="aurora-button--secondary w-100">Search</button></div></form>
+  {% if people_query %}
+  {% if people_matches %}
+  <div class="aurora-list aurora-list--flush mb-3">
+    {% for match in people_matches %}
+    <form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="aurora-list__item d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <input type="hidden" name="person_public_id" value="{{ match.public_id }}">
+      <input type="hidden" name="next" value="setup">
+      <span>{{ match.display_name }}{% if match.registration_number %}<span class="small text-muted"> · {{ match.registration_number }}</span>{% endif %}</span>
+      <span class="aurora-inline-decision">
+        <span class="aurora-inline-field"><label class="aurora-inline-label" for="setup-assignment-type-{{ match.public_id }}">Assignment type <span class="visually-hidden">for {{ match.display_name }}</span></label>
+        <select id="setup-assignment-type-{{ match.public_id }}" class="aurora-select aurora-select--small" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></span>
+        {% if match.is_member %}<span class="aurora-badge aurora-badge--status-active">Already a member</span>{% else %}<button class="aurora-button--small aurora-button--outline-primary">Add</button>{% endif %}
+      </span>
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-info">No matches. Add them as a new participant below.</div>
+  {% endif %}
+  {% endif %}
+  <form method="POST" action="{{ url_for('erp.create_and_enroll_team_member', public_id=project.public_id) }}" class="row g-2">
     <input type="hidden" name="next" value="setup">
-    <div class="col-md-4"><label class="aurora-label" for="t_reg">Registration number</label><input id="t_reg" class="aurora-input" name="registration_number" required></div>
-    <div class="col-md-4"><label class="aurora-label" for="t_type">Assignment type</label><select id="t_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div>
-    <div class="col-md-4"><label class="aurora-label" for="t_role">Role label</label><input id="t_role" class="aurora-input" name="role_label" placeholder="e.g. Volunteer"></div>
-    <div class="col-12"><button class="aurora-button--primary">Add to team</button></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_first_name">First name</label><input id="t_first_name" class="aurora-input" name="first_name" required></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_last_name">Last name</label><input id="t_last_name" class="aurora-input" name="last_name"></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_email">Email</label><input id="t_email" type="email" class="aurora-input" name="email"></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_reg">Registration number (optional)</label><input id="t_reg" class="aurora-input" name="registration_number"></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_type">Assignment type</label><select id="t_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_role">Role</label><select id="t_role" class="aurora-select" name="role_label"><option value="">Not specified</option>{% for option in assignment_role_options %}<option>{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="aurora-label" for="t_role_other">If "Other", specify</label><input id="t_role_other" class="aurora-input" name="role_label_other"></div>
+    <div class="col-md-3 align-self-end"><button class="aurora-button--primary w-100">Create &amp; add</button></div>
   </form>
 </div>
 {% elif step == 'checklist' %}
@@ -91,7 +134,8 @@
   {% endif %}
   <form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2">
     <input type="hidden" name="next" value="setup">
-    <div class="col-md-4"><label class="aurora-label" for="b_category">Category</label><input id="b_category" class="aurora-input" name="category" required></div>
+    <div class="col-md-2"><label class="aurora-label" for="b_category">Category</label><select id="b_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option>{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="aurora-label" for="b_category_other">If "Other", specify</label><input id="b_category_other" class="aurora-input" name="category_other"></div>
     <div class="col-md-5"><label class="aurora-label" for="b_description">Description</label><input id="b_description" class="aurora-input" name="description"></div>
     <div class="col-md-3"><label class="aurora-label" for="b_amount">Estimated amount</label><input id="b_amount" type="number" step="0.01" min="0" class="aurora-input" name="estimated_amount"></div>
     <div class="col-12"><button class="aurora-button--primary">Add budget line</button></div>

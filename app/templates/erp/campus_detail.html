@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ campus.name }}{% endblock %}
+{% block mobile_title %}{{ campus.name }}{% endblock %}
+{% block content %}
+<nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.campuses') }}">Campuses</a></li><li class="aurora-breadcrumb__item" aria-current="page">{{ campus.name }}</li></ol></nav>
+<header class="page-header">
+  <div>
+    <div class="page-eyebrow font-monospace">{{ campus.code or 'Not set' }}</div>
+    <h1 class="page-title">{{ campus.name }}</h1>
+    <p class="page-subtitle">Projects in this campus visible in your assigned scope.</p>
+  </div>
+</header>
+
+<div class="page-stack">
+  <section class="page-section page-section--narrow" aria-labelledby="campus-projects-title">
+    <div class="page-section__bar">
+      <div class="page-section__head">
+        <h2 class="page-section__title" id="campus-projects-title">Projects</h2>
+        <p class="page-section__hint">Projects at this campus that are visible in your assigned scope.</p>
+      </div>
+    </div>
+    <ul class="summary-row">
+      <li class="summary-row__item"><span class="summary-row__value">{{ projects|length }}</span> project{{ 's' if projects|length != 1 else '' }} in scope</li>
+    </ul>
+    <div class="aurora-card">
+      <div class="aurora-table-scroll" tabindex="0">
+        <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
+          <thead><tr><th>Code</th><th>Project</th><th>Program</th><th>Dates</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for project in projects %}
+          <tr>
+            <td data-label="Code" class="font-monospace">{{ project.code or 'Uncoded' }}</td>
+            <td data-label="Project"><a class="fw-semibold" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.title }}</a></td>
+            <td data-label="Program">{{ project.program_type.name }}</td>
+            <td data-label="Dates" class="font-monospace text-xs">{{ project.start_date.strftime('%d %b %Y') }} – {{ project.end_date.strftime('%d %b %Y') }}</td>
+            <td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span></td>
+          </tr>
+          {% else %}<tr><td colspan="5" class="text-center text-muted py-4">No projects in this campus are visible in your assigned scope.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
