@@ -83,6 +83,19 @@ class ProductionConfigValidationTestCase(unittest.TestCase):
                 "postgresql+psycopg://user:pass@host/db",
             )
 
+    def test_supabase_direct_url_is_rewritten_to_ipv4_session_pooler(self):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://postgres:secret@db.projectref.supabase.co:5432/postgres?sslmode=require",
+                "SUPABASE_POOLER_HOST": "aws-0-ap-northeast-1.pooler.supabase.com",
+            },
+        ):
+            self.assertEqual(
+                _database_url("unused.db"),
+                "postgresql+psycopg://postgres.projectref:secret@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require",
+            )
+
     def test_fails_when_secret_key_missing(self):
         self._set_env({})
         os.environ.pop("SECRET_KEY", None)

@@ -7,6 +7,7 @@ database. Development defaults are isolated from the legacy v2 database.
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from datetime import timedelta
 from pathlib import Path
@@ -39,6 +40,26 @@ def _persisted_dev_secret_key() -> str:
 def _database_url(default_name: str) -> str:
     value = os.getenv("DATABASE_URL")
     if value:
+        # Supabase's direct database endpoint is IPv6-only. Vercel Functions
+        # currently need the IPv4-compatible session pooler. Preserve the
+        # password embedded in DATABASE_URL and replace only its username,
+        # host, and port when a pooler host is configured.
+        pooler_host = os.getenv("SUPABASE_POOLER_HOST", "").strip()
+        direct_match = re.match(
+            r"^(?P<scheme>postgres(?:ql)?(?:\+psycopg)?://)"
+            r"(?P<username>[^:@/]+):(?P<password>[^@]+)@"
+            r"db\.(?P<project_ref>[a-z0-9]+)\.supabase\.co(?::\d+)?"
+            r"(?P<suffix>/.*)$",
+            value,
+            flags=re.IGNORECASE,
+        )
+        if pooler_host and direct_match:
+            value = (
+                "postgresql+psycopg://"
+                f"postgres.{direct_match.group('project_ref')}:"
+                f"{direct_match.group('password')}@{pooler_host}:5432"
+                f"{direct_match.group('suffix')}"
+            )
         # Use the installed Psycopg 3 driver explicitly. SQLAlchemy otherwise
         # maps a plain postgresql:// URL to the legacy psycopg2 package, which
         # is intentionally not part of the runtime dependency set.
@@ -95,6 +116,7 @@ class BaseConfig:
     # (Google Drive, GCP jobs, SMTP, breach checks) are connected.
     DISABLE_EXTERNAL_INTEGRATIONS = os.getenv("DISABLE_EXTERNAL_INTEGRATIONS", "false").lower() == "true"
     GOOGLE_DRIVE_REPOSITORY_ROOT_ID = os.getenv("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
+    SUPABASE_POOLER_HOST = os.getenv("SUPABASE_POOLER_HOST")
     AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD = os.getenv("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD")
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
