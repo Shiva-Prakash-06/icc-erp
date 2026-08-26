@@ -1,5 +1,6 @@
 {
   "buildCommand": "echo 'Flask deployment: no frontend build required'",
+  "outputDirectory": ".",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
