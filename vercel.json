@@ -1,6 +1,12 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "echo 'Flask deployment: no frontend build required'",
   "outputDirectory": ".",
+  "functions": {
+    "api/index.py": {
+      "excludeFiles": "{.agents/**,docs/**,e2e/**,frontend/**,migrations/**,scripts/**,terraform/**,tests/**,**/googleapiclient/discovery_cache/documents/**,*.md,*.pdf,*.jpeg,compose.yaml,Dockerfile,Makefile,playwright.config.ts,requirements-dev.txt}"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
