@@ -137,7 +137,7 @@ class TestingConfig(BaseConfig):
 
 class ProductionConfig(BaseConfig):
     APP_ENV = "production"
-    DEMONSTRATOR = False
+    DEMONSTRATOR = os.getenv("DEMONSTRATOR", "false").lower() == "true"
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = "https"
