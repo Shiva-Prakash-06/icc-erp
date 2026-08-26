@@ -178,7 +178,7 @@ def create_app(config_object=None):
         user_id = session.get("user_id")
         g.user = db.session.get(User, user_id) if user_id else None
 
-        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")):
+        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/internal/seed-acceptance", "/public/")):
             return None
 
         public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.forgot_password_sent", "auth.recover_password"}
