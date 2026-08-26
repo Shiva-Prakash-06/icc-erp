@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "echo 'Flask deployment: no frontend build required'",
+  "buildCommand": "MIGRATION_ONLY=true uv run --frozen flask --app run.py db upgrade",
   "outputDirectory": ".",
   "functions": {
     "api/index.py": {
