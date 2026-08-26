@@ -243,11 +243,12 @@ def create_app(config_object=None):
         command = app.cli.commands.get("seed-acceptance")
         if command is None:
             return {"error": "Seed command unavailable"}, 500
-        try:
-            command.callback()
-        except Exception as exc:
-            app.logger.exception("Acceptance seeding failed")
-            return {"error": f"{type(exc).__name__}: {exc}"}, 500
+        result = app.test_cli_runner().invoke(args=["seed-acceptance"])
+        if result.exception:
+            app.logger.exception("Acceptance seeding failed", exc_info=result.exception)
+            return {"error": f"{type(result.exception).__name__}: {result.exception}"}, 500
+        if result.exit_code:
+            return {"error": result.output.strip() or "Acceptance seeding failed"}, 500
         return {"status": "Acceptance fixtures ready"}
 
     @app.get("/readyz")
