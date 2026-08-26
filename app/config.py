@@ -85,6 +85,9 @@ class BaseConfig:
     OFFLINE_SNAPSHOT_TTL_SECONDS = int(os.getenv("OFFLINE_SNAPSHOT_TTL_SECONDS", "28800"))
     DEMONSTRATOR = os.getenv("DEMONSTRATOR", "true").lower() == "true"
     SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "false").lower() == "true"
+    # Explicit opt-in for hosted acceptance testing before external providers
+    # (Google Drive, GCP jobs, SMTP, breach checks) are connected.
+    DISABLE_EXTERNAL_INTEGRATIONS = os.getenv("DISABLE_EXTERNAL_INTEGRATIONS", "false").lower() == "true"
     GOOGLE_DRIVE_REPOSITORY_ROOT_ID = os.getenv("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
     AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD = os.getenv("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD")
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
@@ -125,7 +128,7 @@ class ProductionConfig(BaseConfig):
         # See PLAN.md "Additional release blockers" finding.
         if not migration_only and os.getenv("RATELIMIT_STORAGE_URI", "memory://").startswith("memory://"):
             missing.append("RATELIMIT_STORAGE_URI (must not be memory:// in production)")
-        if not migration_only:
+        if not migration_only and not os.getenv("DISABLE_EXTERNAL_INTEGRATIONS", "false").lower() == "true":
             if os.getenv("DRIVE_VALIDATION_MODE", "live") != "live":
                 missing.append("DRIVE_VALIDATION_MODE=live")
             if not (os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")):
