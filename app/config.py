@@ -138,6 +138,12 @@ class TestingConfig(BaseConfig):
 class ProductionConfig(BaseConfig):
     APP_ENV = "production"
     DEMONSTRATOR = os.getenv("DEMONSTRATOR", "false").lower() == "true"
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_size": 1,
+        "max_overflow": 0,
+        "pool_timeout": 10,
+    }
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = "https"
