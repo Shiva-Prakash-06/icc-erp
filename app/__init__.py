@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import hmac
 import logging
+import os
 import uuid
 from pathlib import Path
 
@@ -227,6 +229,21 @@ def create_app(config_object=None):
     @app.get("/healthz")
     def healthz():
         return {"status": "ok", "service": "icc-oia-erp"}
+
+    @app.post("/internal/seed-acceptance")
+    def seed_acceptance_internal():
+        """One-time, token-gated acceptance fixture provisioning hook."""
+        expected = os.getenv("ACCEPTANCE_SEED_TOKEN")
+        supplied = request.headers.get("X-Acceptance-Seed-Token", "")
+        if not expected or not hmac.compare_digest(supplied, expected):
+            return {"error": "Not found"}, 404
+        if os.getenv("ACCEPTANCE_SEED") != "1":
+            return {"error": "Acceptance seeding is disabled"}, 403
+        command = app.cli.commands.get("seed-acceptance")
+        if command is None:
+            return {"error": "Seed command unavailable"}, 500
+        command.callback()
+        return {"status": "Acceptance fixtures ready"}
 
     @app.get("/readyz")
     def readyz():
