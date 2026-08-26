@@ -23,5 +23,6 @@ playwright-report/
 dist/
 .vercel
 .vercel_python_packages/
+_uv/
 .env*
 supabase/.temp/
