@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import hmac
 import logging
 import os
 import uuid
@@ -178,7 +177,7 @@ def create_app(config_object=None):
         user_id = session.get("user_id")
         g.user = db.session.get(User, user_id) if user_id else None
 
-        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/internal/seed-acceptance", "/public/")):
+        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")):
             return None
 
         public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.forgot_password_sent", "auth.recover_password"}
@@ -229,57 +228,6 @@ def create_app(config_object=None):
     @app.get("/healthz")
     def healthz():
         return {"status": "ok", "service": "icc-oia-erp"}
-
-    @app.post("/internal/seed-acceptance")
-    @csrf.exempt
-    def seed_acceptance_internal():
-        """One-time, token-gated acceptance fixture provisioning hook."""
-        expected = os.getenv("ACCEPTANCE_SEED_TOKEN")
-        supplied = request.headers.get("X-Acceptance-Seed-Token", "")
-        if not expected or not hmac.compare_digest(supplied, expected):
-            return {"error": "Not found"}, 404
-        if os.getenv("ACCEPTANCE_SEED") != "1":
-            return {"error": "Acceptance seeding is disabled"}, 403
-        from app.models.erp import Person, RoleAssignment
-        from app.models.user import User
-
-        rows = {
-            "e2e_faculty": ("Faculty Administrator", "OIA_FACULTY_ADMINISTRATOR"),
-            "e2e_usc": ("USC", "ICC_SECRETARY_USC"),
-            "e2e_igp": ("IGP Head", "IGP_HEAD"),
-            "e2e_events": ("ICC Head", "ICC_EVENTS_HEAD"),
-            "e2e_volunteer": ("Volunteer", "VOLUNTEER"),
-        }
-        for username, (label, role_code) in rows.items():
-            user = User.query.filter_by(username=username).first()
-            if user is None:
-                person = Person(
-                    first_name=username.removeprefix("e2e_").replace("_", " ").title(),
-                    primary_email=f"{username}@example.test",
-                    person_type="Acceptance fixture",
-                )
-                db.session.add(person)
-                db.session.flush()
-                user = User(username=username, email=person.primary_email, person_id=person.id)
-                db.session.add(user)
-            user.role = label
-            user.preferred_role = label
-            user.status = "Approved"
-            user.needs_password_reset = False
-            user.failed_login_count = 0
-            user.locked_until = None
-            user.set_password("123")
-            db.session.flush()
-            assignment = RoleAssignment.query.filter_by(user_id=user.id, role_code=role_code, is_active=True).first()
-            if assignment is None:
-                db.session.add(RoleAssignment(
-                    user_id=user.id,
-                    role_code=role_code,
-                    is_active=True,
-                    can_view_sensitive_links=role_code in {"OIA_FACULTY_ADMINISTRATOR", "IGP_HEAD"},
-                ))
-        db.session.commit()
-        return {"status": "Acceptance fixtures ready"}
 
     @app.get("/readyz")
     def readyz():
