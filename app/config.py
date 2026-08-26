@@ -39,8 +39,14 @@ def _persisted_dev_secret_key() -> str:
 def _database_url(default_name: str) -> str:
     value = os.getenv("DATABASE_URL")
     if value:
-        # SQLAlchemy no longer accepts Heroku's historic postgres:// prefix.
-        return value.replace("postgres://", "postgresql+psycopg://", 1)
+        # Use the installed Psycopg 3 driver explicitly. SQLAlchemy otherwise
+        # maps a plain postgresql:// URL to the legacy psycopg2 package, which
+        # is intentionally not part of the runtime dependency set.
+        if value.startswith("postgres://"):
+            return "postgresql+psycopg://" + value[len("postgres://"):]
+        if value.startswith("postgresql://"):
+            return "postgresql+psycopg://" + value[len("postgresql://"):]
+        return value
     INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{(INSTANCE_DIR / default_name).resolve()}"
 

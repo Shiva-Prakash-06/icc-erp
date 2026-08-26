@@ -1,10 +1,11 @@
 import os
 import unittest
+from unittest.mock import patch
 
 from limits.storage import storage_from_string
 
 from app import create_app
-from app.config import ProductionConfig
+from app.config import ProductionConfig, _database_url
 
 
 REQUIRED_ENV = {
@@ -74,6 +75,13 @@ class ProductionConfigValidationTestCase(unittest.TestCase):
         options = app.config["SQLALCHEMY_ENGINE_OPTIONS"]
         self.assertTrue(options["pool_pre_ping"])
         self.assertIn("timezone=UTC", options["connect_args"]["options"])
+
+    def test_plain_postgresql_url_selects_installed_psycopg3_driver(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@host/db"}):
+            self.assertEqual(
+                _database_url("unused.db"),
+                "postgresql+psycopg://user:pass@host/db",
+            )
 
     def test_fails_when_secret_key_missing(self):
         self._set_env({})
