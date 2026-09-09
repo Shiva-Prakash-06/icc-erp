@@ -29,6 +29,7 @@ from app.models.erp import (
 )
 from app.models.production import ContributionRecord, ProjectRisk, RecruitmentApplication
 from app.models.project import BuddyAssignment, BuddyLog, Project
+from app.models.user import User
 from app.services.authorization import has_permission
 from app.services.scope import approvable_projects
 
@@ -43,6 +44,7 @@ ACTION_QUEUE_KINDS = (
     "Feedback moderation",
     "Recruitment",
     "Report approval",
+    "Project publication",
 )
 
 
@@ -60,6 +62,11 @@ def build_action_queue(user, projects=None):
         projects = approvable_projects(user)
     project_ids = [project.id for project in projects]
     now = datetime.now(timezone.utc)
+
+    # The caller already holds every in-scope project, so resolving a row's
+    # project through the identity map costs nothing and saves one query per
+    # queue row (audit B13, repeated queries on the home page).
+    projects_by_id = {project.id: project for project in projects}
 
     action_queue = []
     for task in WorkTask.query.filter(WorkTask.project_id.in_(project_ids or [-1]), WorkTask.status == "Submitted").all():
@@ -79,13 +86,46 @@ def build_action_queue(user, projects=None):
         action_queue.append({"kind": "Buddy log", "title": log.description[:100], "project": log.assignment.project, "tab": "contributions", "anchor": log.public_id, "due_at": None})
     for response in FeedbackResponse.query.join(FeedbackForm).filter(FeedbackForm.project_id.in_(project_ids or [-1]), FeedbackResponse.moderation_status == "Pending").all():
         action_queue.append({"kind": "Feedback moderation", "title": response.form.title, "project": response.form.project, "tab": "insights", "anchor": response.public_id, "due_at": None})
-    for application in RecruitmentApplication.query.filter(RecruitmentApplication.project_id.in_(project_ids or [-1]), RecruitmentApplication.decision.in_(["Submitted", "Interview Scheduled"])).all():
-        project = db.session.get(Project, application.project_id)
-        person = db.session.get(Person, application.person_id)
-        action_queue.append({"kind": "Recruitment", "title": f"{person.display_name} · {application.desired_role}", "project": project, "tab": "people", "anchor": application.public_id, "due_at": application.interview_at})
+    applications = RecruitmentApplication.query.filter(RecruitmentApplication.project_id.in_(project_ids or [-1]), RecruitmentApplication.decision.in_(["Submitted", "Interview Scheduled"])).all()
+    people_by_id = {}
+    if applications:
+        person_ids = {application.person_id for application in applications}
+        people_by_id = {person.id: person for person in Person.query.filter(Person.id.in_(person_ids)).all()}
+    for application in applications:
+        person = people_by_id.get(application.person_id)
+        display_name = person.display_name if person else "Unknown applicant"
+        action_queue.append({"kind": "Recruitment", "title": f"{display_name} · {application.desired_role}", "project": projects_by_id.get(application.project_id), "tab": "people", "anchor": application.public_id, "due_at": application.interview_at})
     for snapshot in ReportSnapshot.query.filter(ReportSnapshot.project_id.in_(project_ids or [-1]), ReportSnapshot.approval_status == "Draft").all():
-        project = db.session.get(Project, snapshot.project_id)
-        action_queue.append({"kind": "Report approval", "title": snapshot.title, "project": project, "tab": "insights", "anchor": snapshot.public_id, "due_at": None})
+        action_queue.append({"kind": "Report approval", "title": snapshot.title, "project": projects_by_id.get(snapshot.project_id), "tab": "insights", "anchor": snapshot.public_id, "due_at": None})
+    # Pending project publications were absent from the queue entirely, so
+    # faculty saw 12 items and no publication request while the submitter saw
+    # Pending (audit B12). Requests the viewer raised themselves are left out:
+    # `decide_project_publication` refuses self-review, so listing them would
+    # be another visible action that ends in a denial.
+    pending_publications = [
+        candidate for candidate in projects
+        if candidate.publication_status == "Pending"
+        and candidate.publication_requested_by_id != user.id
+        and has_permission(user, "manage_governance", candidate)
+    ]
+    requesters_by_id = {}
+    if pending_publications:
+        requester_ids = {candidate.publication_requested_by_id for candidate in pending_publications if candidate.publication_requested_by_id}
+        if requester_ids:
+            requesters_by_id = {account.id: account for account in User.query.filter(User.id.in_(requester_ids)).all()}
+    for candidate in pending_publications:
+        requester = requesters_by_id.get(candidate.publication_requested_by_id)
+        requested_by = "an unknown requester"
+        if requester is not None:
+            requested_by = requester.person.display_name if requester.person else requester.username
+        action_queue.append({
+            "kind": "Project publication",
+            "title": f"{candidate.title} · requested by {requested_by}",
+            "project": candidate,
+            "tab": "overview",
+            "anchor": "publication",
+            "due_at": None,
+        })
     action_queue.sort(key=lambda item: (item["due_at"] is None, item["due_at"] or now))
     return action_queue
 

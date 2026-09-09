@@ -48,6 +48,11 @@ def create_app(config_object=None):
     from app.services.timeutil import register_filters
     register_filters(app)
 
+    # Server duration and query counts for the beta latency work (audit B13).
+    # Off unless REQUEST_TIMING_ENABLED is set.
+    from app.services.instrumentation import register_request_timing
+    register_request_timing(app, db)
+
     # Importing models registers all tables with SQLAlchemy/Alembic. Schema
     # creation is intentionally not performed during normal application startup.
     from app import models as _models  # noqa: F401

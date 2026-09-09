@@ -636,3 +636,50 @@ window.ICCOffline = (() => {
     document.querySelectorAll('a[href$="/logout"]').forEach(link => link.addEventListener('click', () => purge()));
     return {refresh, read, purge};
 })();
+
+/* Submitting state for slow saves.
+ *
+ * Audit finding B13: several signed-in saves took many seconds, with no
+ * feedback, so testers clicked again. Disabling the button on submit both
+ * shows that the request is in flight and prevents the duplicate POST.
+ *
+ * The button is disabled *after* the browser has serialised the form, so a
+ * button carrying a name/value still contributes it. Forms that opt out
+ * (multi-step or client-validated) can set `data-no-submitting-state`.
+ */
+(function submittingState() {
+    const BUSY_CLASS = 'is-submitting';
+
+    document.addEventListener('submit', event => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || form.hasAttribute('data-no-submitting-state')) return;
+        if (form.noValidate === false && form.checkValidity() === false) return;
+
+        const trigger = event.submitter;
+        const buttons = form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]');
+        window.setTimeout(() => {
+            buttons.forEach(button => {
+                button.disabled = true;
+                button.classList.add(BUSY_CLASS);
+            });
+            if (trigger && trigger.tagName === 'BUTTON' && !trigger.dataset.originalLabel) {
+                trigger.dataset.originalLabel = trigger.innerHTML;
+                trigger.textContent = trigger.dataset.submittingLabel || 'Working…';
+            }
+        }, 0);
+    });
+
+    /* A browser restoring the page from its back/forward cache would
+     * otherwise show a permanently disabled button. */
+    window.addEventListener('pageshow', event => {
+        if (!event.persisted) return;
+        document.querySelectorAll('.' + BUSY_CLASS).forEach(button => {
+            button.disabled = false;
+            button.classList.remove(BUSY_CLASS);
+            if (button.dataset.originalLabel) {
+                button.innerHTML = button.dataset.originalLabel;
+                delete button.dataset.originalLabel;
+            }
+        });
+    });
+})();

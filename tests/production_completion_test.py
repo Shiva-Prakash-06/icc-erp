@@ -678,15 +678,11 @@ class ProductionCompletionTestCase(unittest.TestCase):
             "ICC-2026-CEN-100,Imported Event,CEN,ICC,2026-2027,2026-09-01,2026-09-02,ICC event,Event,ICC,EVENTS\n",
         )
         imported_project = Project.query.filter_by(code="ICC-2026-CEN-100").one()
-        session = ProjectSession(
-            project_id=imported_project.id,
-            code="MAIN",
-            title="Main session",
-            starts_at=datetime(2026, 9, 1, 9, tzinfo=timezone.utc),
-            ends_at=datetime(2026, 9, 1, 10, tzinfo=timezone.utc),
-        )
-        db.session.add(session)
-        db.session.commit()
+        # The projects importer derives the MAIN session from the project row
+        # itself, so creating one here duplicated (project_id, code) and
+        # tripped the uniqueness constraint.
+        session = ProjectSession.query.filter_by(project_id=imported_project.id, code="MAIN").one()
+        self.assertEqual(session.title, "Imported Event")
 
         import_csv(
             "participants",

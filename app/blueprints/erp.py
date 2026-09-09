@@ -34,8 +34,14 @@ from app.services.audit import record_audit, record_sensitive_access
 from app.services.authorization import can_view_project, has_any_permission, has_permission
 from app.services.buddy import validate_buddy_assignment
 from app.services.drive import DriveStorageError, extract_drive_id, refresh_document_metadata
-from app.services.timeutil import to_utc
-from app.services.imports import STANDARD_IMPORTS, commit_batch, stage_supplied_source, stage_uploaded_source
+from app.services.imports import (
+    STANDARD_IMPORTS,
+    MissingSourceError,
+    available_supplied_sources,
+    commit_batch,
+    stage_supplied_source,
+    stage_uploaded_source,
+)
 from app.services.itinerary import (
     ItineraryParseError,
     commit_itinerary_batch,
@@ -44,6 +50,7 @@ from app.services.itinerary import (
 )
 from app.services.project_quickcreate import create_minimal_project
 from app.services.scope import visible_projects
+from app.services.timeutil import to_utc
 from app.services.buddy_import import BuddyImportError, commit_buddy_batch, stage_buddy_import
 from app.models.erp import ReimbursementEntry
 from app.services.reimbursements import (
@@ -1459,7 +1466,16 @@ def imports():
     if not has_permission(g.user, "manage_imports"):
         abort(403)
     batches = ImportBatch.query.order_by(ImportBatch.created_at.desc()).all()
-    return render_template("erp/imports.html", batches=batches, standard_import_types=sorted(STANDARD_IMPORTS))
+    return render_template(
+        "erp/imports.html",
+        batches=batches,
+        standard_import_types=sorted(STANDARD_IMPORTS),
+        supplied_sources=available_supplied_sources(),
+        # Committing a batch needs the global approval capability. Showing the
+        # button to everyone who can reach this page sent USC into a 403
+        # (audit B11).
+        can_commit=has_permission(g.user, "approve"),
+    )
 
 
 @erp_bp.post("/projects/<string:public_id>/documents/upload")
@@ -1510,6 +1526,8 @@ def stage_import():
     try:
         batch = stage_supplied_source(request.form.get("import_type"))
         flash(f"Batch staged: {batch.staged_count} rows, {batch.error_count} errors.", "success")
+    except MissingSourceError as error:
+        flash(str(error), "warning")
     except (ValueError, FileNotFoundError) as error:
         flash(str(error), "danger")
     return redirect(url_for("erp.imports"))

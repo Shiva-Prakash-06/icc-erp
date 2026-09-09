@@ -43,21 +43,63 @@ from app.services.drive import validate_drive_link
 ROOT = Path(__file__).resolve().parents[3]
 
 
+# Supplied workbooks small enough to ship inside the deployment bundle live
+# here. Audit finding B10: `SOURCE_PATHS` previously resolved only against the
+# folder *above* the repository, which is `/var` on Vercel, so staging a
+# supplied source failed with a bare server path.
+BUNDLED_SOURCE_DIR = Path(__file__).resolve().parents[1] / "data" / "import_sources"
+
+
 def _resolve_source_path(filename: str) -> Path:
+    bundled = BUNDLED_SOURCE_DIR / filename
+    if bundled.exists():
+        return bundled
     direct = ROOT / filename
     if direct.exists():
         return direct
     ref = ROOT / "references" / filename
     if ref.exists():
         return ref
-    return direct
+    return bundled
 
 
 SOURCE_PATHS = {
     "events_summary": _resolve_source_path("2026 ICC EVENTS REPORT SUMMARY.xlsx"),
+    # Not bundled: the Coffee Meet & Greet source is a 79 MB folder of
+    # supporting media, far past a sane serverless bundle. It stays available
+    # to a developer who has the reference folder checked out locally, and is
+    # simply not offered where it is absent.
     "coffee_meet": _resolve_source_path("COFFEE MEET & GREET"),
     "summer_school": _resolve_source_path("_Summer School- Check List.xlsx"),
 }
+
+SOURCE_LABELS = {
+    "events_summary": "2026 events summary",
+    "coffee_meet": "Coffee Meet & Greet folder",
+    "summer_school": "Summer School checklist",
+}
+
+
+def available_supplied_sources() -> list[tuple[str, str]]:
+    """`(import_type, label)` for supplied sources actually present in this
+    deployment, so the UI never offers a source that cannot be staged."""
+    return [(key, SOURCE_LABELS[key]) for key, path in SOURCE_PATHS.items() if path.exists()]
+
+
+class MissingSourceError(FileNotFoundError):
+    """A supplied source is not present in this deployment.
+
+    Carries a message written for the person at the screen; the server
+    filesystem path is deliberately not part of it.
+    """
+
+    def __init__(self, import_type: str):
+        self.import_type = import_type
+        label = SOURCE_LABELS.get(import_type, import_type.replace("_", " "))
+        super().__init__(
+            f"The \u201c{label}\u201d source is not available in this deployment. "
+            "Download the matching template below, fill it in, and use Bulk upload instead."
+        )
 IMPORT_SCHEMA_VERSION = 2
 
 STANDARD_IMPORTS = {
@@ -141,7 +183,7 @@ def stage_supplied_source(import_type):
         raise ValueError("Unknown supplied source type.")
     source = SOURCE_PATHS[import_type]
     if not source.exists():
-        raise FileNotFoundError(source)
+        raise MissingSourceError(import_type)
     batch, created = _new_batch(import_type, source)
     if not created:
         return batch

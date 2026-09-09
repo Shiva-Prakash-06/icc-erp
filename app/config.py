@@ -126,6 +126,11 @@ class BaseConfig:
     # Single display timezone for every create/import/edit path. Datetimes
     # are stored in UTC and rendered in this zone (audit finding B09).
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Kolkata")
+    # Per-request server duration and query counts (audit B13). Enable while
+    # measuring; `REQUEST_TIMING_SLOW_MS` logs only requests at or above a
+    # threshold, so a production sample does not log every request.
+    REQUEST_TIMING_ENABLED = os.getenv("REQUEST_TIMING_ENABLED", "false").lower() == "true"
+    REQUEST_TIMING_SLOW_MS = int(os.getenv("REQUEST_TIMING_SLOW_MS", "0"))
     ALLOW_MOCK_DOCUMENT_STORAGE = True
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))

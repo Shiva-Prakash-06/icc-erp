@@ -45,9 +45,13 @@ def _extension(document: DocumentRecord) -> str:
 
 
 def select_authoritative_report(project) -> DocumentRecord | None:
+    # `nullslast` matters: PostgreSQL sorts NULLs first on a DESC order, so a
+    # document with no Drive modification time would outrank a genuinely
+    # newer one and be assembled as the authoritative report. SQLite orders
+    # the other way, which is why this only ever showed up on PostgreSQL.
     candidates = (
         DocumentRecord.query.filter_by(project_id=project.id, category="Event Report")
-        .order_by(DocumentRecord.drive_modified_at.desc(), DocumentRecord.created_at.desc())
+        .order_by(DocumentRecord.drive_modified_at.desc().nullslast(), DocumentRecord.created_at.desc())
         .all()
     )
     return candidates[0] if candidates else None

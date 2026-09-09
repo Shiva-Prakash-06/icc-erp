@@ -494,7 +494,7 @@ class ImportBatch(PublicIdMixin, TimestampMixin, db.Model):
     __tablename__ = "import_batches"
 
     id = db.Column(db.Integer, primary_key=True)
-    idempotency_key = db.Column(db.String(120), unique=True, nullable=False)
+    idempotency_key = db.Column(db.String(255), unique=True, nullable=False)
     import_type = db.Column(db.String(60), nullable=False)
     source_file = db.Column(db.String(500), nullable=False)
     source_sha256 = db.Column(db.String(64), nullable=False)

@@ -13,7 +13,7 @@ from app.models.erp import BudgetLine, ChecklistTemplate, DocumentRecord, Feedba
 from app.models.production import ContributionRecord, RecruitmentApplication
 from app.models.project import BuddyAssignment, BuddyLog, Project
 from app.services.imports import _reference_data
-from app.services.imports import backfill_summer_school_sample_content, commit_batch, seed_icc_checklist_template, stage_supplied_source
+from app.services.imports import SOURCE_PATHS, backfill_summer_school_sample_content, commit_batch, seed_icc_checklist_template, stage_supplied_source
 from app.services.operations import instantiate_checklist
 from app.services.roles import replace_scoped_assignment
 
@@ -258,6 +258,11 @@ def register_cli(app):
         if not current_app.config.get("DEMONSTRATOR"):
             raise click.ClickException("Sample imports are disabled outside demonstrator environments.")
         for import_type in ("events_summary", "coffee_meet", "summer_school"):
+            if not SOURCE_PATHS[import_type].exists():
+                # Not every supplied source is bundled into a deployment; skip
+                # rather than abort the whole run (audit B10).
+                click.echo(f"{import_type}: source not present in this deployment, skipped")
+                continue
             batch = stage_supplied_source(import_type)
             commit_batch(batch)
             click.echo(

@@ -125,12 +125,50 @@ class ActionQueueTestCase(unittest.TestCase):
         from app.models.erp import ReportSnapshot
         db.session.add(ReportSnapshot(project_id=self.project.id, report_type="Event Report", title="Pending report", approval_status="Draft"))
 
+        # Audit B12: a pending publication is a decision like any other and
+        # belongs in the queue. Requested by someone other than the approver,
+        # since a reviewer may not decide their own request.
+        self.project.publication_status = "Pending"
+        self.project.publication_requested_by_id = self.op_request_approver.id
+
         db.session.commit()
 
-    def test_all_ten_kinds_present_for_an_approver(self):
+    def test_every_pending_kind_is_present_for_an_approver(self):
         queue = build_action_queue(self.approver)
         found_kinds = {item["kind"] for item in queue}
         self.assertEqual(found_kinds, set(ACTION_QUEUE_KINDS))
+
+    # --- Audit B12: pending publications were missing from the queue --------
+
+    def test_pending_publication_reaches_the_faculty_queue(self):
+        queue = build_action_queue(self.approver)
+        publications = [item for item in queue if item["kind"] == "Project publication"]
+        self.assertEqual(len(publications), 1)
+        item = publications[0]
+        self.assertIn("Queue test project", item["title"])
+        self.assertIn("opreqapprover", item["title"])  # names the requester
+        self.assertEqual(item["project"].public_id, self.project.public_id)
+        self.assertEqual((item["tab"], item["anchor"]), ("overview", "publication"))
+
+    def test_a_reviewer_is_not_offered_their_own_publication_request(self):
+        """`decide_project_publication` refuses self-review, so queueing it
+        would be another visible action that ends in a denial (cf. B11)."""
+        self.project.publication_requested_by_id = self.approver.id
+        db.session.commit()
+        queue = build_action_queue(self.approver)
+        self.assertEqual([item for item in queue if item["kind"] == "Project publication"], [])
+
+    def test_a_settled_publication_leaves_the_queue(self):
+        for status in ("Published", "Private", "Withdrawn"):
+            with self.subTest(status=status):
+                self.project.publication_status = status
+                db.session.commit()
+                queue = build_action_queue(self.approver)
+                self.assertEqual([item for item in queue if item["kind"] == "Project publication"], [])
+
+    def test_publication_is_absent_for_a_user_without_governance(self):
+        queue = build_action_queue(self.no_permission_user)
+        self.assertEqual([item for item in queue if item["kind"] == "Project publication"], [])
 
     def test_operational_request_scoped_separately_from_approve(self):
         # A user can hold "approve" on a project without holding

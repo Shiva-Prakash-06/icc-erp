@@ -366,3 +366,10 @@ select option { color: var(--color-text); background: #fff; }
 .admin-user-row__name { color: var(--color-text); font-size: .95rem; }
 .admin-user-row__email { overflow-wrap: anywhere; color: var(--color-text-tertiary); font-size: .8125rem; }
 .admin-user-row__meta { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--color-text-secondary); font-size: .8125rem; }
+
+/* Submitting state (audit B13): a save in flight must look different from
+   one that has not started, so testers stop clicking twice. */
+.is-submitting {
+  cursor: progress;
+  opacity: 0.65;
+}
