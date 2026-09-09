@@ -1,11 +1,14 @@
 import os
 import unittest
+import runpy
 from unittest.mock import patch
 
 from limits.storage import storage_from_string
 
 from app import create_app
 from app.config import ProductionConfig, _database_url
+from app.database import db
+from sqlalchemy.pool import NullPool
 
 
 REQUIRED_ENV = {
@@ -38,6 +41,28 @@ class ProductionConfigValidationTestCase(unittest.TestCase):
     def test_passes_with_complete_configuration(self):
         self._set_env({})
         ProductionConfig.validate()
+
+    def test_vercel_does_not_hold_idle_database_sessions(self):
+        with patch.dict(os.environ, {"VERCEL": "1"}):
+            config = runpy.run_path("app/config.py")["ProductionConfig"]
+        self.assertIs(config.SQLALCHEMY_ENGINE_OPTIONS["poolclass"], NullPool)
+        self.assertNotIn("pool_size", config.SQLALCHEMY_ENGINE_OPTIONS)
+
+    def test_assets_and_liveness_do_not_lookup_signed_in_user(self):
+        class IsolatedConfig:
+            TESTING = True
+            SECRET_KEY = "test-only-key"
+            SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+            SQLALCHEMY_TRACK_MODIFICATIONS = False
+            WTF_CSRF_ENABLED = False
+            RATELIMIT_ENABLED = False
+        app = create_app(IsolatedConfig)
+        client = app.test_client()
+        with client.session_transaction() as session:
+            session["user_id"] = 123
+        with patch.object(db.session, "get", side_effect=AssertionError("Unexpected database access")):
+            self.assertEqual(client.get("/healthz").status_code, 200)
+            self.assertEqual(client.get("/static/manifest.webmanifest").status_code, 200)
 
     def test_serving_fails_when_ratelimit_storage_is_in_memory(self):
         self._set_env({"RATELIMIT_STORAGE_URI": "memory://", "MIGRATION_ONLY": "false"})

@@ -61,6 +61,17 @@ class ActionQueueTestCase(unittest.TestCase):
         db.drop_all()
         self.context.pop()
 
+    def test_approved_request_keeps_completion_action_reachable(self):
+        item = OperationalRequest.query.filter_by(title="Pending request").one()
+        item.status = "Approved"
+        db.session.commit()
+        client = self.app.test_client()
+        client.post("/login", data={"username": "approver", "password": "A-secure-test-password-2026"})
+        response = client.get(f"/erp/projects/{self.project.public_id}?tab=finance")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Mark completed", response.data)
+        self.assertNotIn(b"Show 1 settled request", response.data)
+
     def _seed_one_pending_item_of_every_kind(self):
         db.session.add(WorkTask(project_id=self.project.id, title="Pending task", status="Submitted", version=1))
 

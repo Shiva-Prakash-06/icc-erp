@@ -103,7 +103,7 @@ def landing():
     total_active = _published_projects_query().filter(Project.status.in_(("Planned", "Active", "Closing"))).count()
     analytics = _published_analytics_payload() if (total_completed + total_active) > 0 else None
     return render_template(
-        "public/landing.html",
+        "public_site/landing.html",
         total_completed=total_completed,
         total_active=total_active,
         analytics=analytics,
@@ -114,7 +114,7 @@ def landing():
 @public_bp.get("/events")
 def events():
     projects = _published_projects_query().order_by(Project.start_date.desc()).all()
-    return render_template("public/events.html", events=[_public_project_fields(project) for project in projects])
+    return render_template("public_site/events.html", events=[_public_project_fields(project) for project in projects])
 
 
 @public_bp.get("/events/<string:code>")
@@ -137,7 +137,7 @@ def event_detail(code):
         ).all()
     )
     return render_template(
-        "public/event_detail.html",
+        "public_site/event_detail.html",
         event=_public_project_fields(project),
         reports=[_public_snapshot_fields(snapshot) for snapshot in reports],
         documents=[{"title": document.title, "category": document.category, "drive_url": document.drive_url} for document in documents],
@@ -161,7 +161,7 @@ def reports():
         ):
             continue
         rows.append({**_public_snapshot_fields(snapshot), "project_code": project.code if project else None, "project_title": project.title if project else "Multi-project rollup"})
-    return render_template("public/reports.html", reports=rows)
+    return render_template("public_site/reports.html", reports=rows)
 
 
 @public_bp.get("/analytics-data")

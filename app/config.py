@@ -11,6 +11,7 @@ import re
 import secrets
 from datetime import timedelta
 from pathlib import Path
+from sqlalchemy.pool import NullPool
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -144,6 +145,10 @@ class ProductionConfig(BaseConfig):
         "max_overflow": 0,
         "pool_timeout": 10,
     }
+    if os.getenv("VERCEL"):
+        # Frozen serverless instances otherwise retain one session each and
+        # collectively exhaust Supabase's small session-pool client limit.
+        SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "poolclass": NullPool}
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = "https"

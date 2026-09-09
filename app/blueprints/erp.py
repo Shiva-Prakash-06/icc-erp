@@ -403,8 +403,10 @@ def project_detail(public_id):
         settled_tasks=[task for task in project.work_tasks if task.status in SETTLED_WORK_STATUSES],
         open_contributions=[c for c in project.contribution_records if c.approval_status == "Pending"],
         settled_contributions=[c for c in project.contribution_records if c.approval_status != "Pending"],
-        open_requests=[r for r in project.operational_requests if r.status not in {"Approved", "Rejected", "Completed", "Cancelled"}],
-        settled_requests=[r for r in project.operational_requests if r.status in {"Approved", "Rejected", "Completed", "Cancelled"}],
+        # Approved requests still need completion; rejected requests can be
+        # revised/resubmitted. Keep their actions reachable until terminal.
+        open_requests=[r for r in project.operational_requests if r.status not in {"Completed", "Cancelled"}],
+        settled_requests=[r for r in project.operational_requests if r.status in {"Completed", "Cancelled"}],
         open_budget_lines=[b for b in project.budget_lines if b.status not in {"Approved", "Rejected"}],
         settled_budget_lines=[b for b in project.budget_lines if b.status in {"Approved", "Rejected"}],
     )
@@ -1047,6 +1049,31 @@ def decide_document_route(public_id, document_public_id):
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
     return _redirect_to_tab(project, "resources")
+
+
+@erp_bp.post("/projects/<string:public_id>/closure-summary")
+def save_closure_summary(public_id):
+    project = _project(public_id)
+    if not has_permission(g.user, "approve", project):
+        abort(403)
+    try:
+        if int(request.form.get("version")) != project.version:
+            raise ValueError("This project was changed by another user; refresh before retrying.")
+        summary = (request.form.get("closure_summary") or "").strip()
+        if not summary:
+            raise ValueError("Enter a closure summary before saving.")
+        if project.status in {"Completed", "Archived", "Cancelled"}:
+            raise ValueError("The closure summary cannot be edited after the project is settled.")
+        before = {"closure_summary": project.closure_summary, "version": project.version}
+        project.closure_summary = summary
+        project.version += 1
+        record_audit("project.closure_summary", project, before=before,
+                     after={"closure_summary": summary, "version": project.version}, actor=g.user)
+        db.session.commit()
+        flash("Closure summary saved. Review any remaining blockers before completing the project.", "success")
+    except (ValueError, TypeError) as error:
+        flash(str(error), "danger")
+    return redirect(url_for("erp.project_detail", public_id=project.public_id))
 
 
 @erp_bp.post("/projects/<string:public_id>/transition")

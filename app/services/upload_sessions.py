@@ -80,7 +80,7 @@ def start_upload_session(project, filename: str, total_size: int, actor, *, cate
     }
     client = _redis_client()
     if client:
-        client.hset(f"upload:{session_id}:meta", mapping={k: str(v) for k, v in metadata.items()})
+        client.hset(f"upload:{session_id}:meta", mapping={k: "" if v is None else str(v) for k, v in metadata.items()})
         client.expire(f"upload:{session_id}:meta", 3600)
     else:
         _MEMORY_STORE[session_id] = {**metadata, "buffer": bytearray()}
@@ -119,8 +119,10 @@ def complete_upload_session(session_id: str, actor) -> DocumentRecord:
         project_id = int(meta["project_id"])
         filename = meta["filename"]
         total_size = int(meta["total_size"])
-        category_override = meta.get("category") or None
-        classification_override = meta.get("classification") or None
+        # Accept sessions created before optional values stopped being encoded
+        # as the literal string "None" as well as new sessions.
+        category_override = None if meta.get("category") in (None, "", "None") else meta["category"]
+        classification_override = None if meta.get("classification") in (None, "", "None") else meta["classification"]
         client.delete(meta_key, f"upload:{session_id}:data")
     else:
         session = _MEMORY_STORE.pop(session_id, None)

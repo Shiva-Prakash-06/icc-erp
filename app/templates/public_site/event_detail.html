@@ -1,4 +1,4 @@
-{% extends "public/base.html" %}
+{% extends "public_site/base.html" %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
 <nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('public.events') }}">Events</a></li><li class="aurora-breadcrumb__item" aria-current="page">{{ event.title }}</li></ol></nav>

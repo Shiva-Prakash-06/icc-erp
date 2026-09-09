@@ -9,6 +9,7 @@ from datetime import date as date_cls
 from app.database import db
 from app.models.erp import OperatingUnit
 from app.models.project import AcademicYear, Campus, Project, ProgramType
+from app.services.authorization import ROLE_PERMISSIONS, _active_assignments, has_permission
 
 
 def infer_status_from_dates(start_date, end_date, today=None) -> str:
@@ -41,16 +42,33 @@ def create_minimal_project(*, program_type_name: str, title: str, start_date, en
     if not academic_year:
         raise ValueError("No academic year is configured yet; add one before creating a project.")
 
+    # Infer the new record from an actual creation scope. In particular, a
+    # wing head must not create a wing-less record that they cannot reopen.
+    assignments = sorted(_active_assignments(actor), key=lambda row: row.id)
+    creation_scope = next((row for row in assignments
+        if "manage_projects" in ROLE_PERMISSIONS.get(row.role_code, set())
+        and not row.project_id
+        and (not row.operating_unit_id or row.operating_unit_id == getattr(unit, "id", None))), None)
+    if creation_scope is None:
+        raise ValueError("Your role cannot create a project for this program. Choose a program in your assigned scope.")
+    if creation_scope.campus_id:
+        campus = db.session.get(Campus, creation_scope.campus_id)
+    if creation_scope.academic_year_id:
+        academic_year = db.session.get(AcademicYear, creation_scope.academic_year_id)
+
     default_project_type = "IGP inbound program" if program_type_name == "IGP" else "ICC event"
     project = Project(
         title=title, campus_id=campus.id, program_type_id=program.id,
         academic_year_id=academic_year.id, operating_unit_id=getattr(unit, "id", None),
+        wing_id=creation_scope.wing_id,
         project_type=default_project_type, category="Operational",
         status=infer_status_from_dates(start_date, end_date),
         start_date=start_date, end_date=end_date,
         venue=(venue or "").strip() or None, target_audience=(target_audience or "").strip() or None,
         owner_person_id=getattr(actor, "person_id", None),
     )
+    if not has_permission(actor, "manage_projects", project):
+        raise ValueError("The inferred project is outside your assigned scope.")
     db.session.add(project)
     db.session.flush()
     project.code = f"{program.name.upper()}-{start_date.year}-{campus.code or 'CAMP'}-{project.id:04d}"

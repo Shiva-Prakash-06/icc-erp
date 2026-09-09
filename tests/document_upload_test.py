@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import MagicMock, patch
 from datetime import date
 
 os.environ["TESTING"] = "true"
@@ -54,6 +55,21 @@ class DocumentUploadTestCase(unittest.TestCase):
         self.assertEqual(doc.status, "Indexed")
         self.assertIsNotNone(doc.checksum_sha256)
         self.assertEqual(doc.uploaded_by_id, self.user.id)
+
+    def test_redis_optional_metadata_keeps_filename_classification(self):
+        client = MagicMock()
+        with patch("app.services.upload_sessions._redis_client", return_value=client):
+            session_id = start_upload_session(self.project, "UC Screen Flyer.pdf", 12, self.user)
+            metadata = client.hset.call_args.kwargs["mapping"]
+            self.assertEqual(metadata["category"], "")
+            self.assertEqual(metadata["classification"], "")
+            # Also exercise an in-flight session written by the old version.
+            metadata["category"] = metadata["classification"] = "None"
+            client.hgetall.return_value = {k.encode(): v.encode() for k, v in metadata.items()}
+            client.get.return_value = b"poster-bytes"
+            document = complete_upload_session(session_id, self.user)
+        self.assertEqual(document.category, "Screen Banner")
+        self.assertEqual(document.permission_classification, "Public")
 
     def test_identical_upload_is_deduplicated_by_checksum(self):
         first = upload_file_single_shot(self.project, "Lamppost.pdf", b"same-bytes", self.user)

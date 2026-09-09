@@ -7,7 +7,7 @@ os.environ["TESTING"] = "true"
 
 from app import create_app
 from app.database import db
-from app.models.erp import DocumentRecord, OperatingUnit, RoleAssignment
+from app.models.erp import DocumentRecord, OperatingUnit, RoleAssignment, Wing
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.user import User
 from app.services.project_quickcreate import create_minimal_project, infer_status_from_dates
@@ -58,8 +58,9 @@ class CreateMinimalProjectTestCase(unittest.TestCase):
         return self.client.post("/login", data={"username": "admin", "password": "A-secure-test-password-2026"}, follow_redirects=True)
 
     def test_only_title_and_dates_are_required(self):
+        start = date.today() + timedelta(days=7)
         project = create_minimal_project(
-            program_type_name="IGP", title="Minimal IGP", start_date=date(2026, 9, 1), end_date=date(2026, 9, 2), actor=self.user,
+            program_type_name="IGP", title="Minimal IGP", start_date=start, end_date=start + timedelta(days=1), actor=self.user,
         )
         self.assertEqual(project.title, "Minimal IGP")
         self.assertEqual(project.campus_id, self.campus.id)
@@ -105,6 +106,35 @@ class CreateMinimalProjectTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         project = Project.query.filter_by(title="Route Created").one()
         self.assertEqual(project.program_type.name, "ICC")
+
+    def test_wing_head_can_reopen_created_project(self):
+        wing = Wing(code="EVENTS", name="Events", operating_unit_id=self.unit_icc.id)
+        db.session.add(wing)
+        db.session.flush()
+        RoleAssignment.query.filter_by(user_id=self.user.id).delete()
+        db.session.add(RoleAssignment(user_id=self.user.id, role_code="ICC_EVENTS_HEAD",
+            campus_id=self.campus.id, academic_year_id=self.year.id,
+            operating_unit_id=self.unit_icc.id, wing_id=wing.id, is_active=True))
+        db.session.commit()
+        self._login()
+        response = self.client.post("/erp/projects/quick-create", data={
+            "program_type_name": "ICC", "title": "Head owned event",
+            "start_date": "2026-09-13", "end_date": "2026-09-13",
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        project = Project.query.filter_by(title="Head owned event").one()
+        self.assertEqual(project.wing_id, wing.id)
+        self.assertIn(b"Head owned event", response.data)
+
+    def test_wrong_program_does_not_create_unreachable_record(self):
+        RoleAssignment.query.filter_by(user_id=self.user.id).delete()
+        db.session.add(RoleAssignment(user_id=self.user.id, role_code="ICC_SECRETARY_USC",
+            operating_unit_id=self.unit_icc.id, is_active=True))
+        db.session.commit()
+        with self.assertRaisesRegex(ValueError, "assigned scope"):
+            create_minimal_project(program_type_name="IGP", title="Wrong unit",
+                start_date=date(2026, 9, 13), end_date=date(2026, 9, 13), actor=self.user)
+        self.assertEqual(Project.query.filter_by(title="Wrong unit").count(), 0)
 
     def test_quick_create_from_itinerary_route(self):
         self._login()

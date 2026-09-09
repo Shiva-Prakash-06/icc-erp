@@ -126,6 +126,33 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         transition_project(self.icc_project, "Completed", self.user)
         self.assertEqual(self.icc_project.status, "Completed")
 
+    def test_browser_closure_summary_unblocks_completion(self):
+        self.login()
+        self.icc_project.status = "Closing"
+        db.session.commit()
+        path = f"/erp/projects/{self.icc_project.public_id}"
+        self.assertIn(b"Save closure summary", self.client.get(path).data)
+        response = self.client.post(path + "/closure-summary", data={
+            "version": self.icc_project.version, "closure_summary": "Synthetic delivery completed.",
+        }, follow_redirects=True)
+        self.assertIn(b"Closure summary saved", response.data)
+        self.assertEqual(closure_blockers(self.icc_project), [])
+        response = self.client.post(path + "/transition", data={
+            "version": self.icc_project.version, "target_status": "Completed",
+        }, follow_redirects=True)
+        self.assertIn(b"Project moved to Completed", response.data)
+        self.assertEqual(self.icc_project.closure_summary, "Synthetic delivery completed.")
+
+    def test_stale_closure_summary_does_not_overwrite(self):
+        self.login()
+        self.icc_project.closure_summary = "Existing notes"
+        db.session.commit()
+        response = self.client.post(f"/erp/projects/{self.icc_project.public_id}/closure-summary", data={
+            "version": self.icc_project.version - 1, "closure_summary": "Stale notes",
+        }, follow_redirects=True)
+        self.assertIn(b"changed by another user", response.data)
+        self.assertEqual(self.icc_project.closure_summary, "Existing notes")
+
     def test_concurrent_project_update_returns_conflict(self):
         self.login()
         response = self.client.patch(

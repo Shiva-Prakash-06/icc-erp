@@ -26,3 +26,7 @@ dist/
 _uv/
 .env*
 supabase/.temp/
+
+# Vendored agent skills (managed by tooling, not application code)
+.agents/
+skills-lock.json

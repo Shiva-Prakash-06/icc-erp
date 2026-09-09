@@ -174,6 +174,12 @@ def create_app(config_object=None):
     def load_request_context():
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         g.request_id = request_id
+        # Static assets and liveness checks need no account lookup. Browsers
+        # fetch many assets concurrently; querying here exhausted the hosted
+        # database pool and made even the login page fail to load.
+        g.user = None
+        if request.path.startswith(("/static/", "/healthz")):
+            return None
         user_id = session.get("user_id")
         g.user = db.session.get(User, user_id) if user_id else None
 
