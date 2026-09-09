@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy.orm import joinedload
+
 from app.database import db
 from app.models.erp import ChecklistItemStatus, DocumentRecord, OperationalRequest, WorkTask
 from app.models.production import ProjectRisk
@@ -34,8 +36,12 @@ def closure_blockers(project):
         if not task.waived and task.status not in {"Approved", "Completed"}:
             blockers.append(ClosureBlocker("Task", task.public_id, task.title, task.status))
 
+    # Every row's `template_item` is read below, so eager-load it: the home
+    # page calls this once per project and was issuing one extra query per
+    # checklist item each time (audit B13).
     item_statuses = (
         ChecklistItemStatus.query.join(ChecklistItemStatus.checklist)
+        .options(joinedload(ChecklistItemStatus.template_item))
         .filter_by(project_id=project.id)
         .all()
     )

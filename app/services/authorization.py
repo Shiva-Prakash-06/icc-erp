@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from functools import wraps
 
-from flask import abort, g
+from flask import abort, g, has_app_context
 from sqlalchemy import and_, or_
 
 from app.models.erp import RoleAssignment
@@ -66,16 +66,71 @@ LEGACY_ROLE_MAP = {
 }
 
 
+_ASSIGNMENT_CACHE_ATTRIBUTE = "_active_assignment_cache"
+
+
+def register_assignment_cache(app) -> None:
+    """Clear the assignment cache at the start of every request.
+
+    The cache lives on `flask.g`, which is bound to the *application*
+    context, and Flask reuses an already-pushed application context for a
+    request rather than creating a fresh one. Without this hook a long-lived
+    outer app context would let one request's grants be reused by the next --
+    a correctness problem, not just a stale-performance one.
+    """
+
+    @app.before_request
+    def _reset_assignment_cache():
+        setattr(g, _ASSIGNMENT_CACHE_ATTRIBUTE, {})
+
+
+def invalidate_assignment_cache(user=None) -> None:
+    """Drop the per-request assignment cache after granting or revoking a role.
+
+    Call this whenever `RoleAssignment` rows change inside a request that goes
+    on to make further permission decisions; otherwise the decision would be
+    made against the roles as they were at the start of the request.
+    """
+    cache = getattr(g, _ASSIGNMENT_CACHE_ATTRIBUTE, None) if has_app_context() else None
+    if cache is None:
+        return
+    if user is None:
+        cache.clear()
+    else:
+        cache.pop(getattr(user, "id", None), None)
+
+
 def _active_assignments(user):
+    """Active role assignments for `user`, memoised for the current request.
+
+    `has_permission` is called once per project by `approvable_projects`,
+    `visible_projects`, the action queue and several templates, and each call
+    re-ran this query: the home page issued over a hundred queries on an
+    almost empty dataset. Multiplied by a cross-region round trip that is the
+    bulk of the latency the audit recorded in B13. Role assignments cannot
+    change within a request unless the request itself changes them, and those
+    paths call `invalidate_assignment_cache`.
+    """
     if not user:
         return []
+    cache = None
+    if has_app_context():
+        cache = getattr(g, _ASSIGNMENT_CACHE_ATTRIBUTE, None)
+        if cache is None:
+            cache = {}
+            setattr(g, _ASSIGNMENT_CACHE_ATTRIBUTE, cache)
+        if user.id in cache:
+            return cache[user.id]
     today = date.today()
-    return RoleAssignment.query.filter(
+    assignments = RoleAssignment.query.filter(
         RoleAssignment.user_id == user.id,
         RoleAssignment.is_active.is_(True),
         or_(RoleAssignment.starts_on.is_(None), RoleAssignment.starts_on <= today),
         or_(RoleAssignment.ends_on.is_(None), RoleAssignment.ends_on >= today),
     ).all()
+    if cache is not None:
+        cache[user.id] = assignments
+    return assignments
 
 
 def role_codes(user):

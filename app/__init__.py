@@ -53,6 +53,11 @@ def create_app(config_object=None):
     from app.services.instrumentation import register_request_timing
     register_request_timing(app, db)
 
+    # Role assignments are memoised per request; this resets that cache at
+    # each request boundary. See app/services/authorization.py.
+    from app.services.authorization import register_assignment_cache
+    register_assignment_cache(app)
+
     # Importing models registers all tables with SQLAlchemy/Alembic. Schema
     # creation is intentionally not performed during normal application startup.
     from app import models as _models  # noqa: F401

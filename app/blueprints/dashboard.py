@@ -5,7 +5,7 @@ from app.models.project import AcademicYear, Campus, Project
 from app.models.erp import Person, RoleAssignment, Wing
 from app.services.audit import record_audit
 from app.services.account import build_account_activity
-from app.services.authorization import has_any_permission, has_permission
+from app.services.authorization import has_any_permission, has_permission, invalidate_assignment_cache
 from app.services.home import build_home
 from app.services.roles import replace_scoped_assignment
 from app.blueprints.auth import login_required
@@ -119,6 +119,7 @@ def reject_user(user_id):
     user.session_version += 1
     for assignment in RoleAssignment.query.filter_by(user_id=user.id, is_active=True):
         assignment.is_active = False
+    invalidate_assignment_cache(user)
     record_audit("account.reject", user, after={"status": "Rejected", "reason": request.form.get("reason") or "Rejected by faculty administrator"}, actor=g.user)
     db.session.commit()
 

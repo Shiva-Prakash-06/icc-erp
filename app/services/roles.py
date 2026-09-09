@@ -9,7 +9,7 @@ from __future__ import annotations
 from app.database import db
 from app.models.erp import OperatingUnit, RoleAssignment, Wing
 from app.models.project import AcademicYear, Campus, Project
-from app.services.authorization import LEGACY_ROLE_MAP, has_permission
+from app.services.authorization import LEGACY_ROLE_MAP, has_permission, invalidate_assignment_cache
 
 
 def replace_scoped_assignment(user, legacy_role, scope, actor):
@@ -86,4 +86,6 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
     )
     db.session.add(assignment)
     db.session.flush()
+    # Later permission checks in this same request must see the new grant.
+    invalidate_assignment_cache(user)
     return assignment

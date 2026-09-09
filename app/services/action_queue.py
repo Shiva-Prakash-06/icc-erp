@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import joinedload
+
 from app.database import db
 from app.models.erp import (
     BudgetLine,
@@ -71,7 +73,19 @@ def build_action_queue(user, projects=None):
     action_queue = []
     for task in WorkTask.query.filter(WorkTask.project_id.in_(project_ids or [-1]), WorkTask.status == "Submitted").all():
         action_queue.append({"kind": "Task", "title": task.title, "project": task.project, "tab": "delivery", "anchor": task.public_id, "due_at": task.due_at})
-    for item in ChecklistItemStatus.query.join(ChecklistInstance).filter(ChecklistInstance.project_id.in_(project_ids or [-1]), ChecklistItemStatus.status == "Submitted").all():
+    # `template_item.title` and `checklist.project` are read for every row, so
+    # without eager loading this single source issued two extra queries per
+    # queue item -- the bulk of the home page's query count (audit B13).
+    checklist_items = (
+        ChecklistItemStatus.query.join(ChecklistInstance)
+        .options(
+            joinedload(ChecklistItemStatus.template_item),
+            joinedload(ChecklistItemStatus.checklist).joinedload(ChecklistInstance.project),
+        )
+        .filter(ChecklistInstance.project_id.in_(project_ids or [-1]), ChecklistItemStatus.status == "Submitted")
+        .all()
+    )
+    for item in checklist_items:
         action_queue.append({"kind": "Checklist", "title": item.template_item.title, "project": item.checklist.project, "tab": "delivery", "anchor": item.public_id, "due_at": item.due_at})
     for document in DocumentRecord.query.filter(DocumentRecord.project_id.in_(project_ids or [-1]), DocumentRecord.status == "Submitted").all():
         action_queue.append({"kind": "Document", "title": document.title, "project": document.project, "tab": "resources", "anchor": document.public_id, "due_at": None})

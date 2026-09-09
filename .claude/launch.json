@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "icc-erp-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/start.sh"],
+      "port": 5000
+    }
+  ]
+}
