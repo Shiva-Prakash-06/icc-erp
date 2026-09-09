@@ -41,7 +41,7 @@
   <h2 class="h4 mb-2">Sessions &amp; schedule</h2>
   <p class="text-muted mb-3">Add every scheduled segment of this project (e.g. orientation, main event, closing). You can add more than one.</p>
   {% if project.sessions %}
-  <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Session</th><th>Type</th><th>When</th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td>{{ session.title }}</td><td>{{ session.session_type }}</td><td>{{ session.starts_at.strftime('%b %d, %I:%M %p') }}</td></tr>{% endfor %}</tbody></table></div>
+  <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Session</th><th>Type</th><th>When</th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td>{{ session.title }}</td><td>{{ session.session_type }}</td><td>{{ session.starts_at|localdatetime('%b %d, %I:%M %p') }}</td></tr>{% endfor %}</tbody></table></div>
   {% endif %}
   <form method="POST" action="{{ url_for('erp.add_session', public_id=project.public_id) }}" class="row g-2">
     <input type="hidden" name="next" value="setup">

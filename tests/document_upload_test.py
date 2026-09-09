@@ -1,6 +1,8 @@
 import os
 import unittest
 from unittest.mock import MagicMock, patch
+
+from googleapiclient.errors import HttpError
 from datetime import date
 
 os.environ["TESTING"] = "true"
@@ -10,7 +12,12 @@ from app.database import db
 from app.models.erp import DocumentRecord, OperatingUnit
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.user import User
-from app.services.drive import ensure_project_folder, upload_file_to_drive
+from app.services.drive import (
+    DriveStorageError,
+    describe_provider_error,
+    ensure_project_folder,
+    upload_file_to_drive,
+)
 from app.services.upload_sessions import (
     UploadSessionError,
     append_chunk,
@@ -121,6 +128,73 @@ class DocumentUploadTestCase(unittest.TestCase):
     def test_upload_file_to_drive_mock_never_calls_live_api(self):
         result = upload_file_to_drive(self.project, "test.pdf", b"content", "application/pdf")
         self.assertTrue(result["file_id"].startswith("mock-"))
+
+    # --- Audit B08: an upload that is not stored must not look successful ---
+
+    def test_live_mode_without_a_destination_is_refused_before_bytes_are_taken(self):
+        self.app.config["DRIVE_VALIDATION_MODE"] = "live"
+        self.app.config["GOOGLE_DRIVE_REPOSITORY_ROOT_ID"] = None
+        with self.assertRaises(UploadSessionError) as caught:
+            start_upload_session(self.project, "report.pdf", 7, self.user)
+        self.assertIn("not configured", str(caught.exception))
+        self.assertEqual(DocumentRecord.query.count(), 0)
+
+    def test_production_refuses_mock_storage_rather_than_faking_success(self):
+        self.app.config["ALLOW_MOCK_DOCUMENT_STORAGE"] = False
+        with self.assertRaises(UploadSessionError) as caught:
+            upload_file_single_shot(self.project, "report.pdf", b"content", self.user)
+        self.assertIn("Nothing was stored", str(caught.exception))
+        self.assertEqual(DocumentRecord.query.count(), 0)
+
+    def test_storage_failure_leaves_no_document_record(self):
+        self.app.config["DRIVE_VALIDATION_MODE"] = "live"
+        self.app.config["GOOGLE_DRIVE_REPOSITORY_ROOT_ID"] = "root-folder-id"
+        with patch(
+            "app.services.upload_sessions.upload_file_to_drive",
+            side_effect=DriveStorageError("The service identity is not permitted to write."),
+        ):
+            with self.assertRaises(UploadSessionError) as caught:
+                upload_file_single_shot(self.project, "report.pdf", b"content", self.user)
+        self.assertIn("not permitted", str(caught.exception))
+        self.assertEqual(DocumentRecord.query.count(), 0)
+
+    def test_shared_drive_parameters_are_sent_on_folder_lookup_and_create(self):
+        self.app.config["DRIVE_VALIDATION_MODE"] = "live"
+        self.app.config["GOOGLE_DRIVE_REPOSITORY_ROOT_ID"] = "root-folder-id"
+        service = MagicMock()
+        service.files.return_value.get.return_value.execute.return_value = {"id": "root-folder-id", "driveId": "shared-drive-id"}
+        service.files.return_value.list.return_value.execute.return_value = {"files": []}
+        service.files.return_value.create.return_value.execute.return_value = {"id": "new-folder-id"}
+        with patch("app.services.drive.get_drive_service", return_value=service):
+            self.assertEqual(ensure_project_folder(self.project), "new-folder-id")
+        list_kwargs = service.files.return_value.list.call_args.kwargs
+        self.assertTrue(list_kwargs["supportsAllDrives"])
+        self.assertTrue(list_kwargs["includeItemsFromAllDrives"])
+        self.assertEqual(list_kwargs["corpora"], "drive")
+        self.assertEqual(list_kwargs["driveId"], "shared-drive-id")
+        self.assertTrue(service.files.return_value.create.call_args.kwargs["supportsAllDrives"])
+
+    def test_existing_project_folder_is_reused_instead_of_recreated(self):
+        self.app.config["DRIVE_VALIDATION_MODE"] = "live"
+        self.app.config["GOOGLE_DRIVE_REPOSITORY_ROOT_ID"] = "root-folder-id"
+        service = MagicMock()
+        service.files.return_value.get.return_value.execute.return_value = {"id": "root-folder-id", "driveId": "shared-drive-id"}
+        service.files.return_value.list.return_value.execute.return_value = {"files": [{"id": "existing", "name": self.project.code}]}
+        with patch("app.services.drive.get_drive_service", return_value=service):
+            self.assertEqual(ensure_project_folder(self.project), "existing")
+        service.files.return_value.create.assert_not_called()
+
+    def test_quota_failure_names_the_shared_drive_requirement(self):
+        response = MagicMock()
+        response.status = 403
+        error = HttpError(response, b"{}")
+        error.reason = "Service Accounts do not have storage quota."
+        self.assertIn("Shared Drive", describe_provider_error(error))
+
+    def test_missing_folder_is_reported_as_a_configuration_problem(self):
+        response = MagicMock()
+        response.status = 404
+        self.assertIn("not found", describe_provider_error(HttpError(response, b"{}")))
 
 
 if __name__ == "__main__":

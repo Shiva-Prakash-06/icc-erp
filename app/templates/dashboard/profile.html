@@ -41,7 +41,7 @@
     <div class="aurora-card--padded">
       <h5 class="aurora-card__heading mb-3"><i class="ph ph-lock-key text-primary"></i> Account security</h5>
       <dl class="row small mb-3">
-        <dt class="col-6">Last sign-in</dt><dd class="col-6">{{ g.user.last_login_at.strftime('%d %b %Y, %I:%M %p') if g.user.last_login_at else 'Not recorded' }}</dd>
+        <dt class="col-6">Last sign-in</dt><dd class="col-6">{{ g.user.last_login_at|localdatetime if g.user.last_login_at else 'Not recorded' }}</dd>
         <dt class="col-6">Password last changed</dt><dd class="col-6">{{ g.user.password_changed_at.strftime('%d %b %Y') if g.user.password_changed_at else 'Not recorded' }}</dd>
       </dl>
       {% if g.user.needs_password_reset %}<p class="small text-warning-emphasis mb-3"><i class="ph ph-warning"></i> Your password must be changed at next sign-in.</p>{% endif %}

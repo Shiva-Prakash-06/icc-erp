@@ -17,6 +17,16 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 
+class DriveStorageError(RuntimeError):
+    """A document could not be stored in or read from Drive.
+
+    Raised instead of letting a raw `HttpError`/`RuntimeError` escape, so
+    upload routes can flash a legible cause and, critically, so no
+    Available/Indexed `DocumentRecord` is ever created for bytes that were
+    not persisted. See BETA-READINESS-PLAN W1.3 and audit finding B08.
+    """
+
+
 DRIVE_ID_PATTERNS = [
     re.compile(r"/d/([a-zA-Z0-9_-]+)"),
     re.compile(r"[?&]id=([a-zA-Z0-9_-]+)"),
@@ -127,8 +137,40 @@ def validate_drive_link(url, classification="Internal"):
     }
 
 
+def describe_provider_error(error: HttpError) -> str:
+    """Turn a Drive `HttpError` into something a project manager can act on."""
+    status = getattr(error.resp, "status", None)
+    reason = str(getattr(error, "reason", "") or "")
+    if status == 404:
+        return "The configured document storage folder was not found, or is not shared with the service identity."
+    if status in (401, 403):
+        if "quota" in reason.lower():
+            return (
+                "Document storage rejected the upload for lack of storage quota. The repository root must be a "
+                "folder on a Shared Drive; a service account has no personal Drive storage."
+            )
+        return "The service identity is not permitted to write to the configured document storage folder."
+    if status and 500 <= status < 600:
+        return "Document storage is temporarily unavailable. Try the upload again shortly."
+    return f"Document storage rejected the upload: {reason or error}"
+
+
 def get_drive_service():
     return build("drive", "v3", credentials=_credentials(), cache_discovery=False)
+
+
+def enclosing_shared_drive_id(service, root_id):
+    """Return the Shared Drive ID containing `root_id`, or None when the
+    folder lives in an ordinary My Drive.
+
+    A service account has no My Drive storage quota of its own, so the
+    repository root is expected to be a folder on a Shared Drive. Knowing
+    which drive it is on lets folder lookups search that drive's corpus
+    instead of the (empty) service-account corpus. See BETA-READINESS-PLAN
+    W1.2.
+    """
+    metadata = service.files().get(fileId=root_id, fields="id,driveId", supportsAllDrives=True).execute()
+    return metadata.get("driveId")
 
 
 def ensure_project_folder(project):
@@ -140,7 +182,9 @@ def ensure_project_folder(project):
         return f"mock-folder-{project.public_id}"
     root_id = current_app.config.get("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
     if not root_id:
-        raise RuntimeError("GOOGLE_DRIVE_REPOSITORY_ROOT_ID is not configured.")
+        raise DriveStorageError(
+            "Document storage is not configured: GOOGLE_DRIVE_REPOSITORY_ROOT_ID is missing."
+        )
     service = get_drive_service()
     folder_name = project.code or project.public_id
     escaped_name = folder_name.replace("'", "\\'")
@@ -148,12 +192,21 @@ def ensure_project_folder(project):
         f"'{root_id}' in parents and name = '{escaped_name}' and "
         "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     )
-    response = service.files().list(q=query, fields="files(id,name)", spaces="drive").execute()
+    # Without the shared-drive parameters this lookup searches only the
+    # service account's own (always empty) corpus, so it would recreate the
+    # project folder on every upload and then fail on My Drive quota.
+    list_arguments = {"q": query, "fields": "files(id,name)", "supportsAllDrives": True, "includeItemsFromAllDrives": True}
+    drive_id = enclosing_shared_drive_id(service, root_id)
+    if drive_id:
+        list_arguments.update({"corpora": "drive", "driveId": drive_id})
+    else:
+        list_arguments["spaces"] = "drive"
+    response = service.files().list(**list_arguments).execute()
     files = response.get("files", [])
     if files:
         return files[0]["id"]
     metadata = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder", "parents": [root_id]}
-    created = service.files().create(body=metadata, fields="id").execute()
+    created = service.files().create(body=metadata, fields="id", supportsAllDrives=True).execute()
     return created["id"]
 
 
@@ -164,11 +217,20 @@ def upload_file_to_drive(project, filename, content: bytes, mime_type: str):
     if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
         fake_id = "mock-" + hashlib.sha256(f"{project.public_id}:{filename}:{len(content)}".encode()).hexdigest()[:24]
         return {"file_id": fake_id, "name": filename, "web_view_link": f"https://drive.google.com/file/d/{fake_id}/view"}
-    folder_id = ensure_project_folder(project)
-    service = get_drive_service()
-    media = MediaIoBaseUpload(io.BytesIO(content), mimetype=mime_type, resumable=True)
-    metadata = {"name": filename, "parents": [folder_id]}
-    created = service.files().create(body=metadata, media_body=media, fields="id,name,webViewLink").execute()
+    try:
+        folder_id = ensure_project_folder(project)
+        service = get_drive_service()
+        media = MediaIoBaseUpload(io.BytesIO(content), mimetype=mime_type, resumable=True)
+        metadata = {"name": filename, "parents": [folder_id]}
+        created = service.files().create(
+            body=metadata, media_body=media, fields="id,name,webViewLink", supportsAllDrives=True
+        ).execute()
+    except HttpError as error:
+        raise DriveStorageError(describe_provider_error(error)) from error
+    except DriveStorageError:
+        raise
+    except Exception as error:
+        raise DriveStorageError(f"Document storage is unavailable: {error}") from error
     return {"file_id": created["id"], "name": created.get("name"), "web_view_link": created.get("webViewLink")}
 
 
@@ -178,16 +240,19 @@ def download_drive_file(file_id: str, *, export_mime_type: str | None = None) ->
     binary files (PDF, DOCX, images) are fetched as-is."""
     if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
         raise RuntimeError("Cannot download real Drive content while DRIVE_VALIDATION_MODE=mock.")
-    service = get_drive_service()
-    request = (
-        service.files().export_media(fileId=file_id, mimeType=export_mime_type)
-        if export_mime_type else service.files().get_media(fileId=file_id)
-    )
-    buffer = io.BytesIO()
-    downloader = MediaIoBaseDownload(buffer, request)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
+    try:
+        service = get_drive_service()
+        request = (
+            service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+            if export_mime_type else service.files().get_media(fileId=file_id, supportsAllDrives=True)
+        )
+        buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+    except HttpError as error:
+        raise DriveStorageError(describe_provider_error(error)) from error
     buffer.seek(0)
     return buffer.read()
 

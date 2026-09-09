@@ -22,7 +22,6 @@ import io
 import re
 from datetime import date as date_cls, datetime, time, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from dateutil import parser as date_parser
 from openpyxl import load_workbook
@@ -31,8 +30,8 @@ from werkzeug.utils import secure_filename
 from app.database import db
 from app.models.erp import ImportBatch, ImportRow, ItineraryRevision, ProjectSession
 from app.services.audit import record_audit
+from app.services.timeutil import to_utc
 
-IST = ZoneInfo("Asia/Kolkata")
 IMPORTER_VERSION = "1"
 
 MEAL_COLUMNS = ("breakfast", "lunch", "dinner")
@@ -516,14 +515,18 @@ def commit_itinerary_batch(batch, actor):
         source_key = data["source_key"]
         seen_keys.add(source_key)
         day_date = date_cls.fromisoformat(data["date"])
+        # Itinerary rows carry campus-local wall-clock times. Convert to UTC
+        # before storage so this path and manual session entry agree, and so
+        # SQLite (which discards the offset) stores the same instant as
+        # PostgreSQL `timestamptz`. Audit finding B09.
         if data["is_all_day"]:
-            starts_at = datetime.combine(day_date, time(0, 0), tzinfo=IST)
-            ends_at = datetime.combine(day_date + timedelta(days=1), time(0, 0), tzinfo=IST)
+            starts_at = to_utc(datetime.combine(day_date, time(0, 0)))
+            ends_at = to_utc(datetime.combine(day_date + timedelta(days=1), time(0, 0)))
         else:
             start_time = time.fromisoformat(data["start_time"]) if data["start_time"] else time(0, 0)
             end_time = time.fromisoformat(data["end_time"]) if data["end_time"] else time(23, 59)
-            starts_at = datetime.combine(day_date, start_time, tzinfo=IST)
-            ends_at = datetime.combine(day_date, end_time, tzinfo=IST)
+            starts_at = to_utc(datetime.combine(day_date, start_time))
+            ends_at = to_utc(datetime.combine(day_date, end_time))
             if ends_at < starts_at:
                 ends_at = starts_at
 

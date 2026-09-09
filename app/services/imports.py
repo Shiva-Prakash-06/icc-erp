@@ -8,7 +8,6 @@ import io
 import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 from docx import Document as WordDocument
@@ -37,10 +36,10 @@ from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.production import ControlledVocabulary, Position, ReportDefinition
 from app.services.vocabulary import DEFAULT_VOCABULARY
 from app.services.audit import record_audit
+from app.services.timeutil import to_utc
 from app.services.drive import validate_drive_link
 
 
-IST = ZoneInfo("Asia/Kolkata")
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -559,8 +558,8 @@ def _commit_standard_rows(batch, valid_rows, defaults):
                 db.session.add(ProjectSession(
                     project_id=target.id, code="MAIN", title=target.title,
                     session_type="Event" if str(data.get("program_type")).upper() == "ICC" else "Program",
-                    starts_at=datetime.combine(start_date, start_time, tzinfo=IST),
-                    ends_at=datetime.combine(end_date, end_time, tzinfo=IST),
+                    starts_at=to_utc(datetime.combine(start_date, start_time)),
+                    ends_at=to_utc(datetime.combine(end_date, end_time)),
                     venue=target.venue, participant_group=target.target_audience,
                 ))
         elif batch.import_type == "icc_roster":
@@ -696,8 +695,8 @@ def commit_batch(batch, actor=None):
                     code="MAIN",
                     title=data["title"],
                     session_type="Event",
-                    starts_at=datetime.combine(event_date, start_time, tzinfo=IST),
-                    ends_at=datetime.combine(event_date, end_time, tzinfo=IST),
+                    starts_at=to_utc(datetime.combine(event_date, start_time)),
+                    ends_at=to_utc(datetime.combine(event_date, end_time)),
                     venue=data.get("venue"),
                 ))
                 for document in data.get("documents", []):
@@ -777,8 +776,8 @@ def commit_batch(batch, actor=None):
             elif row.target_entity == "ProjectSession":
                 session = ProjectSession.query.filter_by(project_id=project.id, code=data["code"]).first()
                 if not session:
-                    starts = datetime.strptime(f"2026-06-05 {data['starts']}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
-                    ends = datetime.strptime(f"2026-06-05 {data['ends']}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+                    starts = to_utc(datetime.strptime(f"2026-06-05 {data['starts']}", "%Y-%m-%d %H:%M"))
+                    ends = to_utc(datetime.strptime(f"2026-06-05 {data['ends']}", "%Y-%m-%d %H:%M"))
                     session = ProjectSession(
                         project_id=project.id,
                         code=data["code"],

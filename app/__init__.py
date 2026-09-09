@@ -43,6 +43,11 @@ def create_app(config_object=None):
     login_manager.init_app(app)
     limiter.init_app(app)
 
+    # Every template renders datetimes campus-local through these filters;
+    # storage stays UTC. See app/services/timeutil.py and audit finding B09.
+    from app.services.timeutil import register_filters
+    register_filters(app)
+
     # Importing models registers all tables with SQLAlchemy/Alembic. Schema
     # creation is intentionally not performed during normal application startup.
     from app import models as _models  # noqa: F401

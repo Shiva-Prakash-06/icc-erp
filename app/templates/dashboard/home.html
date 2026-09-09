@@ -109,7 +109,7 @@
         <div class="aurora-card__header"><h2 class="aurora-card__heading">Upcoming sessions</h2></div>
         <div class="aurora-list aurora-list--flush">
           {% for session in upcoming_sessions %}
-          <div class="aurora-list__item d-flex justify-content-between"><span>{{ session.title }}<div class="small text-muted">{{ session.project.title }}</div></span><span class="font-monospace text-xs">{{ session.starts_at.strftime('%d %b, %I:%M %p') }}</span></div>
+          <div class="aurora-list__item d-flex justify-content-between"><span>{{ session.title }}<div class="small text-muted">{{ session.project.title }}</div></span><span class="font-monospace text-xs">{{ session.starts_at|localdatetime('%d %b, %I:%M %p') }}</span></div>
           {% else %}<div class="aurora-list__item text-center py-4 text-muted">No upcoming sessions in your scope.</div>{% endfor %}
         </div>
       </div>

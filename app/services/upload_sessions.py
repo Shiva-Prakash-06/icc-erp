@@ -25,7 +25,7 @@ from app.services.documents import (
     is_allowed_extension,
     supersede,
 )
-from app.services.drive import upload_file_to_drive
+from app.services.drive import DriveStorageError, upload_file_to_drive
 
 _MEMORY_STORE: dict[str, dict] = {}
 
@@ -43,6 +43,27 @@ MIME_TYPES = {
 
 class UploadSessionError(ValueError):
     pass
+
+
+def _require_configured_storage() -> None:
+    """Reject an upload before any bytes are accepted when live storage is
+    selected but has no destination configured.
+
+    Audit finding B08: the mock provider fabricated an identifier and
+    discarded the bytes while the UI reported success. Failing at the door is
+    the difference between an honest error and silent data loss.
+    """
+    if current_app.config.get("DRIVE_VALIDATION_MODE") == "mock":
+        if current_app.config.get("ALLOW_MOCK_DOCUMENT_STORAGE", True):
+            return
+        raise UploadSessionError(
+            "Document uploads are disabled because live document storage is not configured. "
+            "Nothing was stored. Contact an administrator."
+        )
+    if not current_app.config.get("GOOGLE_DRIVE_REPOSITORY_ROOT_ID"):
+        raise UploadSessionError(
+            "Document storage is not configured, so uploads cannot be stored. Contact an administrator."
+        )
 
 
 def _redis_client():
@@ -66,6 +87,7 @@ def start_upload_session(project, filename: str, total_size: int, actor, *, cate
         raise UploadSessionError("Total file size must be a positive number of bytes.")
     if total_size > MAX_TOTAL_BYTES:
         raise UploadSessionError(f"File exceeds the {MAX_TOTAL_BYTES // (1024 * 1024)} MiB upload limit.")
+    _require_configured_storage()
 
     session_id = str(uuid.uuid4())
     metadata = {
@@ -153,7 +175,12 @@ def complete_upload_session(session_id: str, actor) -> DocumentRecord:
     suffix = filename.rsplit(".", 1)[-1].lower()
     mime_type = MIME_TYPES.get(suffix, "application/octet-stream")
 
-    drive_result = upload_file_to_drive(project, filename, content, mime_type)
+    try:
+        drive_result = upload_file_to_drive(project, filename, content, mime_type)
+    except DriveStorageError as error:
+        # Raised before the DocumentRecord below is constructed, so a failed
+        # upload leaves no Available/Indexed record behind (audit B08).
+        raise UploadSessionError(str(error)) from error
     title = filename.rsplit(".", 1)[0]
     document = DocumentRecord(
         project_id=project_id, category=category, title=title, status="Indexed",

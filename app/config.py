@@ -119,6 +119,14 @@ class BaseConfig:
     GOOGLE_DRIVE_REPOSITORY_ROOT_ID = os.getenv("GOOGLE_DRIVE_REPOSITORY_ROOT_ID")
     SUPABASE_POOLER_HOST = os.getenv("SUPABASE_POOLER_HOST")
     AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD = os.getenv("AUTO_PROVISIONED_BUDDY_DEFAULT_PASSWORD")
+    # Mock document storage fabricates an identifier and discards the bytes.
+    # It is a development convenience only: production refuses to accept an
+    # upload it cannot actually persist, rather than reporting a false
+    # success (audit finding B08).
+    # Single display timezone for every create/import/edit path. Datetimes
+    # are stored in UTC and rendered in this zone (audit finding B09).
+    APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Kolkata")
+    ALLOW_MOCK_DOCUMENT_STORAGE = True
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
     UPLOAD_MAX_TOTAL_BYTES = int(os.getenv("UPLOAD_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)))
@@ -138,6 +146,7 @@ class TestingConfig(BaseConfig):
 
 class ProductionConfig(BaseConfig):
     APP_ENV = "production"
+    ALLOW_MOCK_DOCUMENT_STORAGE = False
     DEMONSTRATOR = os.getenv("DEMONSTRATOR", "false").lower() == "true"
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,

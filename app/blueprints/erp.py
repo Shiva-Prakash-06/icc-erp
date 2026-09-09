@@ -33,7 +33,8 @@ from app.models.user import User
 from app.services.audit import record_audit, record_sensitive_access
 from app.services.authorization import can_view_project, has_any_permission, has_permission
 from app.services.buddy import validate_buddy_assignment
-from app.services.drive import extract_drive_id, refresh_document_metadata
+from app.services.drive import DriveStorageError, extract_drive_id, refresh_document_metadata
+from app.services.timeutil import to_utc
 from app.services.imports import STANDARD_IMPORTS, commit_batch, stage_supplied_source, stage_uploaded_source
 from app.services.itinerary import (
     ItineraryParseError,
@@ -564,8 +565,10 @@ def add_session(public_id):
         flash("Session title is required.", "danger")
         return _redirect_after_action(project, "overview")
     try:
-        starts_at = datetime.strptime(request.form["starts_at"], "%Y-%m-%dT%H:%M")
-        ends_at = datetime.strptime(request.form["ends_at"], "%Y-%m-%dT%H:%M")
+        # The browser sends campus-local wall-clock time with no offset;
+        # storage is UTC throughout (audit B09).
+        starts_at = to_utc(datetime.strptime(request.form["starts_at"], "%Y-%m-%dT%H:%M"))
+        ends_at = to_utc(datetime.strptime(request.form["ends_at"], "%Y-%m-%dT%H:%M"))
     except (KeyError, ValueError):
         flash("Provide valid start and end times.", "danger")
         return _redirect_after_action(project, "overview")
@@ -1564,6 +1567,9 @@ def download_complete_report(public_id):
         pdf_bytes, snapshot = assemble_complete_report(project, g.user, allow_incomplete=allow_incomplete)
     except ReportIncompleteError:
         flash("Some report dependencies are missing, inaccessible, or unsupported. Review them below before downloading.", "warning")
+        return redirect(url_for("erp.complete_report_preview", public_id=project.public_id))
+    except DriveStorageError as error:
+        flash(f"A source document could not be read from document storage: {error}", "danger")
         return redirect(url_for("erp.complete_report_preview", public_id=project.public_id))
     record_audit("report.download_complete_pdf", snapshot, after={"project": project.public_id, "allow_incomplete": allow_incomplete})
     db.session.commit()

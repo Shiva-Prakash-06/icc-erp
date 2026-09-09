@@ -6,7 +6,7 @@
 {% block content %}
 <nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}">{{ project.code }}</a></li><li class="aurora-breadcrumb__item" aria-current="page">Attendance</li></ol></nav>
 <header class="page-header">
-  <div><div class="page-eyebrow">{{ session.session_type }}</div><h1 class="page-title mb-2">{{ session.title }}</h1><p class="page-subtitle">{{ session.starts_at.strftime('%b %d, %Y · %I:%M %p') }} – {{ session.ends_at.strftime('%I:%M %p') }}</p></div>
+  <div><div class="page-eyebrow">{{ session.session_type }}</div><h1 class="page-title mb-2">{{ session.title }}</h1><p class="page-subtitle">{{ session.starts_at|localdatetime('%b %d, %Y · %I:%M %p', label=False) }} – {{ session.ends_at|localtime }}</p></div>
 </header>
 
 <div class="aurora-card">
@@ -45,7 +45,7 @@
 <details class="aurora-card mt-4">
   <summary class="aurora-card__header"><strong>Immutable attendance history</strong><span>{{ events|length }} changes</span></summary>
   <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards aurora-table mb-0"><thead><tr><th>When</th><th>Change</th><th>Reason</th><th>Recorded by</th></tr></thead><tbody>
-    {% for event in events %}<tr><td data-label="When">{{ event.occurred_at.strftime('%b %d, %Y %I:%M %p') }}</td><td data-label="Change">{{ event.previous_status or 'Not recorded' }} → {{ event.new_status }}</td><td data-label="Reason">{{ event.reason or 'Initial roll call' }}</td><td data-label="Recorded by">{{ actors.get(event.actor_user_id, 'Unknown user') }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No attendance changes recorded yet.</td></tr>{% endfor %}
+    {% for event in events %}<tr><td data-label="When">{{ event.occurred_at|localdatetime('%b %d, %Y %I:%M %p') }}</td><td data-label="Change">{{ event.previous_status or 'Not recorded' }} → {{ event.new_status }}</td><td data-label="Reason">{{ event.reason or 'Initial roll call' }}</td><td data-label="Recorded by">{{ actors.get(event.actor_user_id, 'Unknown user') }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No attendance changes recorded yet.</td></tr>{% endfor %}
   </tbody></table></div>
 </details>
 {% endblock %}
