@@ -8,13 +8,18 @@ import os
 import uuid
 from pathlib import Path
 
-from flask import Flask, g, jsonify, redirect, request, session, url_for
+from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask_wtf.csrf import CSRFError
 from markupsafe import Markup
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import select_config
 from app.database import csrf, db, limiter, login_manager, migrate
+
+
+# The app shell files an installable PWA fetches before any session exists.
+_UNAUTHENTICATED_PATHS = {"/sw.js", "/manifest.webmanifest", "/favicon.ico", "/offline"}
 
 
 def create_app(config_object=None):
@@ -193,12 +198,12 @@ def create_app(config_object=None):
         # fetch many assets concurrently; querying here exhausted the hosted
         # database pool and made even the login page fail to load.
         g.user = None
-        if request.path.startswith(("/static/", "/healthz")):
+        if request.path.startswith(("/static/", "/healthz")) or request.path in _UNAUTHENTICATED_PATHS:
             return None
         user_id = session.get("user_id")
         g.user = db.session.get(User, user_id) if user_id else None
 
-        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")):
+        if request.path.startswith(("/static/", "/healthz", "/readyz", "/api/v1/public/", "/internal/jobs/", "/public/")) or request.path in _UNAUTHENTICATED_PATHS:
             return None
 
         public = {"auth.login", "auth.register", "auth.logout", "auth.forgot_password", "auth.forgot_password_sent", "auth.recover_password"}
@@ -242,9 +247,48 @@ def create_app(config_object=None):
         )
         if request.is_secure:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        if request.path.startswith(("/erp/restricted", "/api/v1/documents", "/api/v1/people", "/api/v1/audit-events", "/api/v1/offline-snapshot")):
+        # Every request, static assets included, is served by the Python
+        # function on serverless -- there is no CDN layer in front of it -- so
+        # these headers are what stop a phone re-downloading the CSS, fonts and
+        # JS on every page load.
+        if request.path.startswith("/static/ui/assets/"):
+            # Vite output is content-hashed: a change produces a new filename.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif request.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        if request.path in {"/sw.js", "/manifest.webmanifest"}:
+            # The worker and manifest must be revalidated or an update never
+            # reaches an installed app.
+            response.headers["Cache-Control"] = "no-cache"
+        if request.path.startswith(("/api/v1/documents", "/api/v1/people", "/api/v1/audit-events", "/api/v1/offline-snapshot")):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    # Served from the root, not /static/, on purpose. A worker's scope defaults
+    # to the directory it is served from, so /static/sw.js could only ever
+    # control /static/* -- it never saw a single app navigation. Serving it here
+    # gives it scope "/" with no Service-Worker-Allowed header needed. The
+    # manifest is served alongside it so scope and start_url resolve against the
+    # origin root too.
+    @app.get("/sw.js")
+    def service_worker():
+        response = send_from_directory(app.static_folder, "sw.js")
+        response.headers["Content-Type"] = "text/javascript; charset=utf-8"
+        return response
+
+    @app.get("/manifest.webmanifest")
+    def web_manifest():
+        response = send_from_directory(app.static_folder, "manifest.webmanifest")
+        response.headers["Content-Type"] = "application/manifest+json"
+        return response
+
+    @app.get("/favicon.ico")
+    def favicon():
+        return send_from_directory(Path(app.static_folder) / "brand", "favicon.ico")
+
+    @app.get("/offline")
+    def offline():
+        return render_template("offline.html"), 200
 
     @app.get("/healthz")
     def healthz():
@@ -274,6 +318,45 @@ def create_app(config_object=None):
     @app.errorhandler(PermissionError)
     def internal_permission_denied(error):
         return _problem(403, str(error))
+
+    @app.errorhandler(CSRFError)
+    def csrf_expired(error):
+        # WTF_CSRF_TIME_LIMIT (2h) is shorter than PERMANENT_SESSION_LIFETIME
+        # (8h), so a form left open past two hours fails here. Without this
+        # handler that surfaced as a raw Werkzeug page.
+        if request.path.startswith("/api/v1/"):
+            return _problem(400, "CSRF token missing or expired")
+        return (
+            "Your session expired before this form was submitted. "
+            "Reload the page and try again.",
+            400,
+        )
+
+    @app.errorhandler(429)
+    def rate_limited(error):
+        if request.path.startswith("/api/v1/"):
+            return _problem(429, "Too many requests")
+        return ("Too many requests. Wait a moment and try again.", 429)
+
+    @app.errorhandler(500)
+    @app.errorhandler(Exception)
+    def internal_error(error):
+        # Roll back first: without this a failed request leaves the session
+        # dirty for whatever reuses this worker or warm serverless instance.
+        try:
+            db.session.rollback()
+        except Exception:
+            app.logger.exception("Rollback after unhandled error failed")
+        # Let Werkzeug's own HTTP exceptions (404, 403, ...) keep their status
+        # and their dedicated handlers above.
+        from werkzeug.exceptions import HTTPException
+
+        if isinstance(error, HTTPException):
+            return error
+        app.logger.exception("Unhandled application error")
+        if request.path.startswith("/api/v1/"):
+            return _problem(500, "Internal server error")
+        return ("Something went wrong. The error has been logged.", 500)
 
     return app
 

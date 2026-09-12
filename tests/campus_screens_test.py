@@ -60,10 +60,14 @@ class CampusScreensTestCase(unittest.TestCase):
             session["session_version"] = self.user.session_version
 
     def test_project_basics_card_shows_campus_program_year_wing(self):
+        # The two "Project Basics" / "Project record" definition lists were
+        # merged into one "Record" facts panel in the blueprint redesign;
+        # the facts it must carry are unchanged.
         self.login()
         response = self.client.get(f"/erp/projects/{self.project.public_id}")
         html = response.get_data(as_text=True)
-        self.assertIn("Project Basics", html)
+        self.assertIn("Record", html)
+        self.assertIn("Academic year", html)
         self.assertIn("Central", html)
         self.assertIn("ICC", html)
         self.assertIn("2026-2027", html)

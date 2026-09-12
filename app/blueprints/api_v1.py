@@ -135,8 +135,6 @@ PERMISSION_BY_RESOURCE = {
     "checklist-template-items": "manage_governance",
     "role-assignments": "manage_users",
     "vocabularies": "manage_governance",
-    "checklist-templates": "manage_governance",
-    "checklist-template-items": "manage_governance",
     "positions": "manage_governance",
     "governance-terms": "manage_governance",
     # The generic collection endpoints below return/accept every column with
@@ -152,6 +150,10 @@ PERMISSION_BY_RESOURCE = {
     "feedback-responses": "report",
     "budgets": "manage_projects",
     "attendance": "manage_projects",
+    # AggregateAttendance keys on session_id, not project_id, so without an
+    # entry here required_permission would be None and list_resource would
+    # apply no gate and no project filter at all.
+    "aggregate-attendance": "manage_projects",
     "checklist-items": "manage_projects",
     "operational-requests": "manage_projects",
     "report-definitions": "manage_governance",
@@ -459,6 +461,14 @@ def list_resource(resource):
     elif model is SessionAttendance:
         query = query.join(ProjectSession, SessionAttendance.session_id == ProjectSession.id).filter(
             ProjectSession.project_id.in_(visible_project_ids or [-1])
+        )
+    elif model is AggregateAttendance:
+        query = query.join(ProjectSession, AggregateAttendance.session_id == ProjectSession.id).filter(
+            ProjectSession.project_id.in_(visible_project_ids or [-1])
+        )
+    elif model is FeedbackResponse:
+        query = query.join(FeedbackForm, FeedbackResponse.form_id == FeedbackForm.id).filter(
+            FeedbackForm.project_id.in_(visible_project_ids or [-1])
         )
     elif model is ChecklistItemStatus:
         query = query.join(ChecklistInstance, ChecklistItemStatus.checklist_instance_id == ChecklistInstance.id).filter(

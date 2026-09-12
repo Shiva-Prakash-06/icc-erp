@@ -18,24 +18,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INSTANCE_DIR = BASE_DIR / "instance"
 
 
-def _persisted_dev_secret_key() -> str:
+def _persisted_dev_secret_key() -> str | None:
     """Return a SECRET_KEY that stays stable across process restarts/workers
     when no SECRET_KEY env var is set (dev/staging only -- production always
     requires an explicit env var via ProductionConfig.validate()). Without
     this, every gunicorn worker would mint its own random key at import time,
     breaking session/CSRF validation whenever a request is served by a
-    different worker than the one that issued it."""
-    INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
-    key_path = INSTANCE_DIR / "dev_secret_key"
+    different worker than the one that issued it.
+
+    Returns None when the instance directory is not writable -- a serverless
+    filesystem is read-only, and this runs at import time, so raising here
+    produced an opaque 500 before ProductionConfig.validate() could report the
+    real problem ("SECRET_KEY missing") legibly."""
     try:
-        existing = key_path.read_text().strip()
-        if existing:
-            return existing
-    except FileNotFoundError:
-        pass
-    generated = secrets.token_urlsafe(32)
-    key_path.write_text(generated)
-    return generated
+        INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+        key_path = INSTANCE_DIR / "dev_secret_key"
+        try:
+            existing = key_path.read_text().strip()
+            if existing:
+                return existing
+        except FileNotFoundError:
+            pass
+        generated = secrets.token_urlsafe(32)
+        key_path.write_text(generated)
+        return generated
+    except OSError:
+        return None
 
 
 def _database_url(default_name: str) -> str:
@@ -69,7 +77,12 @@ def _database_url(default_name: str) -> str:
         if value.startswith("postgresql://"):
             return "postgresql+psycopg://" + value[len("postgresql://"):]
         return value
-    INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Read-only filesystem (serverless). Production requires DATABASE_URL,
+        # and validate() says so clearly; do not fail during module import.
+        pass
     return f"sqlite:///{(INSTANCE_DIR / default_name).resolve()}"
 
 
@@ -80,7 +93,7 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     WTF_CSRF_TIME_LIMIT = 7200
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024)))
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
@@ -132,6 +145,10 @@ class BaseConfig:
     REQUEST_TIMING_ENABLED = os.getenv("REQUEST_TIMING_ENABLED", "false").lower() == "true"
     REQUEST_TIMING_SLOW_MS = int(os.getenv("REQUEST_TIMING_SLOW_MS", "0"))
     ALLOW_MOCK_DOCUMENT_STORAGE = True
+    # Shared secret presented by Vercel Cron as a bearer token, since it cannot
+    # mint the Google OIDC token the Cloud Scheduler path expects. Unset means
+    # the cron path is disabled and only OIDC is accepted.
+    CRON_SECRET = os.getenv("CRON_SECRET")
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
     UPLOAD_MAX_TOTAL_BYTES = int(os.getenv("UPLOAD_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)))
@@ -145,7 +162,10 @@ class TestingConfig(BaseConfig):
     TESTING = True
     SECRET_KEY = "test-only-key"
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL") or "sqlite:///:memory:"
-    WTF_CSRF_ENABLED = False
+    # Off by default so unit tests can POST without a token. The Playwright
+    # acceptance suite sets this true, because production runs with CSRF on and
+    # a suite that never exercises that path cannot catch a missing token.
+    WTF_CSRF_ENABLED = os.getenv("WTF_CSRF_ENABLED", "false").lower() == "true"
     RATELIMIT_ENABLED = False
 
 
@@ -163,6 +183,19 @@ class ProductionConfig(BaseConfig):
         # Frozen serverless instances otherwise retain one session each and
         # collectively exhaust Supabase's small session-pool client limit.
         SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "poolclass": NullPool}
+        # Vercel rejects a request body over 4.5 MB at the edge, before Flask
+        # sees it. The 16 MB / 8 MB defaults would therefore fail every upload
+        # with no application-level error to explain it. Stay clear of the
+        # ceiling so multipart overhead cannot push a chunk past it.
+        _VERCEL_BODY_CEILING = 4 * 1024 * 1024
+        MAX_CONTENT_LENGTH = min(
+            int(os.getenv("MAX_CONTENT_LENGTH", str(_VERCEL_BODY_CEILING))),
+            _VERCEL_BODY_CEILING,
+        )
+        UPLOAD_CHUNK_SIZE_BYTES = min(
+            int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(_VERCEL_BODY_CEILING))),
+            _VERCEL_BODY_CEILING,
+        )
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     PREFERRED_URL_SCHEME = "https"
@@ -218,7 +251,16 @@ def select_config():
     if os.getenv("TESTING", "false").lower() == "true":
         return TestingConfig
     name = os.getenv("APP_ENV", "development").lower()
-    config = CONFIGS.get(name, DevelopmentConfig)
+    # Fail closed. A typo such as APP_ENV=Production or APP_ENV=prod used to
+    # select DevelopmentConfig, which means DEBUG=True, SESSION_COOKIE_SECURE
+    # =False, DEMONSTRATOR=true and no validate() call -- the most permissive
+    # configuration, reached by getting a single character wrong.
+    if name not in CONFIGS:
+        raise RuntimeError(
+            f"APP_ENV={name!r} is not a recognised environment. "
+            f"Expected one of: {', '.join(sorted(CONFIGS))}."
+        )
+    config = CONFIGS[name]
     if config is ProductionConfig:
         config.validate()
     return config

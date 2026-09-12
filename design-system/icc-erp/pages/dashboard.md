@@ -1,10 +1,12 @@
-# Dashboard Override
+# Home Override
 
 Inherits `MASTER.md`.
 
-- Use 12-column desktop bento composition; KPI cards span 3 columns, main chart 8, action queue 4.
-- First viewport prioritizes identity/context, blockers, pending decisions, and current-period KPIs.
-- Decorative atmosphere is limited to the header region and must not reduce chart or card contrast.
-- KPI values are visible immediately; motion may only crossfade settled server values.
-- Dashboard charts always include a text insight and accessible data table/disclosure.
-- Scrollytelling is optional below the operational first viewport and never contains unique actions.
+- The page answers one question: what is waiting on me. Greeting, a one-line count, and a single primary action, then the counters, then the queue.
+- Counters are `.kpi-card` tiles in an auto-fit grid. Each one with a real destination is an `<a>` to the filtered list behind it; the rest are plain `<div>`s. Never fabricate a filter the server does not offer just to make a tile clickable.
+- The decision queue is a real `<table>` — one `<tr>` per record, with a visually hidden header row — laid out as stacked rows. Table semantics matter: the queue is the app's primary list and assistive tech, and the e2e row matcher, both depend on them.
+- Each row carries the approve action inline (a `POST` to the entity's existing `.../decision` endpoint with `status`, `version` and a relative `next`), a send-back link to the record, and an open-record link whose accessible name is `Review` and whose `href` ends in the record's anchor.
+- Approving must return the approver to where they were. Send-back must not, because it needs a reason.
+- Non-approvers get their own open tasks and requests in the same list, not three collapsed disclosures at the foot of the page.
+- The aside holds what is next (upcoming sessions, with a roll-call action where permitted), where you left off, and IGP indicators.
+- Charts always include a text insight and an accessible data table or disclosure.

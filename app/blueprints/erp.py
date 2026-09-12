@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from urllib.parse import urlparse
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, url_for
 
@@ -48,7 +49,7 @@ from app.services.itinerary import (
     create_igp_project_from_itinerary,
     stage_itinerary_import,
 )
-from app.services.project_quickcreate import create_minimal_project
+from app.services.project_quickcreate import create_minimal_project, creatable_program_types
 from app.services.scope import visible_projects
 from app.services.timeutil import to_utc
 from app.services.buddy_import import BuddyImportError, commit_buddy_batch, stage_buddy_import
@@ -195,7 +196,7 @@ def new_project():
         abort(403)
     return render_template(
         "erp/create_project.html",
-        program_types=ProgramType.query.order_by(ProgramType.name).all(),
+        program_types=creatable_program_types(g.user),
     )
 
 
@@ -272,6 +273,14 @@ def _render_projects(*, show_create=False):
             project for project in visible
             if needle in (project.title or "").lower() or needle in (project.code or "").lower()
         ]
+    # Free-text search alone meant finding the one project you own required
+    # reading every card. The status filter is a query param on the existing
+    # route, so the frozen URL map is untouched.
+    status_filter = (request.args.get("status") or "").strip()
+    if status_filter and status_filter != "All":
+        visible = [project for project in visible if project.status == status_filter]
+    status_facets = ["All", "Draft", "Planned", "Active", "Closing", "Completed"]
+
     campuses = Campus.query.order_by(Campus.name).all()
     programs = ProgramType.query.order_by(ProgramType.name).all()
     academic_years = AcademicYear.query.order_by(AcademicYear.start_date.desc()).all()
@@ -309,6 +318,8 @@ def _render_projects(*, show_create=False):
         can_create=has_any_permission(g.user, "manage_projects"),
         show_create=show_create,
         search_query=search_query,
+        status_filter=status_filter or "All",
+        status_facets=status_facets,
         project_category_options=vocabulary_options("project_category"),
         project_type_options=vocabulary_options("project_type"),
     )
@@ -421,6 +432,18 @@ def project_detail(public_id):
 
 
 def _redirect_to_tab(project, tab, anchor=None):
+    """Return to the record's tab, unless the form asked to come back to
+    where the decision was actually taken.
+
+    Home and the project Overview now decide items in place, so posting a
+    verdict must not teleport the approver into a tab they never opened.
+    Only same-origin relative paths are honoured -- anything carrying a
+    scheme or a host is discarded rather than followed."""
+    target = (request.form.get("next") or "").strip()
+    if target.startswith("/") and not target.startswith("//"):
+        parsed = urlparse(target)
+        if not parsed.scheme and not parsed.netloc:
+            return redirect(target)
     return redirect(url_for("erp.project_detail", public_id=project.public_id, tab=tab) + (f"#{anchor}" if anchor else ""))
 
 

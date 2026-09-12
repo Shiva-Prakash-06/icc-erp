@@ -27,6 +27,7 @@
   <h2 class="h4 mb-2">Project basics</h2>
   <p class="text-muted mb-3">Review the project identity and delivery dates before adding operational records.</p>
   <form method="POST" action="{{ url_for('erp.update_project_basics', public_id=project.public_id) }}" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="col-md-8"><label class="aurora-label" for="basic-title">Title <span aria-hidden="true">*</span></label><input id="basic-title" class="aurora-input" name="title" value="{{ project.title }}" required></div>
     <div class="col-md-2"><label class="aurora-label" for="basic-start">Start <span aria-hidden="true">*</span></label><input id="basic-start" type="date" class="aurora-input" name="start_date" value="{{ project.start_date }}" required></div>
     <div class="col-md-2"><label class="aurora-label" for="basic-end">End <span aria-hidden="true">*</span></label><input id="basic-end" type="date" class="aurora-input" name="end_date" value="{{ project.end_date }}" required></div>
@@ -44,6 +45,7 @@
   <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Session</th><th>Type</th><th>When</th></tr></thead><tbody>{% for session in project.sessions|sort(attribute='starts_at') %}<tr><td>{{ session.title }}</td><td>{{ session.session_type }}</td><td>{{ session.starts_at|localdatetime('%b %d, %I:%M %p') }}</td></tr>{% endfor %}</tbody></table></div>
   {% endif %}
   <form method="POST" action="{{ url_for('erp.add_session', public_id=project.public_id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-4"><label class="aurora-label" for="s_title">Session title</label><input id="s_title" class="aurora-input" name="title" required></div>
     <div class="col-md-2"><label class="aurora-label" for="s_type">Type</label><select id="s_type" class="aurora-select" name="session_type">{% for option in session_type_options %}<option>{{ option }}</option>{% endfor %}</select></div>
@@ -66,6 +68,7 @@
   <div class="aurora-list aurora-list--flush mb-3">
     {% for match in people_matches %}
     <form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="aurora-list__item d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="person_public_id" value="{{ match.public_id }}">
       <input type="hidden" name="next" value="setup">
       <span>{{ match.display_name }}{% if match.registration_number %}<span class="small text-muted"> · {{ match.registration_number }}</span>{% endif %}</span>
@@ -82,6 +85,7 @@
   {% endif %}
   {% endif %}
   <form method="POST" action="{{ url_for('erp.create_and_enroll_team_member', public_id=project.public_id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-3"><label class="aurora-label" for="t_first_name">First name</label><input id="t_first_name" class="aurora-input" name="first_name" required></div>
     <div class="col-md-3"><label class="aurora-label" for="t_last_name">Last name</label><input id="t_last_name" class="aurora-input" name="last_name"></div>
@@ -102,6 +106,7 @@
   {% endif %}
   {% if checklist_templates %}
   <form method="POST" action="{{ url_for('erp.instantiate_project_checklist', public_id=project.public_id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-8"><label class="aurora-label" for="c_template">Checklist template</label><select id="c_template" class="aurora-select" name="template_public_id">{% for template in checklist_templates %}<option value="{{ template.public_id }}">{{ template.name }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><button class="aurora-button--primary w-100">Add checklist</button></div>
@@ -118,6 +123,7 @@
   <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Document</th><th>Category</th><th>Status</th></tr></thead><tbody>{% for document in project.document_records %}<tr><td>{{ document.title }}</td><td>{{ document.category }}</td><td>{{ document.status }}</td></tr>{% endfor %}</tbody></table></div>
   {% endif %}
   <form method="POST" action="{{ url_for('erp.add_document', public_id=project.public_id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-4"><label class="aurora-label" for="d_title">Title</label><input id="d_title" class="aurora-input" name="title" required></div>
     <div class="col-md-3"><label class="aurora-label" for="d_category">Category</label><select id="d_category" class="aurora-select" name="category"><option>Schedule</option><option>Report</option><option>Poster</option><option>Presentation</option><option>Other</option></select></div>
@@ -133,6 +139,7 @@
   <div class="aurora-table-scroll mb-3"><table class="aurora-table align-middle mb-0"><thead><tr><th>Category</th><th>Estimated</th></tr></thead><tbody>{% for line in project.budget_lines %}<tr><td>{{ line.category }}</td><td>{{ line.currency }} {{ line.estimated_amount }}</td></tr>{% endfor %}</tbody></table></div>
   {% endif %}
   <form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-2"><label class="aurora-label" for="b_category">Category</label><select id="b_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option>{{ option }}</option>{% endfor %}</select></div>
     <div class="col-md-2"><label class="aurora-label" for="b_category_other">If "Other", specify</label><input id="b_category_other" class="aurora-input" name="category_other"></div>

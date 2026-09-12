@@ -3,11 +3,12 @@
 {% block mobile_title %}Notifications{% endblock %}
 {% block content %}
 <div class="container-fluid">
-  <header class="page-header"><div><div class="page-eyebrow">Personal activity stream</div><div class="d-flex align-items-center gap-3 flex-wrap"><h1 class="page-title">Notifications</h1><span class="aurora-badge">{{ notifications|length }} records</span></div><p class="page-subtitle">Assignments, decisions, deadlines, and operational alerts.</p></div></header>
-  <div class="aurora-card mb-4">
-    <div class="aurora-card__header"><strong>Delivery preference</strong></div>
-    <div class="aurora-card__body">
+  <header class="page-header"><div><h1 class="page-title">Alerts</h1><p class="page-subtitle">Only what needs you. Everything else is in the audit trail.</p></div><span class="aurora-badge">{{ notifications|length }} records</span></header>
+  <div class="aurora-disclosure mb-4" id="deliveryPreference">
+    <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseDeliveryPreference" aria-expanded="false" aria-controls="collapseDeliveryPreference">Delivery preferences</button>
+    <div class="aurora-collapse aurora-disclosure__content" id="collapseDeliveryPreference" data-ui-parent="#deliveryPreference">
       <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-start" data-ui-pending-submit data-ui-pending-label="Saving…">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="col-md-5">
           <label class="aurora-label" for="event_type">Event type</label>
           <select class="aurora-select" id="event_type" name="event_type"><option value="task.deadline">Task deadlines</option><option value="checklist.deadline">Checklist deadlines</option><option value="task.status">Task decisions</option></select>
@@ -25,9 +26,9 @@
       </form>
     </div>
   </div>
-  <div class="aurora-card--padded"><div class="aurora-list notification-list">
+  <div><div class="aurora-list notification-list">
     {% for item in notifications %}
-    <article class="aurora-list__item {% if not item.read_at %}border-start border-primary border-4{% endif %}">
+    <article class="aurora-list__item{% if not item.read_at %} is-unread{% endif %}">
       <div class="d-flex justify-content-between gap-3"><div><h2 class="h6 mb-1">{{ item.title }}</h2><p class="mb-1">{{ item.body }}</p><small class="text-muted">{{ item.created_at }}</small></div>{% if not item.read_at %}<form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}"><button class="aurora-button--small aurora-button--outline-primary">Mark read</button></form>{% endif %}</div>
     </article>
     {% else %}<div class="empty-state"><i class="ph ph-bell" aria-hidden="true"></i><p class="mb-0">No notifications.</p></div>{% endfor %}

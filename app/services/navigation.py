@@ -4,7 +4,8 @@ link list in base.html with no shared "is this active" logic, so they could
 (and did) drift out of sync and show more than one active item at once. See
 PLAN.md "USC sidebar" finding.
 
-Entries carry a ``rail`` flag (default True) so a destination can appear in
+Entries carry a ``topnav`` flag selecting the desktop top bar, and a
+``rail`` flag (default True) so a destination can appear in
 the mobile drawer and command palette without occupying a desktop rail
 slot -- used to demote low-traffic destinations (Campuses, Data imports,
 Notification centre, Audit trail) after the Mission Control / ERP hub /
@@ -17,15 +18,15 @@ from __future__ import annotations
 from app.services.authorization import has_any_permission
 
 NAV_REGISTRY = [
-    {"key": "home", "label": "Home", "mobile_label": "Home", "bottom_nav": True, "rail": True, "icon": "ph-gauge", "group": "Workspace", "endpoint": "dashboard.index"},
+    {"key": "home", "label": "Home", "mobile_label": "Home", "topnav": True, "bottom_nav": True, "rail": True, "icon": "ph-gauge", "group": "Workspace", "endpoint": "dashboard.index"},
     {
-        "key": "projects", "label": "Projects", "mobile_label": "Projects", "bottom_nav": True, "rail": True, "icon": "ph-folder-open", "group": "Workspace",
+        "key": "projects", "label": "Projects", "mobile_label": "Projects", "topnav": True, "bottom_nav": True, "rail": True, "icon": "ph-folder-open", "group": "Workspace",
         "endpoint": "erp.projects", "active_blueprint": "erp",
         "active_exclude_endpoints": {"erp.notifications", "erp.audit", "erp.campuses", "erp.campus_detail", "erp.imports"},
     },
-    {"key": "reports", "label": "Published reports", "mobile_label": "Reports", "bottom_nav": True, "rail": True, "icon": "ph-chart-bar", "group": "Workspace", "endpoint": "public.reports"},
-    {"key": "profile", "label": "My Account & Activity", "mobile_label": "Account", "bottom_nav": True, "rail": True, "icon": "ph-user-circle", "group": "Workspace", "endpoint": "dashboard.profile"},
-    {"key": "admin_users", "label": "Administration", "mobile_label": "Admin", "bottom_nav": False, "rail": True, "icon": "ph-shield-check", "group": "Workspace", "endpoint": "dashboard.admin_users", "permission": "manage_users"},
+    {"key": "reports", "label": "Published reports", "mobile_label": "Reports", "topnav": True, "bottom_nav": True, "rail": True, "icon": "ph-chart-bar", "group": "Workspace", "endpoint": "public.reports"},
+    {"key": "profile", "label": "My Account & Activity", "mobile_label": "Account", "topnav": True, "bottom_nav": True, "rail": True, "icon": "ph-user-circle", "group": "Workspace", "endpoint": "dashboard.profile"},
+    {"key": "admin_users", "label": "Administration", "mobile_label": "Admin", "topnav": True, "bottom_nav": False, "rail": True, "icon": "ph-shield-check", "group": "Workspace", "endpoint": "dashboard.admin_users", "permission": "manage_users"},
 
     {"key": "campuses", "label": "Campuses", "mobile_label": "Campuses", "bottom_nav": False, "rail": False, "icon": "ph-buildings", "group": "Records", "endpoint": "erp.campuses"},
     {"key": "imports", "label": "Data imports", "mobile_label": "Imports", "bottom_nav": False, "rail": False, "icon": "ph-database", "group": "Records", "endpoint": "erp.imports", "permission": "manage_imports"},
@@ -48,5 +49,5 @@ def build_nav(user, current_endpoint, current_blueprint):
             active = current_blueprint == entry["active_blueprint"] and current_endpoint not in entry.get("active_exclude_endpoints", set())
         else:
             active = current_endpoint == entry["endpoint"]
-        items.append({**{"rail": True, "bottom_nav": False}, **entry, "active": active})
+        items.append({**{"rail": True, "bottom_nav": False, "topnav": False}, **entry, "active": active})
     return items

@@ -28,8 +28,29 @@ def test_bootstrap_admin_creates_person_and_platform_assignment_atomically():
         db.drop_all()
 
 
-def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path):
+def test_uat_provisioning_is_refused_outside_an_explicit_demonstrator_run(tmp_path):
+    """These accounts are Approved administrators. The command is registered in
+    every app, production included, so the gate is the only thing stopping it."""
     app = create_app()
+    app.config["DEMONSTRATOR"] = True
+    os.environ.pop("PROVISION_UAT", None)
+    with app.app_context():
+        db.create_all()
+        result = app.test_cli_runner().invoke(
+            args=["provision-uat", "--output", str(tmp_path / "creds.txt")]
+        )
+        assert result.exit_code != 0
+        assert "explicit demonstrator run" in result.output
+        assert not (tmp_path / "creds.txt").exists()
+        assert User.query.filter_by(username="uat_faculty_admin").first() is None
+        db.session.remove()
+        db.drop_all()
+
+
+def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROVISION_UAT", "1")
+    app = create_app()
+    app.config["DEMONSTRATOR"] = True
     output = tmp_path / "UAT_CREDENTIALS.txt"
     with app.app_context():
         db.create_all()
@@ -40,8 +61,14 @@ def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path):
         for username in ("uat_faculty_admin", "uat_usc", "uat_igp_head", "uat_icc_events_head", "uat_volunteer"):
             assert username in contents
             user = User.query.filter_by(username=username).one()
-            assert user.needs_password_reset is False
+            # The sheet calls these one-time passwords; that must be true.
+            assert user.needs_password_reset is True
             assert RoleAssignment.query.filter_by(user_id=user.id, is_active=True).count() == 1
-        assert "123" in contents
+        assert "123" not in contents
+        # Every password is distinct and random, not one shared literal.
+        passwords = [line.split("\t")[1] for line in contents.strip().splitlines() if "\t" in line and not line.startswith("Username")]
+        assert len(passwords) == 5
+        assert len(set(passwords)) == 5
+        assert all(len(pw) >= 20 for pw in passwords)
         db.session.remove()
         db.drop_all()

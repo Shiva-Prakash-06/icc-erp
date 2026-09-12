@@ -25,7 +25,7 @@
   }
 
   function font(context, size, weight) {
-    context.font = (weight || 400) + " " + size + "px Inter, ui-sans-serif, system-ui, sans-serif";
+    context.font = (weight || 400) + " " + size + "px Barlow, ui-sans-serif, system-ui, sans-serif";
     context.fillStyle = textColor;
   }
 

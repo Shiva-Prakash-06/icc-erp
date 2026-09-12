@@ -1,41 +1,50 @@
 {% extends "base.html" %}
-{% block title %}ERP Projects{% endblock %}
+{% block title %}Projects{% endblock %}
 {% block mobile_title %}Projects{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <div class="page-eyebrow">Portfolio command</div>
     <h1 class="page-title">Projects and programs</h1>
-    <p class="page-subtitle">Lifecycle-controlled records for ICC and IGP operations.</p>
+    <p class="page-subtitle">{{ projects|length }} record{{ '' if projects|length == 1 else 's' }} in your scope. Lifecycle-controlled, for ICC and IGP operations.</p>
   </div>
-  {% if can_create %}<a class="aurora-button--primary" href="{{ url_for('erp.new_project') }}"><i class="ph ph-plus-circle" aria-hidden="true"></i>New project</a>{% endif %}
+  {% if can_create %}<a class="aurora-button--primary blueprint" href="{{ url_for('erp.new_project') }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>New project</a>{% endif %}
 </header>
 
-<form method="GET" class="row g-2 mb-4" role="search">
+<form method="GET" class="row g-2 mb-3" role="search">
   <div class="col-md-8"><label class="aurora-label" for="project_search">Search projects by title or code</label><input id="project_search" class="aurora-input" name="q" value="{{ search_query }}" placeholder="Start typing…"></div>
+  {% if status_filter and status_filter != 'All' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
   <div class="col-md-2 align-self-end"><button class="aurora-button--secondary w-100">Search</button></div>
-  {% if search_query %}<div class="col-md-2 align-self-end"><a class="aurora-button--outline-primary w-100" href="{{ url_for('erp.projects') }}">Clear</a></div>{% endif %}
+  {% if search_query %}<div class="col-md-2 align-self-end"><a class="aurora-button--outline-primary w-100" href="{{ url_for('erp.projects', status=status_filter if status_filter != 'All' else None) }}">Clear</a></div>{% endif %}
 </form>
+
+{#- Status facets are plain links carrying the existing query params, so
+    they work with JavaScript disabled and are shareable as URLs. -#}
+<nav class="filter-chips" aria-label="Filter by status">
+  {% for facet in status_facets %}
+  <a class="filter-chip{% if status_filter == facet %} is-active{% endif %}"
+     href="{{ url_for('erp.projects', q=search_query or None, status=facet if facet != 'All' else None) }}"
+     {% if status_filter == facet %}aria-current="true"{% endif %}>{{ facet }}</a>
+  {% endfor %}
+</nav>
 
 <section aria-label="Projects">
   {% if projects %}
-  <div class="project-card-grid">
-    {% for project in projects %}
-    <a class="project-card-link" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
-      <article class="aurora-card--padded">
-        <div class="d-flex align-items-start justify-content-between gap-3">
-          <div class="project-card__code">{{ project.code or 'Project record' }}</div>
-          <span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span>
-        </div>
-        <h2 class="project-card__title">{{ project.title }}</h2>
-        <p class="project-card__meta">{{ project.campus.name }} · {{ project.program_type.name }}</p>
-        <div class="project-card__footer"><span class="font-monospace text-xs">{{ project.start_date.strftime('%d %b %Y') }} – {{ project.end_date.strftime('%d %b %Y') }}</span><i class="ph ph-arrow-up-right text-primary" aria-hidden="true"></i></div>
-      </article>
-    </a>
-    {% endfor %}
+  <div class="project-row__head" aria-hidden="true">
+    <span>Project</span><span>Programme</span><span>Dates</span><span>Status</span>
   </div>
+  {% for project in projects %}
+  <a class="project-row" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
+    <span class="project-row__id">
+      <span class="project-row__code font-monospace">{{ project.code or 'Project record' }}</span>
+      <span class="project-row__title">{{ project.title }}</span>
+    </span>
+    <span class="project-row__cell">{{ project.program_type.name }}<small>{{ project.campus.name }}</small></span>
+    <span class="project-row__cell font-monospace">{{ project.start_date.strftime('%d %b %Y') }} – {{ project.end_date.strftime('%d %b %Y') }}</span>
+    <span class="aurora-badge aurora-badge--status-{{ project.status|lower|replace(' ', '-') }}">{{ project.status }}</span>
+  </a>
+  {% endfor %}
   {% else %}
-  <div class="aurora-card--padded empty-state"><i class="ph ph-folder-open" aria-hidden="true"></i><h2 class="h4 mb-0">No projects found</h2><p class="mb-0">{% if search_query %}No projects match “{{ search_query }}.”{% else %}Projects appear here when the server grants access.{% endif %}</p></div>
+  <div class="empty-state"><i class="ph ph-folder-open" aria-hidden="true"></i><h2 class="h4 mb-0">No projects found</h2><p class="mb-0">{% if search_query or status_filter != 'All' %}Nothing matches the current search and filter.{% else %}Projects appear here when the server grants access.{% endif %}</p></div>
   {% endif %}
 </section>
 {% endblock %}

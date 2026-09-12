@@ -60,13 +60,13 @@ Source: `base.html`, shared by every signed-in page.
 | Region | Desktop | Mobile | Contract |
 |---|---|---|---|
 | Demonstrator banner | Top, non-dismissible | Top, wraps | Exact warning retained and announced once |
-| Primary navigation | Expanded/collapsible 248/76px rail | Four top destinations plus Menu; role-aware | Same authorized destinations as current Jinja conditions; `aria-current`; no unauthorized URLs in command data |
+| Primary navigation | Sticky 56px top bar (no rail) | Four top destinations plus Menu; role-aware | Same authorized destinations as current Jinja conditions; `aria-current`; no unauthorized URLs in command data |
 | Top bar | Context title, academic year, command trigger, user actions | 56px title/back/menu; safe-area aware | Predictable back destination; no hard-coded record IDs; academic-year label remains informational unless page exposes a filter |
-| Main | Offset from rail/top; max 1600px | Bottom padding includes nav and safe area | Skip target, one H1, flashed feedback before page content |
+| Main | Below the top bar; max 1440px | Bottom padding includes nav and safe area | Skip target, one H1, flashed feedback before page content |
 | Command palette | Keyboard-accessible island + fallback | Full-width dialog | `Ctrl/Cmd+K`, arrows, Enter, Escape; authorized static destinations only |
 | Logout | Separated in user footer/menu | Separated in menu | Existing GET route and offline purge listener preserved until backend contract changes separately |
 
-Shell states: expanded/collapsed rail, long username/role, no campus, active deep route, multiple flashes, command no results, 400% zoom, software keyboard, landscape phone, JS mount failure.
+Shell states: long username/role, no campus, active deep route, multiple flashes, command no results, 400% zoom, software keyboard, landscape phone, JS mount failure.
 
 ## 5. Dashboard pages
 

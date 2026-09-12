@@ -50,6 +50,31 @@ ACTION_QUEUE_KINDS = (
 )
 
 
+# Every reject path in app.services.operations refuses a decision without a
+# written reason ("Rejected tasks require a reason", and the equivalent for
+# checklists, documents, contributions, budget lines, buddy logs, feedback
+# and recruitment). So only the *approve* half of a decision can be taken
+# from a list: the send-back half opens the record, where the reason field
+# lives. Approving never needs one, which is why the common case is one
+# click and the exceptional case still gets its audit trail.
+# The endpoint and its parameters are returned rather than a built URL:
+# this service is called from tests and jobs with only an app context, and
+# url_for needs a request. The template resolves it.
+def _decision(endpoint, *, field, value, version, approve, reject, **params):
+    """``version`` is None for the one decision that carries no optimistic
+    concurrency token (``moderate_feedback`` takes no ``expected_version``);
+    the template omits the field rather than posting a meaningless 0."""
+    return {
+        "decide_endpoint": endpoint,
+        "decide_params": params,
+        "decide_field": field,
+        "approve_value": value,
+        "version": version,
+        "approve_label": approve,
+        "reject_label": reject,
+    }
+
+
 def build_action_queue(user, projects=None):
     """Return the sorted, unsliced 10-source action queue for ``user``.
 
@@ -72,7 +97,8 @@ def build_action_queue(user, projects=None):
 
     action_queue = []
     for task in WorkTask.query.filter(WorkTask.project_id.in_(project_ids or [-1]), WorkTask.status == "Submitted").all():
-        action_queue.append({"kind": "Task", "title": task.title, "project": task.project, "tab": "delivery", "anchor": task.public_id, "due_at": task.due_at})
+        action_queue.append({"kind": "Task", "title": task.title, "project": task.project, "tab": "delivery", "anchor": task.public_id, "due_at": task.due_at,
+                             "meta": task.description or "", **_decision("erp.update_task", field="status", value="Approved", version=task.version, approve="Approve", reject="Send back", public_id=task.project.public_id, task_public_id=task.public_id)})
     # `template_item.title` and `checklist.project` are read for every row, so
     # without eager loading this single source issued two extra queries per
     # queue item -- the bulk of the home page's query count (audit B13).
@@ -86,20 +112,27 @@ def build_action_queue(user, projects=None):
         .all()
     )
     for item in checklist_items:
-        action_queue.append({"kind": "Checklist", "title": item.template_item.title, "project": item.checklist.project, "tab": "delivery", "anchor": item.public_id, "due_at": item.due_at})
+        action_queue.append({"kind": "Checklist", "title": item.template_item.title, "project": item.checklist.project, "tab": "delivery", "anchor": item.public_id, "due_at": item.due_at,
+                             "meta": "Blocks closure" if item.template_item.mandatory else "", **_decision("erp.update_checklist_item", field="status", value="Approved", version=item.version, approve="Verify", reject="Send back", public_id=item.checklist.project.public_id, item_public_id=item.public_id)})
     for document in DocumentRecord.query.filter(DocumentRecord.project_id.in_(project_ids or [-1]), DocumentRecord.status == "Submitted").all():
-        action_queue.append({"kind": "Document", "title": document.title, "project": document.project, "tab": "resources", "anchor": document.public_id, "due_at": None})
+        action_queue.append({"kind": "Document", "title": document.title, "project": document.project, "tab": "resources", "anchor": document.public_id, "due_at": None,
+                             "meta": document.permission_classification or "", **_decision("erp.decide_document_route", field="status", value="Approved", version=document.version, approve="Approve", reject="Send back", public_id=document.project.public_id, document_public_id=document.public_id)})
     for contribution in ContributionRecord.query.filter(ContributionRecord.project_id.in_(project_ids or [-1]), ContributionRecord.approval_status == "Pending").all():
-        action_queue.append({"kind": "Contribution", "title": f"{contribution.person.display_name} · {contribution.activity_type}", "project": contribution.project, "tab": "contributions", "anchor": contribution.public_id, "due_at": None})
+        action_queue.append({"kind": "Contribution", "title": f"{contribution.person.display_name} · {contribution.activity_type}", "project": contribution.project, "tab": "contributions", "anchor": contribution.public_id, "due_at": None,
+                             "meta": f"{contribution.duration_hours} h" if contribution.duration_hours else "", **_decision("erp.decide_contribution_route", field="status", value="Approved", version=contribution.version, approve="Approve", reject="Send back", public_id=contribution.project.public_id, contribution_public_id=contribution.public_id)})
     operational_request_project_ids = [project.id for project in projects if has_permission(user, "approve_operational_requests", project)]
     for request_item in OperationalRequest.query.filter(OperationalRequest.project_id.in_(operational_request_project_ids or [-1]), OperationalRequest.status == "Submitted").all():
-        action_queue.append({"kind": "Operational request", "title": request_item.title, "project": request_item.project, "tab": "finance", "anchor": request_item.public_id, "due_at": None})
+        action_queue.append({"kind": "Operational request", "title": request_item.title, "project": request_item.project, "tab": "finance", "anchor": request_item.public_id, "due_at": None,
+                             "meta": request_item.request_type or "", **_decision("erp.decide_operational_request_route", field="status", value="Approved", version=request_item.version, approve="Approve", reject="Query", public_id=request_item.project.public_id, request_public_id=request_item.public_id)})
     for line in BudgetLine.query.filter(BudgetLine.project_id.in_(project_ids or [-1]), BudgetLine.status == "Submitted").all():
-        action_queue.append({"kind": "Budget line", "title": f"{line.category} ({line.currency} {line.estimated_amount})", "project": line.project, "tab": "finance", "anchor": line.public_id, "due_at": None})
+        action_queue.append({"kind": "Budget line", "title": f"{line.category} ({line.currency} {line.estimated_amount})", "project": line.project, "tab": "finance", "anchor": line.public_id, "due_at": None,
+                             "meta": "", **_decision("erp.decide_budget_line_route", field="status", value="Approved", version=line.version, approve="Approve", reject="Query", public_id=line.project.public_id, line_public_id=line.public_id)})
     for log in BuddyLog.query.join(BuddyAssignment).filter(BuddyAssignment.project_id.in_(project_ids or [-1]), BuddyLog.status == "Pending").all():
-        action_queue.append({"kind": "Buddy log", "title": log.description[:100], "project": log.assignment.project, "tab": "contributions", "anchor": log.public_id, "due_at": None})
+        action_queue.append({"kind": "Buddy log", "title": log.description[:100], "project": log.assignment.project, "tab": "contributions", "anchor": log.public_id, "due_at": None,
+                             "meta": "", **_decision("erp.decide_buddy_log_route", field="status", value="Approved", version=log.version, approve="Approve", reject="Send back", public_id=log.assignment.project.public_id, log_public_id=log.public_id)})
     for response in FeedbackResponse.query.join(FeedbackForm).filter(FeedbackForm.project_id.in_(project_ids or [-1]), FeedbackResponse.moderation_status == "Pending").all():
-        action_queue.append({"kind": "Feedback moderation", "title": response.form.title, "project": response.form.project, "tab": "insights", "anchor": response.public_id, "due_at": None})
+        action_queue.append({"kind": "Feedback moderation", "title": response.form.title, "project": response.form.project, "tab": "insights", "anchor": response.public_id, "due_at": None,
+                             "meta": "", **_decision("erp.moderate_feedback_route", field="status", value="Approved", version=None, approve="Publish", reject="Hold", public_id=response.form.project.public_id, response_public_id=response.public_id)})
     applications = RecruitmentApplication.query.filter(RecruitmentApplication.project_id.in_(project_ids or [-1]), RecruitmentApplication.decision.in_(["Submitted", "Interview Scheduled"])).all()
     people_by_id = {}
     if applications:
@@ -108,9 +141,13 @@ def build_action_queue(user, projects=None):
     for application in applications:
         person = people_by_id.get(application.person_id)
         display_name = person.display_name if person else "Unknown applicant"
-        action_queue.append({"kind": "Recruitment", "title": f"{display_name} · {application.desired_role}", "project": projects_by_id.get(application.project_id), "tab": "people", "anchor": application.public_id, "due_at": application.interview_at})
+        queue_project = projects_by_id.get(application.project_id)
+        action_queue.append({"kind": "Recruitment", "title": f"{display_name} · {application.desired_role}", "project": queue_project, "tab": "people", "anchor": application.public_id, "due_at": application.interview_at,
+                             "meta": application.decision or "", **_decision("erp.decide_recruitment_route", field="decision", value="Selected", version=application.version, approve="Select", reject="Decline", public_id=queue_project.public_id, application_public_id=application.public_id)})
     for snapshot in ReportSnapshot.query.filter(ReportSnapshot.project_id.in_(project_ids or [-1]), ReportSnapshot.approval_status == "Draft").all():
-        action_queue.append({"kind": "Report approval", "title": snapshot.title, "project": projects_by_id.get(snapshot.project_id), "tab": "insights", "anchor": snapshot.public_id, "due_at": None})
+        snapshot_project = projects_by_id.get(snapshot.project_id)
+        action_queue.append({"kind": "Report approval", "title": snapshot.title, "project": snapshot_project, "tab": "insights", "anchor": snapshot.public_id, "due_at": None,
+                             "meta": "", **_decision("erp.approve_report_route", field="status", value="Approved", version=snapshot.version, approve="Approve", reject="Send back", public_id=snapshot_project.public_id, snapshot_public_id=snapshot.public_id)})
     # Pending project publications were absent from the queue entirely, so
     # faculty saw 12 items and no publication request while the submitter saw
     # Pending (audit B12). Requests the viewer raised themselves are left out:
@@ -139,6 +176,8 @@ def build_action_queue(user, projects=None):
             "tab": "overview",
             "anchor": "publication",
             "due_at": None,
+            "meta": "Awaiting a publication decision",
+            **_decision("erp.decide_publication", field="decision", value="Published", version=candidate.version, approve="Publish", reject="Hold", public_id=candidate.public_id),
         })
     action_queue.sort(key=lambda item: (item["due_at"] is None, item["due_at"] or now))
     return action_queue

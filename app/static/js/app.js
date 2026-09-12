@@ -3,27 +3,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     document.documentElement.classList.add('has-ui-controller');
 
-    // Presentation-only shell preference. Navigation and authorization remain
-    // server-rendered and complete regardless of this enhancement.
-    const railToggle = document.querySelector('[data-rail-toggle]');
-    const railKey = 'oia.ui.rail-collapsed';
-    function setRail(collapsed) {
-        document.documentElement.classList.toggle('is-rail-collapsed', collapsed);
-        if (railToggle) {
-            railToggle.setAttribute('aria-pressed', String(collapsed));
-            railToggle.setAttribute('aria-label', collapsed ? 'Expand navigation' : 'Collapse navigation');
-        }
-    }
-    try { setRail(window.localStorage.getItem(railKey) === 'true'); } catch (_) { setRail(false); }
-    if (railToggle) {
-        railToggle.addEventListener('click', function() {
-            const collapsed = !document.documentElement.classList.contains('is-rail-collapsed');
-            setRail(collapsed);
-            try { window.localStorage.setItem(railKey, String(collapsed)); } catch (_) { /* Preference persistence is optional. */ }
-            document.dispatchEvent(new CustomEvent('oia:rail-change', {detail: {collapsed: collapsed}}));
-        });
-    }
-
     // Flask-WTF validates every browser mutation. Injecting the server-issued
     // token centrally also protects legacy forms while they are migrated to
     // explicit form classes.
@@ -129,6 +108,35 @@ document.addEventListener('DOMContentLoaded', function() {
             button.setAttribute('aria-expanded', String(!expanded));
         });
     });
+
+    // A deep link from the decision queue points at one record, which may
+    // sit inside a collapsed disclosure. Open every collapsed ancestor of
+    // the fragment target (and the tab overflow, if that is where it
+    // lives) so the link always lands on something you can see. Purely an
+    // enhancement: without JavaScript nothing is collapsed in the first
+    // place, because .aurora-collapse only hides under .has-ui-controller.
+    function revealFragmentTarget() {
+        const id = decodeURIComponent(window.location.hash.slice(1));
+        if (!id) return;
+        const target = document.getElementById(id);
+        if (!target) return;
+        let node = target.parentElement;
+        while (node) {
+            if (node.classList.contains('aurora-collapse') && !node.classList.contains('is-open')) {
+                node.classList.add('is-open');
+                const opener = node.id && document.querySelector(`[data-ui-target="#${node.id}"]`);
+                if (opener) {
+                    opener.setAttribute('aria-expanded', 'true');
+                    opener.classList.remove('is-collapsed');
+                }
+            }
+            if (node.tagName === 'DETAILS') node.open = true;
+            node = node.parentElement;
+        }
+        target.scrollIntoView({block: 'center'});
+    }
+    revealFragmentTarget();
+    window.addEventListener('hashchange', revealFragmentTarget);
 
     // Accessible file-picker readout: shows the selected filename(s) next to
     // the native <input type="file">. Purely additive -- the field remains a
@@ -311,7 +319,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/static/sw.js').catch(function() {
+        // Root path, root scope. The old /static/sw.js registration could only
+        // control /static/*, so it never intercepted an app navigation.
+        navigator.serviceWorker.register('/sw.js', {scope: '/'}).then(function(registration) {
+            // Retire the previous /static/-scoped worker, which would otherwise
+            // linger in browsers that already installed it.
+            navigator.serviceWorker.getRegistrations().then(function(all) {
+                all.forEach(function(other) {
+                    if (other !== registration && other.scope.indexOf('/static/') !== -1) {
+                        other.unregister();
+                    }
+                });
+            });
+        }).catch(function() {
             // Installation is optional; the authenticated application remains fully usable online.
         });
     });
@@ -336,7 +356,7 @@ const OIAChartTheme = {
     get border() { return uiToken('--color-border', '#bae6fd'); },
     get muted() { return uiToken('--color-text-tertiary', '#475569'); },
     get text() { return uiToken('--color-text', '#0f172a'); },
-    font: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    font: 'Barlow, ui-sans-serif, system-ui, sans-serif'
 };
 
 // Chart.js helper methods for dynamic analytics rendering

@@ -1,6 +1,7 @@
 .ph { display: inline-block; width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -.125em; background: currentColor; -webkit-mask: var(--oia-icon) center / contain no-repeat; mask: var(--oia-icon) center / contain no-repeat; }
 .ph::before { content: none !important; }
 .ph-star-fill, .ph-check-square-fill, .ph-chat-heart-fill { filter: drop-shadow(0 0 6px currentColor); }
+.ph-download-simple { --oia-icon: url("../icons/download.svg"); }
 .ph-airplane-tilt { --oia-icon: url("../icons/plane.svg"); }
 .ph-envelope-simple-open { --oia-icon: url("../icons/mail-open.svg"); }
 .ph-hand-heart { --oia-icon: url("../icons/heart-handshake.svg"); }

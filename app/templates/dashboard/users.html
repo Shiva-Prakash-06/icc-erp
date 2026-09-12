@@ -85,11 +85,13 @@
                                         <div class="admin-user-edit">
                                             {{ volunteer_summary(u) }}
                                             <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 {{ assignment_fields(u, '-pending-desktop') }}
                                                 <button type="submit" class="aurora-button--success aurora-button--small py-1 px-3 fw-bold rounded-pill"><i class="ph ph-check" aria-hidden="true"></i> Grant access</button>
                                             </form>
                                             <div class="admin-user-edit__divider" role="separator"></div>
                                             <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" data-confirm-submit="Reject registration for {{ u.username }}?">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="aurora-button--outline-danger aurora-button--small rounded-pill"><i class="ph ph-x-circle" aria-hidden="true"></i> Reject registration</button>
                                             </form>
                                         </div>
@@ -120,11 +122,13 @@
                         <div id="edit-user-{{ u.public_id }}-pending-mobile" class="aurora-collapse admin-user-edit">
                             {{ volunteer_summary(u) }}
                             <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 {{ assignment_fields(u, '-pending-mobile') }}
                                 <button type="submit" class="aurora-button--success aurora-button--small py-1 px-3 fw-bold rounded-pill"><i class="ph ph-check" aria-hidden="true"></i> Grant access</button>
                             </form>
                             <div class="admin-user-edit__divider" role="separator"></div>
                             <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" data-confirm-submit="Reject registration for {{ u.username }}?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="aurora-button--outline-danger aurora-button--small rounded-pill w-100"><i class="ph ph-x-circle" aria-hidden="true"></i> Reject registration</button>
                             </form>
                         </div>
@@ -185,6 +189,7 @@
                                     <td colspan="6">
                                         <div class="admin-user-edit">
                                             <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 {{ assignment_fields(u, '-desktop') }}
                                                 <button type="submit" class="aurora-button--outline-info aurora-button--small py-1 px-3 rounded-pill">Update</button>
                                             </form>
@@ -216,6 +221,7 @@
                         </button>
                         <div id="edit-user-{{ u.public_id }}-mobile" class="aurora-collapse admin-user-edit">
                             <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 {{ assignment_fields(u, '-mobile') }}
                                 <button type="submit" class="aurora-button--outline-info aurora-button--small py-1 px-3 rounded-pill w-100">Update</button>
                             </form>

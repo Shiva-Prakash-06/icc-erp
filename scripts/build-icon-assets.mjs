@@ -7,6 +7,7 @@ const source = join(root, "node_modules", "lucide-static", "icons");
 const target = join(root, "app", "static", "icons");
 
 const icons = {
+  "ph-download-simple": "download",
   "ph-airplane-tilt": "plane",
   "ph-envelope-simple-open": "mail-open",
   "ph-hand-heart": "heart-handshake",

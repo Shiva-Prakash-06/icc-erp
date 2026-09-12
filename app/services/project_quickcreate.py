@@ -74,3 +74,22 @@ def create_minimal_project(*, program_type_name: str, title: str, start_date, en
     project.code = f"{program.name.upper()}-{start_date.year}-{campus.code or 'CAMP'}-{project.id:04d}"
     db.session.commit()
     return project
+
+
+def creatable_program_types(actor):
+    """Program types ``actor`` can actually create a project for.
+
+    :func:`create_minimal_project` refuses a program outside the actor's
+    creation scope, but the New project form was offering every program in
+    the system -- so a scoped ICC Events Head could pick IGP and only learn
+    it was refused after submitting. Same rule, applied before the choice
+    is offered.
+    """
+    assignments = [row for row in _active_assignments(actor)
+                   if "manage_projects" in ROLE_PERMISSIONS.get(row.role_code, set()) and not row.project_id]
+    allowed = []
+    for program in ProgramType.query.order_by(ProgramType.name).all():
+        unit = OperatingUnit.query.filter_by(code=program.name).first()
+        if any(not row.operating_unit_id or row.operating_unit_id == getattr(unit, "id", None) for row in assignments):
+            allowed.append(program)
+    return allowed

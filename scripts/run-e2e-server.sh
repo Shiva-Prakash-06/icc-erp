@@ -27,6 +27,9 @@ fi
 export FLASK_APP=run.py
 export APP_ENV=testing
 export TESTING=true
+# Production runs with CSRF on; the acceptance suite must too, or a missing
+# server-rendered csrf_token goes unnoticed until it breaks login in production.
+export WTF_CSRF_ENABLED=true
 export DEMONSTRATOR=true
 export ACCEPTANCE_SEED=1
 export SECRET_KEY="acceptance-test-secret-key-only"

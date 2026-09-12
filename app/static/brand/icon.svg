@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ICC">
+  <!-- Editable source for the PWA icon set. Regenerate the PNGs with:
+       .venv/bin/python scripts/build_pwa_icons.py
+       Replace this file with official artwork to rebrand; nothing else changes. -->
+  <rect width="512" height="512" fill="#5980a6"/>
+  <g stroke="#f2f2f3" stroke-opacity=".51" stroke-width="9" fill="none">
+    <path d="M56 56h87M56 56v87M456 56h-87M456 56v87M56 456h87M56 456v-87M456 456h-87M456 456v-87"/>
+  </g>
+  <text x="256" y="256" fill="#f2f2f3" font-family="Barlow Condensed, Barlow, sans-serif"
+        font-weight="700" font-size="235" text-anchor="middle" dominant-baseline="central"
+        letter-spacing="4">ICC</text>
+</svg>

@@ -2,11 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {#- viewport-fit=cover is what makes env(safe-area-inset-*) non-zero. The CSS
+      already uses those insets for the bottom nav; without this they are 0 and
+      the nav sits under the home indicator on a notched phone. -#}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="ICC and IGP operational intelligence platform for Christ University.">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <meta name="theme-color" content="#f0f9ff">
-  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <meta name="theme-color" content="#f2f2f3">
+  {#- Manifest and worker are served from the origin root so the worker's scope
+      is "/" rather than "/static/". -#}
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/apple-touch-icon-180.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ICC ERP">
   <title>{% block title %}OIA Project Intelligence{% endblock %} | Christ University</title>
   {% for stylesheet in ui_styles('frontend/src/entries/aurora.tsx') %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
 </head>
@@ -22,36 +34,6 @@
 
   {% if g.user and not hide_sidebar %}
   <div class="app-shell">
-    <aside class="app-rail" aria-label="Primary navigation">
-      <a class="brand-lockup text-decoration-none" href="{{ url_for('dashboard.index') }}" aria-label="OIA Intelligence home">
-        <span class="brand-mark" aria-hidden="true">OI</span>
-        <span class="brand-copy">OIA Intelligence<small>Project intelligence hub</small></span>
-      </a>
-
-      <nav class="flex-grow-1">
-        <ul class="nav-list">
-          {% set ns = namespace(current_group=None) %}
-          {% for item in primary_nav if item.rail %}
-          {% if item.group != ns.current_group %}{% if not loop.first %}<li class="nav-group-label">{{ item.group }}</li>{% endif %}{% set ns.current_group = item.group %}{% endif %}
-          <li><a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span></a></li>
-          {% endfor %}
-        </ul>
-      </nav>
-
-      <button class="rail-collapse" type="button" data-rail-toggle aria-label="Collapse navigation" aria-pressed="false">
-        <i class="ph ph-caret-left rail-collapse__close" aria-hidden="true"></i>
-        <i class="ph ph-caret-right rail-collapse__open" aria-hidden="true"></i>
-        <span class="rail-collapse__close">Collapse</span>
-      </button>
-
-      <a class="app-nav-link" href="{{ url_for('public.landing') }}" target="_blank" rel="noopener noreferrer"><i class="ph ph-globe" aria-hidden="true"></i><span>Public site</span></a>
-      <div class="rail-user">
-        <div class="user-avatar" aria-hidden="true">{{ g.user.username[0].upper() }}</div>
-        <div class="rail-user__info"><div class="rail-user__name">{{ g.user.username }}</div><div class="rail-user__role">{{ g.user.role }}</div></div>
-        <a class="icon-action text-danger" href="{{ url_for('auth.logout') }}" aria-label="Log out"><i class="ph ph-power" aria-hidden="true"></i></a>
-      </div>
-    </aside>
-
     <div class="app-main">
       <header class="mobile-header">
         <div class="mobile-header-left">
@@ -67,11 +49,18 @@
       </header>
 
       <header class="app-topbar">
-        <div class="app-topbar__context">
-          <span class="topbar-crumb">OIA <span aria-hidden="true">/</span> <strong>{% block crumb %}{{ self.mobile_title() }}{% endblock %}</strong></span>
-        </div>
+        <a class="brand-lockup" href="{{ url_for('dashboard.index') }}" aria-label="ICC and OIA home">
+          <span class="brand-mark" aria-hidden="true">ICC</span>
+          <span class="brand-copy">ICC / OIA</span>
+        </a>
+        <nav class="app-topbar__nav" aria-label="Primary navigation">
+          {% for item in primary_nav if item.topnav %}
+          <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+          {% endfor %}
+        </nav>
+        <div class="app-topbar__spacer"></div>
         <div class="topbar-actions">
-          <button class="command-trigger" type="button" data-command-open><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Command palette</span><kbd>⌘ K</kbd></button>
+          <button class="command-trigger" type="button" data-command-open aria-label="Command palette"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Search or jump to…</span><kbd aria-hidden="true">⌘K</kbd></button>
           <span class="aurora-badge"><i class="ph ph-calendar-blank" aria-hidden="true"></i>{{ current_academic_year_label }}</span>
           <button class="icon-action position-relative" type="button" data-notification-toggle aria-controls="notificationPanel" aria-expanded="false" aria-label="Open notifications{% if shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}">
             <i class="ph ph-bell" aria-hidden="true"></i>
@@ -81,6 +70,7 @@
             <div class="user-avatar" aria-hidden="true">{{ g.user.username[0].upper() }}</div>
             <span class="topbar-user-chip__copy"><strong>{{ g.user.username }}</strong><small>{{ g.user.role }}</small></span>
           </div>
+          <a class="icon-action text-danger" href="{{ url_for('auth.logout') }}" aria-label="Log out"><i class="ph ph-power" aria-hidden="true"></i></a>
         </div>
       </header>
 
@@ -111,7 +101,7 @@
 
     <div class="drawer-scrim" data-ui-drawer-close></div>
     <aside class="mobile-drawer" id="mobileNavDrawer" aria-label="Mobile navigation drawer" aria-hidden="true" inert>
-      <div class="d-flex align-items-center justify-content-between mb-4"><div><span class="aurora-badge">Navigation</span><h2 class="h4 mb-0 mt-2">OIA command</h2></div><button class="icon-action" type="button" data-ui-drawer-close aria-label="Close navigation"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+      <div class="d-flex align-items-center justify-content-between mb-4"><div><span class="page-eyebrow">Navigation</span><h2 class="h4 mb-0">ICC / OIA</h2></div><button class="icon-action" type="button" data-ui-drawer-close aria-label="Close navigation"><i class="ph ph-x" aria-hidden="true"></i></button></div>
       <nav class="flex-grow-1">
         <div class="nav-list">
           {% set ns = namespace(current_group=None) %}
@@ -119,6 +109,7 @@
           {% if item.group != ns.current_group %}{% if not loop.first %}<div class="nav-group-label">{{ item.group }}</div>{% endif %}{% set ns.current_group = item.group %}{% endif %}
           <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</a>
           {% endfor %}
+          <a class="app-nav-link" href="{{ url_for('public.landing') }}" target="_blank" rel="noopener noreferrer"><i class="ph ph-globe" aria-hidden="true"></i><span>Public site</span></a>
         </div>
       </nav>
       <button class="aurora-button--secondary w-100" type="button" data-command-open><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Open command palette</button>
@@ -147,13 +138,13 @@
   {% else %}
   <main id="main-content" class="auth-wrapper" tabindex="-1">
     <div class="auth-stage{% block auth_stage_class %}{% endblock %}">
-      <aside class="auth-intro" aria-label="OIA Project Intelligence">
-        <div><span class="brand-mark" aria-hidden="true">OI</span><div class="page-eyebrow mt-4">Christ University · OIA</div><p class="auth-intro__title">Project intelligence, in one operational view.</p><p>Coordinate programs, people, evidence and reporting through an access-controlled institutional record.</p></div>
-        <div class="auth-intro__flow" aria-hidden="true"><span>Projects</span><i class="ph ph-arrow-right"></i><span>Delivery</span><i class="ph ph-arrow-right"></i><span>Evidence</span><i class="ph ph-arrow-right"></i><span>Reports</span></div>
-      </aside>
       <div class="auth-form-column">
+        <div class="auth-lockup">
+          <span class="brand-mark" aria-hidden="true">ICC</span>
+          <span class="brand-copy">Christ University<small>International Christite Community</small></span>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}<div class="auth-flash-stack mx-auto mb-4">{% for category, message in messages %}<div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="{{ 'alert' if category in ['danger','error'] else 'status' }}"><i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-info' }}" aria-hidden="true"></i><span>{{ message }}</span></div>{% endfor %}</div>{% endif %}
+          {% if messages %}<div class="auth-flash-stack mb-4">{% for category, message in messages %}<div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="{{ 'alert' if category in ['danger','error'] else 'status' }}"><i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-info' }}" aria-hidden="true"></i><span>{{ message }}</span></div>{% endfor %}</div>{% endif %}
         {% endwith %}
         {% block auth_content %}{% endblock %}
       </div>
@@ -168,7 +159,12 @@
   ]</script>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+  {#- Chart.js is 206 KB, four times the whole stylesheet. It used to load
+      render-blocking on every page, including the login screen, which has no
+      chart. Only pages that actually draw one opt in now. Both tags are
+      deferred, and deferred scripts execute in document order, so window.Chart
+      exists by the time app.js reads it on DOMContentLoaded. -#}
+  {% block vendor_scripts %}{% endblock %}
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
   {% set aurora_entry = ui_asset('frontend/src/entries/aurora.tsx') %}
   {% if aurora_entry %}<script type="module" src="{{ aurora_entry }}"></script>{% endif %}

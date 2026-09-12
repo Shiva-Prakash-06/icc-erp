@@ -1,0 +1,53 @@
+# Files uploaded to Vercel. A CLI deploy does NOT read .gitignore, so anything
+# secret or local must be listed here as well. Everything listed here is also
+# kept out of the published static output.
+#
+# KEEP (do not add these): app/, api/, public/, migrations/ (the buildCommand
+# runs `flask db upgrade`), run.py, pyproject.toml, uv.lock, requirements.txt.
+
+# Secrets, local databases, and generated credentials
+.env
+.env.*
+instance/
+supabase/
+*.db
+*.db.*
+*.sqlite*
+
+# Infrastructure and release artifacts
+terraform/
+dist/
+cloudbuild.yaml
+compose.yaml
+Dockerfile
+
+# Source and tooling not needed to run the function
+frontend/
+scripts/
+e2e/
+tests/
+docs/
+design-system/
+references/
+archive/
+outputs/
+playwright.config.ts
+requirements-dev.txt
+Makefile
+seed.py
+
+# Build and tooling noise
+node_modules/
+.venv/
+_uv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+.github/
+.agents/
+skills-lock.json
+.DS_Store

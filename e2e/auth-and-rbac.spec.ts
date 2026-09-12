@@ -30,19 +30,26 @@ test("role-shaped navigation and APIs do not leak forbidden operations", async (
 });
 
 test("scoped ICC Events Head reaches project creation but cannot see IGP", async ({ page }, testInfo) => {
+  // Creation moved from an inline campus/program/year/wing form on the
+  // projects list to the "Create a project" page, where campus, academic
+  // year, owner, code and status are all inferred from the actor's own
+  // scope. What still has to hold is the boundary: an ICC Events Head can
+  // create, is never offered IGP, and never sees the IGP project.
   await signIn(page, "e2e_events");
   await page.goto("/erp/projects/new");
-  await expect(page.getByRole("heading", { name: /projects and programs/i })).toBeVisible();
-  await expect(page.getByLabel("Operating unit")).toHaveValue(/.+/);
-  await expect(page.getByLabel("Wing (ICC)").locator("option")).toContainText(["No wing / IGP", "Events"]);
+  await expect(page.getByRole("heading", { name: /create a project/i })).toBeVisible();
+  const manual = page.locator("form", { has: page.locator("#manual_title") });
+  const programs = manual.getByLabel("Program");
+  await expect(programs.locator("option")).toContainText(["ICC"]);
+  await expect(programs.locator("option").filter({ hasText: "IGP" })).toHaveCount(0);
+
   const uniqueTitle = `Scoped browser project ${testInfo.project.name}`;
-  await page.getByLabel("Title").fill(uniqueTitle);
-  await page.getByLabel("Start").fill("2026-09-01");
-  await page.getByLabel("End").fill("2026-09-01");
-  await page.getByLabel("Wing (ICC)").selectOption({ label: "Events" });
-  await page.getByRole("button", { name: "Create draft" }).click();
-  await expect(page).toHaveURL(/\/setup\?step=sessions/);
+  await manual.locator("#manual_title").fill(uniqueTitle);
+  await manual.locator("#manual_start").fill("2026-09-01");
+  await manual.locator("#manual_end").fill("2026-09-01");
+  await manual.getByRole("button", { name: "Create project" }).click();
   await expect(page.getByText(uniqueTitle)).toBeVisible();
+
   expect((await page.request.get("/api/v1/projects")).status()).toBe(200);
   const payload = await (await page.request.get("/api/v1/projects")).json();
   expect(payload.data.every((project: { code?: string }) => project.code !== "E2E-IGP")).toBeTruthy();

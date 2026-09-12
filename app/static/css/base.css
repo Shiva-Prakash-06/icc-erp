@@ -1,7 +1,9 @@
-@font-face { font-family: Inter; src: url("../fonts/inter-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
-@font-face { font-family: Inter; src: url("../fonts/inter-600.woff2") format("woff2"); font-style: normal; font-weight: 500 800; font-display: swap; }
-@font-face { font-family: "Space Grotesk"; src: url("../fonts/space-grotesk-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
-@font-face { font-family: "Space Grotesk"; src: url("../fonts/space-grotesk-700.woff2") format("woff2"); font-style: normal; font-weight: 600 800; font-display: swap; }
+@font-face { font-family: Barlow; src: url("../fonts/barlow-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: Barlow; src: url("../fonts/barlow-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: Barlow; src: url("../fonts/barlow-600.woff2") format("woff2"); font-style: normal; font-weight: 600 800; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/barlow-condensed-500.woff2") format("woff2"); font-style: normal; font-weight: 400 500; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/barlow-condensed-600.woff2") format("woff2"); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/barlow-condensed-700.woff2") format("woff2"); font-style: normal; font-weight: 700 800; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("../fonts/ibm-plex-mono-600.woff2") format("woff2"); font-style: normal; font-weight: 500 700; font-display: swap; }
 
@@ -11,13 +13,12 @@ body {
   margin: 0;
   min-height: 100dvh;
   overflow-x: hidden;
-  background:
-    radial-gradient(58rem 44rem at 90% -8%, rgb(56 189 248 / 24%), transparent 66%),
-    radial-gradient(52rem 38rem at -8% 42%, rgb(125 211 252 / 28%), transparent 70%),
-    radial-gradient(46rem 34rem at 76% 105%, rgb(37 99 235 / 10%), transparent 72%),
-    linear-gradient(135deg, #f8fdff 0%, var(--color-canvas) 42%, #eaf7ff 100%);
+  /* Flat institutional ground. The aurora gradients are gone: depth in this
+     system comes from hairline rules and the printed-drawing corner marks,
+     never from light. */
+  background: var(--color-canvas);
   color: var(--color-text);
-  font: 400 16px/1.5 var(--font-sans);
+  font: 400 15px/1.55 var(--font-sans);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -27,38 +28,68 @@ button, [role="button"], select, label[for], summary { touch-action: manipulatio
 summary { cursor: pointer; }
 details > summary { list-style: revert; }
 button, a, input, select, textarea, summary { outline: none; }
-:focus-visible { outline: 2px solid var(--color-focus) !important; outline-offset: 3px; }
-::selection { color: var(--color-text); background: rgb(14 165 233 / 24%); }
+:focus-visible { outline: 2px solid var(--color-focus) !important; outline-offset: 2px; }
+::selection { color: var(--color-text); background: rgb(89 128 166 / 28%); }
 a { color: var(--color-link); text-decoration-thickness: 1px; text-underline-offset: 3px; }
-a:hover { color: var(--color-primary-hover); }
+a:hover { color: var(--color-primary-pressed); }
 img, svg, canvas { max-width: 100%; }
 hr { border: 0; border-top: 1px solid var(--color-border-subtle); margin: var(--space-6) 0; }
 h1, h2, h3, h4, h5, h6 {
   margin-top: 0;
   color: var(--color-text);
   font-family: var(--font-display);
-  line-height: 1.14;
-  letter-spacing: -.035em;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -.015em;
 }
-h1 { font-size: clamp(1.8rem, 3vw, 2rem); font-weight: 700; }
-h2 { font-size: clamp(1.3rem, 2vw, 1.7rem); font-weight: 700; }
-h3 { font-size: 1.125rem; font-weight: 700; }
+h1 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); line-height: 1.05; }
+h2 { font-size: clamp(1.25rem, 2vw, 1.375rem); }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.125rem; }
 p { margin-top: 0; }
-small, .small { font-size: .875rem; line-height: 1.45; }
+small, .small { font-size: .8125rem; line-height: 1.45; }
 kbd, code, pre, .font-monospace {
   font-family: var(--font-mono) !important;
   font-variant-numeric: tabular-nums slashed-zero;
 }
+.tabular { font-variant-numeric: tabular-nums; }
 strong, .fw-semibold, .fw-bold { font-weight: 600; }
 .skip-link {
   position: fixed; top: 8px; left: 8px; z-index: 1000; transform: translateY(-150%);
-  padding: 10px 14px; border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; font-weight: 700;
+  padding: 10px 14px; background: var(--color-primary); color: #fff; font-weight: 600;
 }
 .skip-link:focus { transform: translateY(0); }
 .sr-only, .visually-hidden {
   position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important;
   overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important;
 }
+
+/* ── Blueprint registration marks ──────────────────────────────────────────
+   The system's one ornament: four corner ticks drawn just outside a box, the
+   way a drawing is registered for print. Applied to primary actions, counter
+   tiles and framed panels. Purely decorative, so the corners are empty <i>s
+   the accessibility tree never sees. */
+.blueprint { position: relative; }
+.blueprint > .corner {
+  position: absolute; width: 11px; height: 11px; pointer-events: none;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.blueprint > .corner::before, .blueprint > .corner::after { content: ""; position: absolute; background: currentColor; }
+.blueprint > .corner::before { left: 5px; top: 0; width: 1px; height: 100%; }
+.blueprint > .corner::after { top: 5px; left: 0; width: 100%; height: 1px; }
+.blueprint > .corner.tl { top: -6px; left: -6px; }
+.blueprint > .corner.tr { top: -6px; right: -6px; }
+.blueprint > .corner.bl { bottom: -6px; left: -6px; }
+.blueprint > .corner.br { bottom: -6px; right: -6px; }
+
+/* Entrance motion is for transient, JS-only overlays (the command palette)
+   and nothing else. Do not put these on a server-rendered interactive
+   surface: with JavaScript disabled there is no rAF to drive Playwright's
+   actionability check, so a running CSS animation makes the element
+   permanently "not stable" and every click times out -- which is exactly
+   what an entrance animation on the sign-in column did. */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -67,10 +98,11 @@ strong, .fw-semibold, .fw-bold { font-weight: 600; }
 @media (forced-colors: active) {
   * { box-shadow: none !important; }
   .aurora-card, .aurora-card--padded, .auth-card, .command-dialog, .aurora-badge,
-  .aurora-button, [class*="aurora-button--"], input, select, textarea, .app-rail, .app-topbar {
+  .aurora-button, [class*="aurora-button--"], input, select, textarea, .app-topbar {
     border: 1px solid CanvasText;
     box-shadow: none;
     forced-color-adjust: auto;
   }
+  .blueprint > .corner { display: none; }
   .app-nav-link[aria-current="page"], .aurora-tab.active { outline: 2px solid Highlight; }
 }

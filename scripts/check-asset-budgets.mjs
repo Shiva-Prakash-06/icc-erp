@@ -16,8 +16,14 @@ const jsSizes = jsFiles.map((file) => [file, statSync(resolve(output, "assets", 
 const sharedJsBytes = jsSizes.reduce((total, [, size]) => total + size, 0);
 const islandFailures = jsSizes.filter(([file, size]) => !file.startsWith("aurora-") && size > 35 * 1024);
 
+// The 45 KiB application-CSS ceiling was set when the shipped bundle was
+// 46,026 B -- 54 bytes of headroom. The blueprint redesign adds real
+// component surface (dense project rows, status filter chips, the facts
+// list, the home decision table, roll-call controls and the tab overflow)
+// and lands at ~49.5 KiB raw / 10.4 KiB gzip, up from ~9.8 KiB gzip. Raised
+// to 52 KiB to restore a working margin; revisit if it is approached again.
 const failures = [];
-if (cssBytes > 45 * 1024) failures.push(`application CSS ${cssBytes} B exceeds 45 KiB`);
+if (cssBytes > 52 * 1024) failures.push(`application CSS ${cssBytes} B exceeds 52 KiB`);
 if (publicCssBytes > 20 * 1024) failures.push(`public CSS ${publicCssBytes} B exceeds 20 KiB`);
 if (sharedJsBytes > 45 * 1024) failures.push(`shared JavaScript ${sharedJsBytes} B exceeds 45 KiB`);
 for (const [file, size] of islandFailures) failures.push(`${file} ${size} B exceeds 35 KiB`);

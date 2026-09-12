@@ -23,7 +23,7 @@ If port 5010 is already in use, stop the other local Flask process first or use 
 ## Before you begin
 
 1. Open the UAT web address supplied by the project coordinator.
-2. Use the test password `123` with the username assigned below.
+2. Use the one-time password for your username from the private credential sheet the project coordinator gives you. Each account has its own randomly generated password, and the platform requires you to set a new one at first sign-in.
 3. Use a current version of Chrome, Firefox, Safari, or Edge. If the screen looks crowded, zoom out to 100% and widen the browser window.
 
 ## Sign in and change your password
@@ -43,7 +43,11 @@ If port 5010 is already in use, stop the other local Flask process first or use 
 | `uat_icc_events_head` | Central Campus ICC Events Head | ICC Events project creation and event operations within the Events wing. |
 | `uat_volunteer` | Volunteer | Assigned contributions and project activity. |
 
-All five UAT accounts use the test password `123`.
+Each of the five UAT accounts has its own randomly generated one-time password, issued on the private
+credential sheet (`instance/UAT_CREDENTIALS.txt`, readable only by the operator who ran the command).
+The platform forces a password change at first sign-in. Provisioning is deliberately gated: it runs
+only with `DEMONSTRATOR=true` and `PROVISION_UAT=1`, so it cannot create pre-approved administrator
+accounts against a production database.
 
 ## Faculty Administrator journey
 

@@ -9,10 +9,11 @@
   <div><div class="page-eyebrow">{{ session.session_type }}</div><h1 class="page-title mb-2">{{ session.title }}</h1><p class="page-subtitle">{{ session.starts_at|localdatetime('%b %d, %Y · %I:%M %p', label=False) }} – {{ session.ends_at|localtime }}</p></div>
 </header>
 
-<div class="aurora-card">
-  <div class="aurora-card__header"><strong>Roll call</strong></div>
+<div>
+  <div class="page-section__bar mb-3"><h2 class="page-section__title">Roll call</h2><span class="page-section__count">{{ team|length }} enrolled</span></div>
   <form method="POST" action="{{ url_for('erp.mark_session_attendance', public_id=project.public_id, session_public_id=session.public_id) }}">
-    <p class="small text-muted px-3 pt-3 mb-0" id="correctionReasonHint">Correction reason is only editable once an attendance record already exists for a participant.</p>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="small text-muted mb-3" id="correctionReasonHint">Correction reason is only editable once an attendance record already exists for a participant.</p>
     <div class="aurora-table-scroll" tabindex="0">
       <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
         <thead><tr><th>Name</th><th>Registration</th><th>Attendance</th><th>Correction reason</th><th>Current verification</th></tr></thead>
@@ -23,11 +24,12 @@
             <td data-label="Name">{{ assignment.person.display_name }}</td>
             <td data-label="Registration" class="font-monospace">{{ assignment.person.registration_number or '—' }}</td>
             <td data-label="Attendance">
-              <select class="aurora-select aurora-select--small" name="status_{{ assignment.person_id }}" aria-label="Attendance for {{ assignment.person.display_name }}">
+              <fieldset class="aurora-fieldset roll-options">
+                <legend class="visually-hidden">Attendance for {{ assignment.person.display_name }}</legend>
                 {% for status in ['Present', 'Absent', 'Excused', 'Late'] %}
-                <option{% if record and record.status == status %} selected{% endif %}{% if not record and status == 'Present' %} selected{% endif %}>{{ status }}</option>
+                <label title="{{ status }}"><input type="radio" name="status_{{ assignment.person_id }}" value="{{ status }}"{% if record and record.status == status %} checked{% endif %}{% if not record and status == 'Present' %} checked{% endif %}><span aria-hidden="true">{{ status[0] }}</span><span class="visually-hidden">{{ status }}</span></label>
                 {% endfor %}
-              </select>
+              </fieldset>
             </td>
             <td data-label="Correction reason"><label class="visually-hidden" for="reason_{{ assignment.person_id }}">Correction reason for {{ assignment.person.display_name }}</label><input class="aurora-input aurora-input--small" id="reason_{{ assignment.person_id }}" name="reason_{{ assignment.person_id }}"{% if record %} placeholder="Required if changing status"{% else %} disabled aria-describedby="correctionReasonHint"{% endif %}></td>
             <td data-label="Current verification">{% if record %}<span class="aurora-badge">v{{ record.version }}</span><div class="small text-muted">{{ actors.get(record.verified_by_id, 'Unknown verifier') }} · {{ record.verified_at.strftime('%b %d, %Y %I:%M %p') if record.verified_at else 'time unavailable' }}</div>{% else %}<span class="text-muted">Not recorded</span>{% endif %}</td>
@@ -38,12 +40,12 @@
         </tbody>
       </table>
     </div>
-    <div class="aurora-card__body border-top"><button class="aurora-button--primary">Save attendance</button></div>
+    <div class="roll-bar"><span class="page-section__count">Everyone defaults to Present; change only what differs.</span><button class="aurora-button--primary blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Save attendance</button></div>
   </form>
 </div>
 
-<details class="aurora-card mt-4">
-  <summary class="aurora-card__header"><strong>Immutable attendance history</strong><span>{{ events|length }} changes</span></summary>
+<details class="aurora-disclosure mt-4">
+  <summary class="aurora-disclosure__trigger">Immutable attendance history ({{ events|length }} changes)</summary>
   <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards aurora-table mb-0"><thead><tr><th>When</th><th>Change</th><th>Reason</th><th>Recorded by</th></tr></thead><tbody>
     {% for event in events %}<tr><td data-label="When">{{ event.occurred_at|localdatetime('%b %d, %Y %I:%M %p') }}</td><td data-label="Change">{{ event.previous_status or 'Not recorded' }} → {{ event.new_status }}</td><td data-label="Reason">{{ event.reason or 'Initial roll call' }}</td><td data-label="Recorded by">{{ actors.get(event.actor_user_id, 'Unknown user') }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No attendance changes recorded yet.</td></tr>{% endfor %}
   </tbody></table></div>

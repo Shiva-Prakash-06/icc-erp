@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f3">
+  <title>Offline | OIA Project Intelligence</title>
+  {% for stylesheet in ui_styles('frontend/src/entries/aurora.tsx') %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
+</head>
+<body>
+  {#- Served by the service worker when a navigation cannot reach the network.
+      It carries no operational data on purpose: an offline shell is cached, and
+      a cache outlives a logout. -#}
+  <main id="main-content" class="auth-wrapper" tabindex="-1">
+    <div class="auth-card mx-auto">
+      <div class="auth-header">
+        <div class="auth-logo">O</div>
+        <h1 class="auth-title">You are offline</h1>
+        <p class="auth-subtitle">Command Portal | Office of International Affairs</p>
+      </div>
+      <p class="text-muted">
+        This device has no connection right now. Operational records are never
+        stored on the device, so there is nothing to show until you reconnect.
+      </p>
+      {#- A link, not a button with an inline handler: script-src 'self' has no
+          'unsafe-inline', so an onclick would be blocked by CSP and do nothing. -#}
+      <a class="aurora-button--primary w-100 mt-2 py-2.5 d-block text-center" href="/">Try again</a>
+    </div>
+  </main>
+</body>
+</html>

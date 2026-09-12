@@ -37,7 +37,6 @@ function loadShellMotion(event: Event) {
   shellMotionRuntime ??= import("../islands/shell-motion");
   void shellMotionRuntime.then(({ animateShellEvent }) => animateShellEvent(event));
 }
-document.addEventListener("oia:rail-change", loadShellMotion);
 document.addEventListener("oia:notification-change", loadShellMotion);
 document.addEventListener("oia:project-view-change", loadShellMotion);
 document.documentElement.classList.add("has-aurora-runtime");

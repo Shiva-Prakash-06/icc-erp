@@ -26,6 +26,7 @@
       <h2 class="aurora-card__heading"><i class="ph ph-airplane-tilt" aria-hidden="true"></i> Create IGP from itinerary</h2>
       <p class="text-muted">Upload a day-by-day itinerary (.xlsx or .csv). The program title and dates are inferred from the file, and every session is imported immediately.</p>
       <form method="POST" action="{{ url_for('erp.quick_create_from_itinerary') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="aurora-file-field mb-3">
           <label class="aurora-label" for="itinerary_source_file">Itinerary file</label>
           <input id="itinerary_source_file" class="aurora-input" type="file" name="source_file" accept=".xlsx,.csv" required data-ui-toggle="file-field" data-ui-target="#itinerary_source_file_name">
@@ -42,6 +43,7 @@
       <h2 class="aurora-card__heading"><i class="ph ph-file-arrow-up" aria-hidden="true"></i> Upload program/event documents</h2>
       <p class="text-muted">Give the project a title and dates, then upload its documents in one step — each file is automatically classified and stored.</p>
       <form method="POST" action="{{ url_for('erp.quick_create_with_documents') }}" enctype="multipart/form-data" class="aurora-form-groups">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <fieldset class="aurora-fieldset">
           <legend class="aurora-fieldset__legend">Project details</legend>
           <div class="row g-2">
@@ -70,6 +72,7 @@
       <h2 class="aurora-card__heading"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Create manually</h2>
       <p class="text-muted">Only a title and dates are required. Campus, academic year, owner, code, and status are inferred automatically.</p>
       <form method="POST" action="{{ url_for('erp.quick_create_project') }}" class="aurora-form-groups">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <fieldset class="aurora-fieldset">
           <legend class="aurora-fieldset__legend">Project details</legend>
           <div class="row g-2">

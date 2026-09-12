@@ -63,6 +63,12 @@ def drive_validate():
 @internal_jobs_bp.post("/retention")
 def retention():
     _authorize("SCHEDULER_SERVICE_ACCOUNT")
+    return {"status": "ok", **_run_retention()}
+
+
+def _run_retention():
+    """Retention sweep, split out so the cron dispatcher can run it without
+    re-entering the OIDC authorization the POST route performs."""
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=current_app.config["REJECTED_APPLICATION_RETENTION_DAYS"])
     expired = RecruitmentApplication.query.filter(
@@ -101,4 +107,29 @@ def retention():
     }
     db.session.add(AuditEvent(action="retention.execute", entity_type="RetentionPolicy", after_summary=result))
     db.session.commit()
-    return {"status": "ok", **result}
+    return result
+
+
+# Vercel Cron invokes its targets with GET and cannot mint a Google OIDC token,
+# so it cannot use the POST endpoints above. This dispatcher gives it one GET
+# path per job, authorized by the shared CRON_SECRET that Vercel injects as a
+# bearer token. The OIDC contract for Cloud Scheduler/Tasks is unchanged.
+_CRON_JOBS = {
+    "reminders": lambda: {"result": generate_deadline_notifications()},
+    "notifications-deliver": lambda: {"result": deliver_pending()},
+    "retention": _run_retention,
+}
+
+
+@internal_jobs_bp.get("/cron/<string:job>")
+def cron_dispatch(job):
+    handler = _CRON_JOBS.get(job)
+    if handler is None:
+        return jsonify({"status": "unknown-job", "job": job}), 404
+    if not current_app.config.get("CRON_SECRET"):
+        # Refuse rather than fall through to the OIDC branch, which would give
+        # a confusing "missing OIDC token" error for a misconfigured cron.
+        raise PermissionError("CRON_SECRET is not configured; scheduled jobs are disabled.")
+    verify_internal_job_request([])
+    payload = handler()
+    return jsonify({"status": "ok", "job": job, **payload})

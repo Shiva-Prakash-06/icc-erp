@@ -17,8 +17,11 @@ test("project setup exposes Basics and remains usable with browser history", asy
 
 test("operational request completes Draft to Submitted to Approved to Completed", async ({ page }, testInfo) => {
   await signIn(page, "e2e_events");
-  await openProject(page, "E2E-ICC-EVENT", "Operations");
+  await openProject(page, "E2E-ICC-EVENT", "Budget");
   const title = `Equipment request ${testInfo.project.name}`;
+  // Creating a request is a secondary action on this tab: the form lives
+  // behind "Create a request" so the section opens on what needs deciding.
+  await page.getByRole("button", { name: "Create a request" }).click();
   await page.getByLabel("Request type").selectOption({ label: "Equipment" });
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByRole("button", { name: "Create draft" }).click();
@@ -29,12 +32,15 @@ test("operational request completes Draft to Submitted to Approved to Completed"
   await expect(page.getByRole("row").filter({ hasText: title }).getByLabel(new RegExp(`Decision for ${title}`))).toHaveCount(0);
   await page.goto("/logout");
   await signIn(page, "e2e_faculty");
-  await openProject(page, "E2E-ICC-EVENT", "Operations");
+  await openProject(page, "E2E-ICC-EVENT", "Budget");
   const row = page.getByRole("row").filter({ hasText: title });
   await row.getByLabel(new RegExp(`Decision for ${title}`)).selectOption("Approved");
   await row.getByRole("button", { name: "Save" }).click();
   await row.getByRole("button", { name: /mark completed/i }).click();
-  await expect(row).toContainText("Completed");
+  // A completed request is settled, so it leaves the "needs action" list
+  // and joins the settled table behind its disclosure.
+  await page.getByRole("button", { name: /^Show \d+ settled/i }).click();
+  await expect(page.getByRole("row").filter({ hasText: title })).toContainText("Completed");
 });
 
 test("dynamic feedback stores canonical rating and chart table stays in parity", async ({ page }, testInfo) => {

@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f2f3">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/apple-touch-icon-180.png') }}">
   <meta name="description" content="ICC and IGP public event calendar and published reports — Christ University.">
   <title>{% block title %}Public overview{% endblock %} | ICC/IGP Christ University</title>
   {% for stylesheet in ui_inline_styles('frontend/src/entries/public.ts') %}<style>{{ stylesheet }}</style>{% endfor %}

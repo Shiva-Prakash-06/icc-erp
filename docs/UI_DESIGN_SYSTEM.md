@@ -3,6 +3,8 @@
 Status: implementation contract  
 Visual source of truth: [`design-system/icc-erp/MASTER.md`](../design-system/icc-erp/MASTER.md)
 
+> **2026-09-11 — blueprint redesign.** The visual language changed wholesale (flat ground, square corners, Barlow Condensed, hairline rules, no glass). Component *behaviour and APIs below are unchanged*; only their appearance is. Two shell facts in this document are now historical: there is no desktop rail (one sticky top bar) and no collapse control.
+
 This document specifies component behavior. The master file specifies tokens. A component is not production-ready until every applicable state below is implemented and tested.
 
 ## 1. Global component rules
@@ -146,8 +148,8 @@ Mobile policy:
 
 ### 2.9 Navigation shell
 
-- Desktop rail contains labeled destinations grouped by Command, Reporting, and Administration.
-- Collapsed rail retains tooltips and accessible labels; collapse choice persists locally but does not affect authorization.
+- The desktop top bar contains labeled destinations; the mobile drawer keeps the Workspace/Records grouping. Both are rendered from `NAV_REGISTRY`, so they cannot drift apart.
+- The active destination is marked by an ink underline plus `aria-current="page"`, never by colour alone.
 - Mobile bottom navigation contains at most four top-level destinations plus Menu and uses icon + label.
 - Destinations unavailable to a role are not serialized into client navigation data. If temporarily unavailable for state reasons, render disabled with explanation rather than silently hiding.
 - Logout is spatially separated from normal navigation.

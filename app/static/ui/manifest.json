@@ -1,4 +1,28 @@
 {
+  "app/static/fonts/barlow-400.woff2": {
+    "file": "assets/barlow-400-qiz4-Cze.woff2",
+    "src": "app/static/fonts/barlow-400.woff2"
+  },
+  "app/static/fonts/barlow-500.woff2": {
+    "file": "assets/barlow-500-BPAOfeC8.woff2",
+    "src": "app/static/fonts/barlow-500.woff2"
+  },
+  "app/static/fonts/barlow-600.woff2": {
+    "file": "assets/barlow-600-DILqtrty.woff2",
+    "src": "app/static/fonts/barlow-600.woff2"
+  },
+  "app/static/fonts/barlow-condensed-500.woff2": {
+    "file": "assets/barlow-condensed-500-BgYH2mbd.woff2",
+    "src": "app/static/fonts/barlow-condensed-500.woff2"
+  },
+  "app/static/fonts/barlow-condensed-600.woff2": {
+    "file": "assets/barlow-condensed-600-DepVgxBB.woff2",
+    "src": "app/static/fonts/barlow-condensed-600.woff2"
+  },
+  "app/static/fonts/barlow-condensed-700.woff2": {
+    "file": "assets/barlow-condensed-700-v1xN8_Wq.woff2",
+    "src": "app/static/fonts/barlow-condensed-700.woff2"
+  },
   "app/static/fonts/ibm-plex-mono-400.woff2": {
     "file": "assets/ibm-plex-mono-400-DMJ8VG8y.woff2",
     "src": "app/static/fonts/ibm-plex-mono-400.woff2"
@@ -6,22 +30,6 @@
   "app/static/fonts/ibm-plex-mono-600.woff2": {
     "file": "assets/ibm-plex-mono-600-BgSNZQsw.woff2",
     "src": "app/static/fonts/ibm-plex-mono-600.woff2"
-  },
-  "app/static/fonts/inter-400.woff2": {
-    "file": "assets/inter-400-C38fXH4l.woff2",
-    "src": "app/static/fonts/inter-400.woff2"
-  },
-  "app/static/fonts/inter-600.woff2": {
-    "file": "assets/inter-600-LgqL8muc.woff2",
-    "src": "app/static/fonts/inter-600.woff2"
-  },
-  "app/static/fonts/space-grotesk-500.woff2": {
-    "file": "assets/space-grotesk-500-lFbtlQH6.woff2",
-    "src": "app/static/fonts/space-grotesk-500.woff2"
-  },
-  "app/static/fonts/space-grotesk-700.woff2": {
-    "file": "assets/space-grotesk-700-RjhwGPKo.woff2",
-    "src": "app/static/fonts/space-grotesk-700.woff2"
   },
   "app/static/icons/activity.svg": {
     "file": "assets/activity-B50wuuWZ.svg",
@@ -138,6 +146,10 @@
   "app/static/icons/database.svg": {
     "file": "assets/database-DYsced7h.svg",
     "src": "app/static/icons/database.svg"
+  },
+  "app/static/icons/download.svg": {
+    "file": "assets/download-DzXYrrPz.svg",
+    "src": "app/static/icons/download.svg"
   },
   "app/static/icons/earth.svg": {
     "file": "assets/earth-Cm42n7Cl.svg",
@@ -360,7 +372,7 @@
     "src": "app/static/icons/x.svg"
   },
   "frontend/src/entries/aurora.tsx": {
-    "file": "assets/aurora-COmF7SIq.js",
+    "file": "assets/aurora-BVQTMQxb.js",
     "name": "aurora",
     "src": "frontend/src/entries/aurora.tsx",
     "isEntry": true,
@@ -369,9 +381,10 @@
       "frontend/src/islands/shell-motion.ts"
     ],
     "css": [
-      "assets/aurora-CFRjN99S.css"
+      "assets/aurora-CyHoT1Eq.css"
     ],
     "assets": [
+      "assets/download-DzXYrrPz.svg",
       "assets/plane-dVH5V_M9.svg",
       "assets/mail-open-BDAguctH.svg",
       "assets/heart-handshake-CB8ejTxc.svg",
@@ -385,32 +398,29 @@
       "assets/award-CCyhx8Gw.svg",
       "assets/bell-CRYWSwE7.svg",
       "assets/building-DCF29qKM.svg",
-      "assets/calendar-BNVmUqGe.svg",
+      "assets/building-2-DApz11on.svg",
       "assets/calendar-days-0KQreHDW.svg",
       "assets/calendar-check-2-C9zHARpX.svg",
       "assets/chevron-left-BJWUOf3q.svg",
-      "assets/chevron-right-BfvWZFn0.svg",
       "assets/chart-column-big-CHJZSWpK.svg",
       "assets/check-C2tN36xL.svg",
       "assets/circle-check-big-BCAqS4b_.svg",
-      "assets/square-check-big-BrAolcJ7.svg",
-      "assets/clock-CnEgkVqp.svg",
       "assets/history-2G2PGc8o.svg",
+      "assets/database-DYsced7h.svg",
       "assets/mail-DN5GQiyt.svg",
       "assets/file-up-tq5ULWJI.svg",
       "assets/file-C0khycg1.svg",
       "assets/file-text-DyJGYwLA.svg",
       "assets/folder-open-BXtCDeEh.svg",
       "assets/folder-UkSXRlpN.svg",
+      "assets/gauge-MhZ8eYco.svg",
       "assets/earth-Cm42n7Cl.svg",
       "assets/image-Cgur-tj8.svg",
       "assets/circle-alert-D3Ua740a.svg",
       "assets/list-DFAhupL8.svg",
-      "assets/list-checks-DlR0ffuz.svg",
       "assets/search-B6JsRoiY.svg",
       "assets/notebook-DL65SKgL.svg",
       "assets/pen-line-CAWJDZlg.svg",
-      "assets/circle-plus-D4zyO0Le.svg",
       "assets/power-BREdLRDW.svg",
       "assets/shield-check-Ba2XaMkI.svg",
       "assets/grid-2x2-BPQuUJ-K.svg",
@@ -422,12 +432,12 @@
     ]
   },
   "frontend/src/entries/public.ts": {
-    "file": "assets/public-DFjhDfJ5.js",
+    "file": "assets/public-mj0tPamH.js",
     "name": "public",
     "src": "frontend/src/entries/public.ts",
     "isEntry": true,
     "css": [
-      "assets/public-nOcUZp5I.css"
+      "assets/public-Dyl9xWfK.css"
     ],
     "assets": [
       "assets/log-in-Bc-XhVZx.svg",
@@ -447,7 +457,7 @@
     "isDynamicEntry": true
   },
   "frontend/src/islands/shell-motion.ts": {
-    "file": "assets/shell-motion-fuEBam2D.js",
+    "file": "assets/shell-motion-CYYRLEzp.js",
     "name": "shell-motion",
     "src": "frontend/src/islands/shell-motion.ts",
     "isDynamicEntry": true

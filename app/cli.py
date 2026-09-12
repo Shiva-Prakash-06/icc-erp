@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -18,12 +19,38 @@ from app.services.operations import instantiate_checklist
 from app.services.roles import replace_scoped_assignment
 
 
+def _require_seed_environment(command: str, env_flag: str) -> None:
+    """Refuse to create pre-approved accounts outside an explicit demonstrator run.
+
+    These commands are registered into every app, production included. They
+    previously created Approved administrators with the password "123" and
+    needs_password_reset=False, with no environment gate at all. This mirrors
+    the guard seed-acceptance already uses.
+    """
+    if os.getenv(env_flag) != "1" or not current_app.config.get("DEMONSTRATOR"):
+        raise click.ClickException(
+            f"{command} is allowed only for an explicit demonstrator run "
+            f"(requires DEMONSTRATOR=true and {env_flag}=1)."
+        )
+
+
+def _one_time_password() -> str:
+    """A random one-time password. Always paired with needs_password_reset=True.
+
+    Not routed through validate_password: a 24-character urlsafe token clears
+    the length and common-password rules by construction, and the live breach
+    check would add a pointless network call to a local CLI command.
+    """
+    return secrets.token_urlsafe(18)
+
+
 def register_cli(app):
     @app.cli.command("seed-test-users")
     def seed_test_users():
         """Create the five approved local accounts used for manual testing."""
 
-        test_password = "123"
+        _require_seed_environment("seed-test-users", "SEED_TEST_USERS")
+        test_password = _one_time_password()
 
         role_labels = {
             "OIA_FACULTY_ADMINISTRATOR": "OIA Faculty Administrator",
@@ -40,7 +67,7 @@ def register_cli(app):
             user = User.query.filter_by(username=username).first()
             if not user:
                 user = User(username=username, email=email, role=label, preferred_role=label,
-                            status="Approved", needs_password_reset=False)
+                            status="Approved", needs_password_reset=True)
                 user.set_password(password)
                 db.session.add(user)
                 db.session.flush()
@@ -50,7 +77,7 @@ def register_cli(app):
                 user.role = label
                 user.preferred_role = label
                 user.status = "Approved"
-                user.needs_password_reset = False
+                user.needs_password_reset = True
             user.set_password(password)
             assignment = RoleAssignment.query.filter_by(user_id=user.id, role_code=code).first()
             if not assignment:
@@ -59,6 +86,8 @@ def register_cli(app):
                                               can_view_sensitive_links=code in {"OIA_FACULTY_ADMINISTRATOR", "IGP_HEAD"}))
         db.session.commit()
         click.echo(f"RBAC test users ready: {len(role_labels)} accounts ({created} created).")
+        click.echo(f"One-time password for all {len(role_labels)} accounts: {test_password}")
+        click.echo("Each account must set a new password at first sign-in.")
 
     @app.cli.command("bootstrap-reference-data")
     def bootstrap_reference_data():
@@ -196,6 +225,7 @@ def register_cli(app):
     @click.option("--output", type=click.Path(dir_okay=False, path_type=Path), default=Path("instance/UAT_CREDENTIALS.txt"))
     def provision_uat(output):
         """Create first-login UAT accounts and a private, untracked credential sheet."""
+        _require_seed_environment("provision-uat", "PROVISION_UAT")
         year, campus, _icc_type, _igp_type, icc, igp, events_wing = _reference_data()
         rows = {
             "uat_faculty_admin": ("OIA Faculty Administrator", "OIA_FACULTY_ADMINISTRATOR", None, None, True),
@@ -207,7 +237,7 @@ def register_cli(app):
         credentials = []
         for username, (label, role_code, unit, wing, sensitive) in rows.items():
             email = f"{username}@example.test"
-            password = "123"
+            password = _one_time_password()
             user = User.query.filter_by(username=username).first()
             if not user:
                 person = Person(first_name=username.replace("uat_", "").replace("_", " ").title(), primary_email=email, campus_id=campus.id, person_type="UAT User")
@@ -221,7 +251,7 @@ def register_cli(app):
             user.role = label
             user.preferred_role = label
             user.status = "Approved"
-            user.needs_password_reset = False
+            user.needs_password_reset = True
             user.failed_login_count = 0
             user.locked_until = None
             user.set_password(password)

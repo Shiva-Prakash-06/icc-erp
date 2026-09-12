@@ -1,0 +1,3 @@
+# Internal operations platform. Not for indexing.
+User-agent: *
+Disallow: /

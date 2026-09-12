@@ -3,8 +3,8 @@
   "captured_at": "2026-07-17",
   "contract": "presentation-only Aurora migration",
   "url_map": {
-    "route_count": 133,
-    "sha256": "f0fd6d4d5fec2321680a56e3fae034b5087c164adaae9126bce02fb42a4e4a56",
+    "route_count": 139,
+    "sha256": "57ae7c26989f1d5630769147b7e6cb6c9411c93cf304327589bbd82a3451f16a",
     "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
     "includes_parameter_converters": true
   },

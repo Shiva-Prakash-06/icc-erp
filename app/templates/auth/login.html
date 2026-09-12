@@ -1,36 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Sign In - OIA Project Intelligence{% endblock %}
+{% block title %}Sign in - OIA Project Intelligence{% endblock %}
 
 {% block auth_content %}
-<div class="auth-card mx-auto">
+<div class="auth-card">
     <div class="auth-header">
-        <div class="auth-logo">O</div>
-        <h1 class="auth-title">OIA Project Intelligence</h1>
-        <p class="auth-subtitle">Command Portal | Office of International Affairs</p>
+        <h1 class="auth-title">Sign in</h1>
+        <p class="auth-subtitle">Office of International Affairs</p>
     </div>
-    
+
     <form action="{{ url_for('auth.login') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="aurora-field">
             <label for="username" class="aurora-label">Username or Email</label>
             <input type="text" id="username" name="username" class="aurora-input" placeholder="Enter username/email" required autocomplete="username">
         </div>
-        
+
         <div class="aurora-field">
             <label for="password" class="aurora-label">Password</label>
             <div class="d-flex gap-2">
                 <input type="password" id="password" name="password" class="aurora-input" placeholder="Enter password" required autocomplete="current-password">
-                <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
+                <button type="button" class="aurora-button--secondary" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
             </div>
         </div>
-        
-        <button type="submit" class="aurora-button--primary w-100 mt-2 py-2.5">Access Platform</button>
-        <a href="{{ url_for('auth.forgot_password') }}" class="d-block text-center text-info small mt-3">Forgot password?</a>
+
+        {#- "Access Platform" is the accessible name every e2e suite signs in
+            with; the label stays put even though the heading above it now
+            reads "Sign in". -#}
+        <button type="submit" class="aurora-button--primary aurora-button--large w-100 mt-2 blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Access Platform</button>
     </form>
-    
-    <div class="text-center mt-4">
-        <span class="text-muted small">Need an account?</span>
-        <a href="{{ url_for('auth.register') }}" class="text-info small fw-bold text-decoration-none ms-1">Register Now</a>
+
+    <div class="d-flex justify-content-between mt-3">
+        <a href="{{ url_for('auth.forgot_password') }}" class="small">Forgot password</a>
+        <a href="{{ url_for('auth.register') }}" class="small">Request access</a>
     </div>
 </div>
 {% endblock %}
