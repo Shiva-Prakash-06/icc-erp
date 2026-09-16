@@ -28,7 +28,7 @@ def login_required(f):
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per minute", methods=["POST"])
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT"], methods=["POST"])
 def login():
     if g.user:
         return redirect(url_for('dashboard.index'))

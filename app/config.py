@@ -101,6 +101,10 @@ class BaseConfig:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    # Per-IP cap on sign-in attempts. Configurable because a pilot group
+    # sharing one campus NAT presents as a single IP, and the default trips
+    # on ordinary simultaneous logins rather than on an attack.
+    LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "10 per minute")
     DRIVE_VALIDATION_MODE = os.getenv("DRIVE_VALIDATION_MODE", "mock")
     GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")

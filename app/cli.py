@@ -221,6 +221,27 @@ def register_cli(app):
         db.session.commit()
         click.echo("Acceptance fixtures ready. Test password: 123")
 
+    @app.cli.command("seed-beta")
+    @click.option("--reset/--no-reset", default=True,
+                  help="Delete every existing application row first (default).")
+    def seed_beta_command(reset):
+        """Reset the database and seed the beta-testing roster and projects.
+
+        Destructive by design: `--reset` empties every application table. Gated
+        on BETA_SEED=1 rather than on DEMONSTRATOR, because the beta runs on a
+        production config where DEMONSTRATOR is false and setting it true would
+        change unrelated behaviour.
+        """
+        if os.getenv("BETA_SEED") != "1":
+            raise click.ClickException(
+                "seed-beta is destructive and runs only with BETA_SEED=1 set explicitly."
+            )
+        from app.services.beta_seed import BETA_PASSWORD, seed_beta
+
+        summary = seed_beta(reset=reset)
+        click.echo(", ".join(f"{key}={value}" for key, value in summary.items()))
+        click.echo(f"All {summary['users']} beta accounts share the password: {BETA_PASSWORD}")
+
     @app.cli.command("provision-uat")
     @click.option("--output", type=click.Path(dir_okay=False, path_type=Path), default=Path("instance/UAT_CREDENTIALS.txt"))
     def provision_uat(output):
