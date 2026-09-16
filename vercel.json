@@ -8,11 +8,6 @@
       "excludeFiles": "{.agents/**,docs/**,e2e/**,frontend/**,migrations/**,scripts/**,terraform/**,tests/**,**/googleapiclient/discovery_cache/documents/**,*.md,*.pdf,*.jpeg,compose.yaml,Dockerfile,Makefile,playwright.config.ts,requirements-dev.txt}"
     }
   },
-  "crons": [
-    { "path": "/internal/jobs/cron/reminders", "schedule": "0 2 * * *" },
-    { "path": "/internal/jobs/cron/notifications-deliver", "schedule": "*/15 * * * *" },
-    { "path": "/internal/jobs/cron/retention", "schedule": "30 3 * * *" }
-  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]

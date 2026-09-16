@@ -83,9 +83,24 @@ uses a separate entry point: `GET /internal/jobs/cron/<job>`, authorized by the
 `CRON_SECRET` that Vercel sends as a bearer token, compared with `hmac.compare_digest`.
 The POST + OIDC endpoints are unchanged, so the GCP path still works.
 
-Jobs configured in `vercel.json`: `reminders` (daily 02:00 UTC),
-`notifications-deliver` (every 15 min), `retention` (daily 03:30 UTC). Cron frequency
-and count are plan-limited — the Hobby plan allows far fewer than this.
+**No crons are currently configured.** The `crons` block was removed from
+`vercel.json` because the account is on the Hobby plan, which rejects the deployment
+outright with `cron_jobs_limits_reached`: Hobby permits only daily schedules, and
+`notifications-deliver` needs `*/15 * * * *`. Nothing scheduled runs today — no
+deadline reminders, no notification delivery, no retention pruning.
+
+To restore them, upgrade the team to Pro and add back:
+
+```json
+  "crons": [
+    { "path": "/internal/jobs/cron/reminders", "schedule": "0 2 * * *" },
+    { "path": "/internal/jobs/cron/notifications-deliver", "schedule": "*/15 * * * *" },
+    { "path": "/internal/jobs/cron/retention", "schedule": "30 3 * * *" }
+  ],
+```
+
+`CRON_SECRET` is already set in the production environment, so the endpoints are live
+and authorized; only the schedule that invokes them is missing.
 
 ## Known platform limits
 
