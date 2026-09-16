@@ -80,7 +80,7 @@
       decide whether the project can close, and they used to sit one
       collapsed accordion away from being invisible. -#}
   {% if blockers %}
-  <section class="page-section mb-4" id="closure-blockers" aria-label="Closure blockers">
+  <section class="page-section mb-4" id="closure-blockers" aria-label="Closure blockers" data-tour="blockers">
     <div class="page-section__bar">
       <h2 class="page-section__title">{{ blockers|length }} thing{{ '' if blockers|length == 1 else 's' }} block{{ 's' if blockers|length == 1 else '' }} closure</h2>
       <span class="page-section__count">Clear these to complete the project</span>

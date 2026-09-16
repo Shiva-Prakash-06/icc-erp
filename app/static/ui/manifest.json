@@ -372,7 +372,7 @@
     "src": "app/static/icons/x.svg"
   },
   "frontend/src/entries/aurora.tsx": {
-    "file": "assets/aurora-BVQTMQxb.js",
+    "file": "assets/aurora-C81gharM.js",
     "name": "aurora",
     "src": "frontend/src/entries/aurora.tsx",
     "isEntry": true,
@@ -381,7 +381,7 @@
       "frontend/src/islands/shell-motion.ts"
     ],
     "css": [
-      "assets/aurora-CyHoT1Eq.css"
+      "assets/aurora-qAhy8Ng1.css"
     ],
     "assets": [
       "assets/download-DzXYrrPz.svg",

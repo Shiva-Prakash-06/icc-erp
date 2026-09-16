@@ -15,15 +15,70 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.models.erp import ImportBatch, OperationalRequest, Person, ProjectSession, WorkTask
-from app.models.production import RecruitmentApplication
+from app.models.erp import ImportBatch, OperationalRequest, Person, ProjectSession, SessionAttendance, WorkTask
+from app.models.production import ApprovalEvent, ContributionRecord, RecruitmentApplication
 from app.models.project import BuddyAssignment
 from app.services.action_queue import build_action_queue, build_oversight_metrics
 from app.services.authorization import has_any_permission, has_permission
 from app.services.lifecycle import closure_blockers
+from app.services.roles import (
+    ONBOARDING_CHECKLISTS,
+    ONBOARDING_CLIENT_SIGNALS,
+    onboarding_audience,
+)
 from app.services.scope import approvable_projects, visible_projects
 
 _OPEN_TASK_STATUSES = ("Not Started", "In Progress", "Blocked", "Submitted")
+
+
+def _onboarding_completion(user):
+    """Which getting-started tasks are already done.
+
+    Everything that leaves a row behind is read from that row rather than
+    from a flag: a decision the user actually cleared, a roll call they
+    actually verified, an import they actually committed. Only the three
+    tasks that touch nothing in the database (using the command palette,
+    opening a project, reading the audit trail) come from the signals the
+    browser reports -- see ONBOARDING_CLIENT_SIGNALS.
+    """
+    signals = user.onboarding_signals or {}
+    done = {key for key in ONBOARDING_CLIENT_SIGNALS if signals.get(key)}
+
+    if ApprovalEvent.query.filter_by(actor_user_id=user.id).first():
+        done.add("decision")
+    if SessionAttendance.query.filter_by(verified_by_id=user.id).first():
+        done.add("roll_call")
+    if ImportBatch.query.filter_by(committed_by_id=user.id).first():
+        done.add("import_committed")
+    if user.person_id and ContributionRecord.query.filter_by(person_id=user.person_id).first():
+        done.add("hours_logged")
+    return done
+
+
+def build_onboarding_checklist(user):
+    """The getting-started card: the role's three or four tasks, each with a
+    real completion flag and the page where it is done. Returns ``None`` once the
+    user has hidden it, so the card disappears for good rather than lingering
+    as a permanently-ticked decoration. Skipping the *tour* does not hide it --
+    that is exactly when a written list is most useful."""
+    signals = user.onboarding_signals or {}
+    if signals.get("checklist_hidden"):
+        return None
+    audience = onboarding_audience(user)
+    tasks = ONBOARDING_CHECKLISTS.get(audience, [])
+    if not tasks:
+        return None
+    done = _onboarding_completion(user)
+    # Not "items": a dict key of that name is shadowed by dict.items in Jinja.
+    rows = [{**task, "done": task["key"] in done} for task in tasks]
+    completed = sum(row["done"] for row in rows)
+    return {
+        "audience": audience,
+        "tasks": rows,
+        "completed": completed,
+        "total": len(rows),
+        "percent": round(completed * 100 / len(rows)),
+    }
 
 
 def build_home(user, *, show_all_queue=False):
@@ -116,4 +171,11 @@ def build_home(user, *, show_all_queue=False):
         "show_all_queue": show_all_queue,
         "oversight_metrics": oversight_metrics,
         "igp_indicators": igp_indicators,
+        "onboarding_checklist": build_onboarding_checklist(user),
+        # The tour's "blockers" step anchors to an element that only exists on
+        # a project page, so the step needs somewhere to navigate to. Resolved
+        # here because `projects_in_scope` is already in hand; on any other
+        # page the step has no destination and is skipped rather than shown
+        # pointing at nothing.
+        "onboarding_tour_project": projects_in_scope[0].public_id if projects_in_scope else None,
     }

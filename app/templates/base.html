@@ -53,20 +53,21 @@
           <span class="brand-mark" aria-hidden="true">ICC</span>
           <span class="brand-copy">ICC / OIA</span>
         </a>
-        <nav class="app-topbar__nav" aria-label="Primary navigation">
+        <nav class="app-topbar__nav" aria-label="Primary navigation" data-tour="nav">
           {% for item in primary_nav if item.topnav %}
           <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
           {% endfor %}
         </nav>
         <div class="app-topbar__spacer"></div>
         <div class="topbar-actions">
-          <button class="command-trigger" type="button" data-command-open aria-label="Command palette"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Search or jump to…</span><kbd aria-hidden="true">⌘K</kbd></button>
+          <button class="command-trigger" type="button" data-command-open data-tour="search" aria-label="Command palette"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Search or jump to…</span><kbd aria-hidden="true">⌘K</kbd></button>
           <span class="aurora-badge"><i class="ph ph-calendar-blank" aria-hidden="true"></i>{{ current_academic_year_label }}</span>
           <button class="icon-action position-relative" type="button" data-notification-toggle aria-controls="notificationPanel" aria-expanded="false" aria-label="Open notifications{% if shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}">
             <i class="ph ph-bell" aria-hidden="true"></i>
             {% if shell_unread_count %}<span class="notification-count" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
           </button>
-          <div class="topbar-user-chip" aria-label="Signed in as {{ g.user.username }}, {{ g.user.role }}">
+          <button class="icon-action onb-help" type="button" data-onboarding-replay aria-label="Replay the guided tour"><span aria-hidden="true">?</span></button>
+          <div class="topbar-user-chip" data-tour="role" aria-label="Signed in as {{ g.user.username }}, {{ g.user.role }}">
             <div class="user-avatar" aria-hidden="true">{{ g.user.username[0].upper() }}</div>
             <span class="topbar-user-chip__copy"><strong>{{ g.user.username }}</strong><small>{{ g.user.role }}</small></span>
           </div>
@@ -92,7 +93,7 @@
       </main>
     </div>
 
-    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <nav class="mobile-bottom-nav" aria-label="Mobile navigation" data-tour="nav">
       {% for item in primary_nav if item.bottom_nav %}
       <a href="{{ url_for(item.endpoint) }}" class="mobile-nav-link{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i><span>{{ item.mobile_label }}</span></a>
       {% endfor %}
@@ -153,6 +154,7 @@
   {% endif %}
 
   {% if g.user %}
+  {% include "_onboarding.html" %}
   <div id="aurora-command-root"></div>
   <script id="aurora-command-data" type="application/json">[
     {% for item in primary_nav %}{"name":{{ item.label|tojson }},"url":{{ url_for(item.endpoint)|tojson }},"category":{{ item.group|tojson }},"keywords":""}{% if not loop.last %},{% endif %}{% endfor %}
@@ -166,6 +168,7 @@
       exists by the time app.js reads it on DOMContentLoaded. -#}
   {% block vendor_scripts %}{% endblock %}
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% if g.user and not hide_sidebar %}<script src="{{ url_for('static', filename='js/onboarding.js') }}" defer></script>{% endif %}
   {% set aurora_entry = ui_asset('frontend/src/entries/aurora.tsx') %}
   {% if aurora_entry %}<script type="module" src="{{ aurora_entry }}"></script>{% endif %}
 </body>

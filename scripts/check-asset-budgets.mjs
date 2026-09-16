@@ -22,8 +22,14 @@ const islandFailures = jsSizes.filter(([file, size]) => !file.startsWith("aurora
 // list, the home decision table, roll-call controls and the tab overflow)
 // and lands at ~49.5 KiB raw / 10.4 KiB gzip, up from ~9.8 KiB gzip. Raised
 // to 52 KiB to restore a working margin; revisit if it is approached again.
+//
+// Revisited 2026-09-16 for the first-run onboarding surface (welcome modal,
+// anchored spotlight tour, getting-started checklist -- the ".onb-*" block in
+// components.css). ~3.2 KiB raw / ~0.7 KiB gzip of genuinely new components,
+// landing at ~52.7 KiB raw. Raised to 55 KiB; the gzip figure users actually
+// pay is ~11.2 KiB.
 const failures = [];
-if (cssBytes > 52 * 1024) failures.push(`application CSS ${cssBytes} B exceeds 52 KiB`);
+if (cssBytes > 55 * 1024) failures.push(`application CSS ${cssBytes} B exceeds 55 KiB`);
 if (publicCssBytes > 20 * 1024) failures.push(`public CSS ${publicCssBytes} B exceeds 20 KiB`);
 if (sharedJsBytes > 45 * 1024) failures.push(`shared JavaScript ${sharedJsBytes} B exceeds 45 KiB`);
 for (const [file, size] of islandFailures) failures.push(`${file} ${size} B exceeds 35 KiB`);

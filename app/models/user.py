@@ -32,6 +32,18 @@ class User(UserMixin, db.Model):
     identity_provider = db.Column(db.String(30), default='internal', nullable=False)
     external_subject = db.Column(db.String(255), nullable=True)
 
+    # First-run onboarding. `onboarding_step` is the 1-based index of the tour
+    # step the user is on (0 = not running), persisted server-side rather than
+    # in sessionStorage because tour steps navigate between pages and the tour
+    # has to survive a logout too. `onboarding_signals` records the handful of
+    # getting-started tasks that leave no other trace in the database -- using
+    # the command palette, opening a project, reading the audit trail; every
+    # other checklist task is derived from real rows (see app/services/home.py).
+    onboarding_seen = db.Column(db.Boolean, default=False, nullable=False)
+    onboarding_step = db.Column(db.Integer, default=0, nullable=False)
+    onboarding_dismissed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    onboarding_signals = db.Column(db.JSON, nullable=False, default=dict)
+
     # Relationships
     campus = db.relationship('Campus', backref='users', lazy=True)
     person = db.relationship('Person', back_populates='user_account', uselist=False)

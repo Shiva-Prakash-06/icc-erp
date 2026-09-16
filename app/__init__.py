@@ -190,6 +190,35 @@ def create_app(config_object=None):
         unread = Notification.query.filter_by(user_id=user.id, read_at=None).count()
         return {"shell_notifications": items, "shell_unread_count": unread}
 
+    @app.context_processor
+    def onboarding_shell():
+        """First-run state for every authenticated page.
+
+        Deliberately cheap: copy and flags only, no project queries. The one
+        piece of onboarding data that needs a query -- the project the tour's
+        "blockers" step navigates to -- is resolved in ``build_home`` where
+        the project list is already in hand.
+        """
+        user = getattr(g, "user", None)
+        if not user or getattr(user, "status", None) != "Approved":
+            return {"onboarding": None}
+        from app.services.roles import ONBOARDING_WELCOME, onboarding_audience, onboarding_tour_steps
+
+        audience = onboarding_audience(user)
+        # Two getting-started tasks leave no row behind, so the page that
+        # satisfies them reports itself once when it loads.
+        page_signal = {"erp.project_detail": "project_opened", "erp.audit": "audit_viewed"}.get(request.endpoint)
+        return {
+            "onboarding": {
+                "audience": audience,
+                "page_signal": page_signal,
+                "welcome": ONBOARDING_WELCOME[audience],
+                "steps": onboarding_tour_steps(audience),
+                "seen": bool(user.onboarding_seen),
+                "step": user.onboarding_step or 0,
+            }
+        }
+
     @app.before_request
     def load_request_context():
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())

@@ -1,0 +1,64 @@
+{#- First-run onboarding: the welcome modal, the anchored spotlight tour, and
+    the configuration both read.
+
+    Every step's destination is resolved here rather than in the service that
+    defines it, because `url_for` needs a request context that
+    app/services/roles.py deliberately does not assume. A step with a null url
+    can run on any page; one with a url navigates there first. `blockers`
+    anchors to an element that exists only on a project page, so it carries the
+    project the home page picked -- and when there is no project in scope it
+    stays null and onboarding.js drops the step rather than drawing a tooltip
+    pointing at nothing. -#}
+{% if onboarding %}
+{% set step_urls = {
+  'queue': url_for('dashboard.index'),
+  'counters': url_for('dashboard.index'),
+  'checklist': url_for('dashboard.index'),
+  'blockers': url_for('erp.project_detail', public_id=onboarding_tour_project) if onboarding_tour_project|default(none) else none
+} %}
+{% set ns = namespace(steps=[]) %}
+{% for step in onboarding.steps %}{% set ns.steps = ns.steps + [dict(step, url=step_urls.get(step.target))] %}{% endfor %}
+<script id="onboarding-data" type="application/json">{{ {
+  'audience': onboarding.audience,
+  'seen': onboarding.seen,
+  'step': onboarding.step,
+  'endpoint': url_for('api_v1.get_onboarding'),
+  'pageSignal': onboarding.page_signal,
+  'steps': ns.steps
+} | tojson }}</script>
+
+<div class="onb-scrim" id="onboardingWelcome" role="dialog" aria-modal="true" aria-labelledby="onboardingWelcomeTitle" hidden>
+  <div class="onb-modal blueprint" role="document">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <p class="page-eyebrow">Welcome to the ICC / OIA platform</p>
+    <h2 class="onb-modal__title" id="onboardingWelcomeTitle">{{ onboarding.welcome.title }}</h2>
+    <p class="onb-modal__body">{{ onboarding.welcome.body }}</p>
+    <ol class="onb-modal__list">
+      {% for bullet in onboarding.welcome.bullets %}<li>{{ bullet }}</li>{% endfor %}
+    </ol>
+    <div class="onb-modal__actions">
+      <button class="aurora-button--primary" type="button" data-onboarding-start>Show me around · 60s</button>
+      <button class="aurora-button--secondary" type="button" data-onboarding-decline>I'll explore myself</button>
+    </div>
+  </div>
+</div>
+
+{#- The spotlight is one element whose 9999px ring *is* the page dimming, so
+    the highlighted element stays interactive and nothing sits on top of it. -#}
+<div class="onb-spotlight" id="onboardingSpotlight" aria-hidden="true" hidden></div>
+
+<div class="onb-card blueprint" id="onboardingCard" role="dialog" aria-labelledby="onboardingCardTitle" aria-describedby="onboardingCardBody" tabindex="-1" hidden>
+  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+  <p class="page-eyebrow" data-onboarding-counter aria-live="polite"></p>
+  <h3 class="onb-card__title" id="onboardingCardTitle"></h3>
+  <p class="onb-card__body" id="onboardingCardBody"></p>
+  <div class="onb-card__foot">
+    <div class="onb-dots" data-onboarding-dots aria-hidden="true"></div>
+    <div class="onb-card__actions">
+      <button class="aurora-button--link" type="button" data-onboarding-skip>Skip</button>
+      <button class="aurora-button--secondary aurora-button--small" type="button" data-onboarding-back>Back</button>
+      <button class="aurora-button--primary aurora-button--small" type="button" data-onboarding-next>Next</button>
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -59,6 +59,7 @@ from app.services.imports import STANDARD_IMPORTS, build_import_template, commit
 from app.services.lifecycle import closure_blockers, transition_project
 from app.services.people import create_and_enroll_participant
 from app.services.publication import decide_project_publication, submit_project_publication
+from app.services.roles import ONBOARDING_CLIENT_SIGNALS
 from app.services.vocabulary import resolve_vocabulary_value
 from app.services.notifications import queue_notification
 from app.services.operations import (
@@ -423,6 +424,72 @@ def current_identity():
             },
         }
     }
+
+
+def _onboarding_payload(user):
+    return {
+        "data": {
+            "seen": bool(user.onboarding_seen),
+            "step": user.onboarding_step or 0,
+            "dismissed_at": user.onboarding_dismissed_at.isoformat() if user.onboarding_dismissed_at else None,
+            "signals": dict(user.onboarding_signals or {}),
+        }
+    }
+
+
+@api_v1_bp.get("/onboarding")
+def get_onboarding():
+    """First-run state for the signed-in account.
+
+    Registered above the generic ``/<resource>`` rule; Werkzeug prefers the
+    static rule regardless of declaration order, but keeping them adjacent
+    makes that dependency visible.
+    """
+    return _onboarding_payload(g.user)
+
+
+@api_v1_bp.patch("/onboarding")
+def patch_onboarding():
+    """Advance, replay, skip or record a signal for the first-run flow.
+
+    This is a PATCH on the user's own onboarding state and nothing else: the
+    payload keys are fixed, so no field of ``users`` outside these four
+    columns can be reached through it.
+    """
+    payload = request.get_json(silent=True) or {}
+    user = g.user
+
+    if "seen" in payload:
+        try:
+            user.onboarding_seen = _boolean_value(payload["seen"])
+        except ValueError:
+            return _problem(422, "Invalid onboarding state", "seen must be a boolean.")
+    if "step" in payload:
+        try:
+            step = int(payload["step"])
+        except (TypeError, ValueError):
+            return _problem(422, "Invalid onboarding step", "step must be an integer.")
+        if step < 0:
+            return _problem(422, "Invalid onboarding step", "step must not be negative.")
+        user.onboarding_step = step
+        # Reaching step 0 is how the tour ends, whether by finishing it, by
+        # pressing Skip or by Esc. Replaying (step 1) clears the stamp again so
+        # a replayed-and-finished tour reads as freshly dismissed.
+        user.onboarding_dismissed_at = datetime.now(timezone.utc) if step == 0 else None
+    if "signal" in payload:
+        signal = str(payload["signal"])
+        allowed = ONBOARDING_CLIENT_SIGNALS | {"checklist_hidden"}
+        if signal not in allowed:
+            return _problem(422, "Unknown onboarding signal", f"{signal} is not a recorded signal.")
+        try:
+            value = _boolean_value(payload.get("value", True))
+        except ValueError:
+            return _problem(422, "Invalid onboarding signal", "value must be a boolean.")
+        # The column is a JSON dict; SQLAlchemy only notices a *replaced* value.
+        user.onboarding_signals = {**(user.onboarding_signals or {}), signal: value}
+
+    db.session.commit()
+    return _onboarding_payload(user)
 
 
 @api_v1_bp.get("/<resource>")

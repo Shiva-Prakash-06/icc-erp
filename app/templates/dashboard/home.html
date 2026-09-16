@@ -94,7 +94,7 @@
   {#- Counters. Each one that has a real destination is a link to the
       filtered list behind it; the rest stay plain tiles rather than
       pretending to a filter the server does not offer. -#}
-  <section class="counter-grid" aria-label="Home indicators">
+  <section class="counter-grid" aria-label="Home indicators" data-tour="counters">
     <a class="aurora-card--padded kpi-card blueprint" href="{{ url_for('erp.projects') }}">
       <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
       <span><span class="aurora-card__value">{{ project_count }}</span><span class="aurora-card__title">Projects in scope</span></span>
@@ -123,7 +123,7 @@
   </section>
 
   <div class="split-main">
-    <section class="page-section" aria-label="Waiting on you">
+    <section class="page-section" aria-label="Waiting on you" data-tour="queue">
       <div class="page-section__bar">
         <h2 class="page-section__title">Waiting on you</h2>
         <span class="page-section__count">
@@ -178,6 +178,39 @@
     </section>
 
     <aside class="split-aside">
+      {% if onboarding_checklist %}
+      {#- Getting started. Every row is ticked from a real record -- an
+          approval the user actually made, a roll call they verified, an
+          import they committed -- except the three that leave nothing
+          behind, which the browser reports. See app/services/home.py. -#}
+      <section class="page-section onb-checklist" aria-label="Getting started" data-tour="checklist" id="onboardingChecklist">
+        <div class="page-section__bar">
+          <h2 class="page-section__title">Getting started</h2>
+          <span class="page-section__count">{{ onboarding_checklist.completed }} of {{ onboarding_checklist.total }}</span>
+        </div>
+        <div class="onb-progress" role="img" aria-label="{{ onboarding_checklist.completed }} of {{ onboarding_checklist.total }} done">
+          <span class="onb-progress__fill" data-onboarding-progress="{{ onboarding_checklist.percent }}"></span>
+        </div>
+        <ul class="onb-tasks">
+          {% for item in onboarding_checklist.tasks %}
+          <li class="onb-task{% if item.done %} is-done{% endif %}">
+            <span class="onb-task__mark" aria-hidden="true">{% if item.done %}<i class="ph ph-check"></i>{% endif %}</span>
+            {% if item.endpoint %}
+            <a class="onb-task__label" href="{{ url_for(item.endpoint, **item.params) }}">{{ item.label }}</a>
+            {% else %}
+            <span class="onb-task__label">{{ item.label }}</span>
+            {% endif %}
+            {% if item.done %}<span class="visually-hidden">Done</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="onb-checklist__actions">
+          <button class="aurora-button--link" type="button" data-onboarding-replay>Replay the tour</button>
+          <button class="aurora-button--link" type="button" data-onboarding-hide-checklist>Hide this</button>
+        </div>
+      </section>
+      {% endif %}
+
       <section class="page-section" aria-label="Today">
         <div class="page-section__bar"><h2 class="page-section__title">Next up</h2></div>
         <div class="aurora-list">

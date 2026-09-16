@@ -414,3 +414,88 @@ a.aurora-list__item:hover { color: var(--color-text); }
   letter-spacing: .09em;
   text-transform: uppercase;
 }
+
+/* ── First-run onboarding ─────────────────────────────────────────────────
+   Welcome modal, anchored spotlight tour, getting-started checklist.
+
+   The spotlight is a single fixed box whose 9999px ring *is* the page
+   dimming, so the highlighted element keeps its own contrast and stays
+   clickable -- there is no separate scrim element over the page. Both
+   overlay colours are the blueprint ink mixed down from the existing token
+   rather than introduced as new ones. */
+.onb-spotlight {
+  position: fixed;
+  z-index: var(--z-overlay);
+  border: 1px solid var(--color-decorative-sky);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--color-text) 55%, transparent);
+  pointer-events: none;
+  transition-property: top, left, width, height;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-enter);
+}
+
+.onb-card, .onb-modal {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-surface-ink);
+  box-shadow: var(--shadow-3);
+}
+
+.onb-card {
+  position: fixed;
+  z-index: var(--z-dialog);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-5);
+}
+
+.onb-card:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.onb-card__title, .onb-modal__title { margin: var(--space-2) 0 var(--space-1); font-family: var(--font-display); font-weight: 600; line-height: 1.1; }
+.onb-card__title { font-size: 1.375rem; }
+.onb-card__body, .onb-modal__body { margin: 0 0 var(--space-4); color: var(--color-text-secondary); line-height: 1.5; }
+.onb-card__body { font-size: .875rem; }
+.onb-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.onb-card__actions, .onb-dots, .onb-modal__actions { display: flex; align-items: center; gap: var(--space-2); }
+
+.onb-dots { gap: 5px; }
+.onb-dot { width: 6px; height: 6px; background: var(--color-border-strong); }
+.onb-dot.is-done { background: var(--color-secondary); }
+.onb-dot.is-current { width: 16px; background: var(--color-primary); }
+
+/* The welcome modal's scrim is a real element, unlike the tour's, because
+   nothing underneath it should be reachable. */
+.onb-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-text) 42%, transparent);
+  overflow-y: auto;
+}
+
+.onb-modal { width: 100%; max-width: 460px; padding: var(--space-6); }
+.onb-modal__title { font-size: 1.75rem; letter-spacing: -.01em; }
+.onb-modal__body { font-size: .9375rem; }
+.onb-modal__list { margin: 0 0 var(--space-6); padding-left: var(--space-5); display: grid; gap: var(--space-2); color: var(--color-text-secondary); font-size: .875rem; line-height: 1.5; }
+.onb-modal__list li::marker { color: var(--color-primary); font-family: var(--font-mono); font-size: .8125rem; }
+.onb-modal__actions { flex-wrap: wrap; }
+body.onb-modal-open { overflow: hidden; }
+
+/* The `?` in the top bar is a glyph, not an icon mask: one character costs
+   nothing and avoids adding a lucide asset for a single use. */
+.onb-help { font-family: var(--font-display); font-size: 1rem; font-weight: 600; }
+
+/* Getting-started checklist. */
+.onb-progress { height: 3px; margin-bottom: var(--space-4); background: var(--color-surface-3); }
+.onb-progress__fill { display: block; width: 0; height: 100%; background: var(--color-primary); transition: width var(--motion-standard) var(--ease-enter); }
+.onb-tasks { list-style: none; margin: 0; padding: 0; }
+.onb-task { display: flex; align-items: center; gap: var(--space-3); padding: 10px 0; border-bottom: 1px solid var(--color-border-subtle); font-size: .875rem; }
+.onb-task__mark { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--color-border-strong); color: var(--color-canvas); }
+.onb-task.is-done .onb-task__mark { background: var(--color-success); border-color: var(--color-success); }
+.onb-task.is-done .onb-task__label { color: var(--color-text-tertiary); text-decoration: line-through; }
+.onb-checklist__actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .onb-spotlight, .onb-progress__fill { transition: none; }
+}

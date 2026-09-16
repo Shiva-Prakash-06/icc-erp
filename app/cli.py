@@ -160,6 +160,11 @@ def register_cli(app):
                 user.set_password(password)
                 db.session.add(user)
                 db.session.flush()
+            # Acceptance fixtures are "returning" users: every spec other than
+            # the onboarding one would otherwise open behind a first-run modal.
+            # e2e/onboarding.spec.ts resets this flag for itself.
+            user.onboarding_seen = True
+            user.onboarding_step = 0
             assignment = RoleAssignment.query.filter_by(user_id=user.id, role_code=role_code, is_active=True).first()
             if not assignment:
                 db.session.add(RoleAssignment(user_id=user.id, role_code=role_code, is_active=True, can_view_sensitive_links=role_code in {"OIA_FACULTY_ADMINISTRATOR", "IGP_HEAD"}, **scope))
