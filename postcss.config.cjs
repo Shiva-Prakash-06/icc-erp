@@ -13,10 +13,34 @@ module.exports = {
         // the nav (ph-gauge, ph-buildings) was purged and rendered as a
         // solid square, since .ph paints currentColor through a mask that
         // no longer had a --oia-icon URL.
-        : ["./app/templates/**/*.html", "./app/static/js/**/*.js", "./frontend/src/**/*.{ts,tsx}", "./app/services/**/*.py"],
+        // The application bundle deliberately does NOT see
+        // templates/public_site/. Those pages load the separately purged
+        // public stylesheet above and never link aurora.css, so every rule
+        // kept here only because a public template mentioned the class --
+        // .page-header, .page-title, .kpi-card, .resource-list,
+        // .aurora-breadcrumb, .public-chart-frame and the rest of the
+        // marketing furniture -- was dead weight in the app bundle.
+        : ["./app/templates/*.html", "./app/templates/auth/**/*.html",
+           "./app/templates/dashboard/**/*.html", "./app/templates/erp/**/*.html",
+           "./app/static/js/**/*.js", "./frontend/src/**/*.{ts,tsx}", "./app/services/**/*.py"],
       safelist: {
         standard: ["alert-success", "alert-danger", "alert-warning", "alert-info"],
-        greedy: [/^aurora-badge--status-/],
+        // Every one of these families is built by interpolation in a
+        // template (`ds-chip--{{ state }}`), so the extractor only ever
+        // sees the bare prefix and purges the real rule -- the state
+        // colour then silently disappears and a row reads as unstyled.
+        greedy: [
+          /^aurora-badge--status-/,
+          /^ds-chip--/,
+          /^ds-event--/,
+          /^ds-row--/,
+          /^ds-tile--/,
+          /^ds-chart__seg--/,
+          /^ds-chart__key--/,
+          /^ds-kpi__value--/,
+          /^ds-section--/,
+          /^ds-fact--/,
+        ],
       },
       variables: true,
       keyframes: true,

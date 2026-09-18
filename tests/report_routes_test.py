@@ -52,7 +52,20 @@ class ReportRoutesTestCase(unittest.TestCase):
     def test_preview_page_renders(self):
         response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Complete PDF report", response.data)
+        self.assertIn(b"Complete report", response.data)
+
+    def test_preview_copy_matches_the_real_dependency_mode(self):
+        """Audit P0-04: the page claimed the PDF was "assembled from the
+        authoritative Event Report document plus testimonial and programme
+        pages" while its own dependency table said none were found.
+
+        This project has no indexed documents, so the page must say that
+        and must not promise an authoritative source.
+        """
+        response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete")
+        body = response.data.decode()
+        self.assertIn("No report or appendix documents have been indexed", body)
+        self.assertNotIn("authoritative Event Report document, with every appendix", body)
 
     def test_download_without_dependencies_returns_generated_summary_pdf(self):
         response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete.pdf")

@@ -1,0 +1,172 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- navigation "Sections":
+  - link "ICC and OIA home":
+    - /url: /
+    - generic: ICC
+  - link "Campuses":
+    - /url: /
+    - generic: Campuses
+    - generic: Campuses
+  - link "Events":
+    - /url: /erp/projects
+    - generic: Events
+    - generic: Events
+  - link "Analytics":
+    - /url: /erp/analytics
+    - generic: Analytics
+    - generic: Analytics
+  - link "Published reports":
+    - /url: /public/reports
+    - generic: Published reports
+    - generic: Published reports
+  - link "Data imports":
+    - /url: /erp/imports
+    - generic: Data imports
+    - generic: Data imports
+  - link "Audit trail":
+    - /url: /erp/audit
+    - generic: Audit trail
+    - generic: Audit trail
+  - link "Administration":
+    - /url: /admin/users
+    - generic: Administration
+    - generic: Administration
+  - button "Search or jump to":
+    - generic: Search
+  - link "Notification centre, 1 unread":
+    - /url: /erp/notifications
+    - generic: "1"
+    - generic: Notification centre
+    - generic: Notification centre, 1 unread
+  - link "My account":
+    - /url: /profile
+    - generic: My account
+    - generic: My account
+  - button "Replay the guided tour":
+    - generic: "?"
+    - generic: Replay the tour
+  - link "Log out":
+    - /url: /logout
+    - generic: Log out
+    - generic: Log out
+- main:
+  - navigation "Breadcrumb":
+    - link "Campuses":
+      - /url: /
+    - generic: /
+    - link "Central":
+      - /url: /erp/campuses/5ca400c4-9659-475e-b7a8-ad32a5540aa5
+    - generic: /
+    - link "ICC":
+      - /url: /erp/campuses/5ca400c4-9659-475e-b7a8-ad32a5540aa5/icc
+    - generic: /
+    - generic: ICC-2026-CEN-001
+  - heading "Coffee Meet & Greet" [level=1]
+  - generic: Overdue
+  - link "6 blocking closure":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=analytics#closure-blockers
+    - text: 6 blocking closure
+  - link "Edit":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5/setup?step=basics
+    - text: Edit
+  - link "Report":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5/report/complete
+    - text: Report
+  - navigation "Event sections":
+    - link "Logistics 11":
+      - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=logistics
+      - text: Logistics
+      - generic: "11"
+    - link "Finance 6":
+      - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=finance
+      - text: Finance
+      - generic: "6"
+    - link "Documents 4":
+      - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=documents
+      - text: Documents
+      - generic: "4"
+    - link "People 17":
+      - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=people
+      - text: People
+      - generic: "17"
+    - link "Analytics":
+      - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=analytics
+      - text: Analytics
+  - generic: Items complete
+  - generic: 30/38
+  - generic: 78% of everything tracked
+  - generic: Overdue
+  - generic: "0"
+  - generic: 6 still block closure
+  - link "Budget committed 86% ₹30K of ₹34K":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=finance
+    - generic: Budget committed
+    - generic: 86%
+    - generic: ₹30K of ₹34K
+  - link "Team 17 0 buddy pairings":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=people
+    - generic: Team
+    - generic: "17"
+    - generic: 0 buddy pairings
+  - heading "Blocking closure 6" [level=2]:
+    - text: Blocking closure
+    - generic: "6"
+  - generic "Submit post-event report"
+  - generic "Submitted"
+  - generic: —
+  - generic: Task
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=logistics#6d7c3994-03fb-465b-973b-d69a5adafa7e
+  - generic "Post-event report submitted"
+  - generic "Submitted"
+  - generic: —
+  - generic: Checklist
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=logistics#1cff3549-ba7a-4efc-99a7-595f62118fb4
+  - generic "Post-event report"
+  - generic "Submitted"
+  - generic: —
+  - generic: Document
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=documents#c20be00c-3514-44d2-a764-c26c6a84455b
+  - generic "Attendance record"
+  - generic "Submitted"
+  - generic: —
+  - generic: Document
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=documents#ec9c584f-db65-433d-ab70-28382a6347fa
+  - generic "Reimbursement for additional refreshments"
+  - generic "Submitted"
+  - generic: —
+  - generic: Operational request
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=finance#0c9fb521-23ca-4f2f-b61a-d408edeb788c
+  - generic "Closure summary"
+  - generic "Missing"
+  - generic: —
+  - generic: Report
+  - generic: —
+  - link "Resolve":
+    - /url: /erp/projects/f8d95b78-19df-4942-b58d-4f4e219222b5?tab=documents#f8d95b78-19df-4942-b58d-4f4e219222b5
+  - heading "Items by state" [level=2]
+  - generic: 38 items · ICC-2026-CEN-001
+  - 'img "Items by state. Logistics: 11 items, 8 complete, 3 active. Finance: 6 items, 4 complete, 2 active. Documents: 4 items, 1 complete, 3 active. People: 17 items, 17 complete."':
+    - generic: Logistics
+    - generic: "11"
+    - generic: Finance
+    - generic: "6"
+    - generic: Documents
+    - generic: "4"
+    - generic: People
+    - generic: "17"
+  - generic: Complete
+  - generic: Active
+  - generic: Upcoming
+  - generic: Overdue
+- status: Demo environment—data may be reset; do not enter sensitive or personal data.

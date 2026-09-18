@@ -84,7 +84,7 @@ test("the tour advances across pages, skips persist, and ? replays it", async ({
   await page.reload();
   await expect(page.getByRole("dialog", { name: /blocking it/i })).toBeHidden();
 
-  // The `?` in the top bar starts it again from step one.
+  // The `?` at the foot of the rail starts it again from step one.
   await page.goto("/");
   await page.getByRole("button", { name: /replay the guided tour/i }).click();
   await expect(page.getByRole("dialog", { name: /everything waiting on you is here/i })).toBeVisible();
@@ -109,7 +109,7 @@ test("the getting-started checklist tracks real work and can be hidden", async (
   // database records it -- the browser reports it.
   const searchTask = checklist.locator("li.onb-task").filter({ hasText: "Jump somewhere with" });
   await expect(searchTask).not.toHaveClass(/is-done/);
-  await page.getByRole("button", { name: /command palette/i }).click();
+  await page.getByRole("button", { name: /search or jump to/i }).click();
   await page.keyboard.press("Escape");
   await page.goto("/");
   await expect(checklist.locator("li.onb-task").filter({ hasText: "Jump somewhere with" })).toHaveClass(/is-done/);

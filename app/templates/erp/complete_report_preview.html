@@ -1,42 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Complete Report{% endblock %}
-{% block mobile_title %}Complete report{% endblock %}
-{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Complete report{% endblock %}
+{% from "_tiles.html" import dimension_chip %}
+{% block title %}Complete report{% endblock %}
+{#- The page used to carry its own <h1 class="h2"> on top of the shell's
+    screen title, so it shipped two level-one headings. The shell's title is
+    the H1; everything under it is an H2 region. -#}
+{% block screen_title %}Complete report{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code or project.title }}</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Complete report</span>{% endblock %}
 {% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id) }}{% endblock %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-start mb-4">
-  <div>
-    <p class="text-info text-uppercase small fw-bold mb-1">Complete PDF report</p>
-    <h1 class="h2">{{ project.title }}</h1>
-    <p class="text-muted">Assembled from the authoritative Event Report document plus testimonial and programme pages.</p>
-  </div>
+{% block tools %}
   {% if preflight.complete %}
-  <a class="aurora-button--primary" href="{{ url_for('erp.download_complete_report', public_id=project.public_id) }}">Download complete PDF report</a>
+  <a class="ds-btn ds-btn--primary" href="{{ url_for('erp.download_complete_report', public_id=project.public_id) }}"><i class="ph ph-download-simple" aria-hidden="true"></i>Download PDF</a>
   {% else %}
-  <a class="aurora-button--outline-primary" href="{{ url_for('erp.download_complete_report', public_id=project.public_id, allow_incomplete=1) }}">Download available report anyway</a>
+  <a class="ds-btn" href="{{ url_for('erp.download_complete_report', public_id=project.public_id, allow_incomplete=1) }}"><i class="ph ph-download-simple" aria-hidden="true"></i>Download what exists</a>
   {% endif %}
-</div>
+{% endblock %}
+{% block content %}
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 
-{% if not preflight.complete %}
-<div class="alert alert-warning">Some dependencies could not be included in the report. Downloading anyway acknowledges the gap below — it does not approve or resolve it. Missing items are never inserted into the PDF.</div>
-{% endif %}
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">{{ project.title }}<span class="ds-rows__n">{{ preflight.dependencies|length|pluralise('source') }}</span></h2>
+    <div class="ds-rows__foot">
+      {#- Audit P0-04: this sentence claimed the report was "assembled from
+          the authoritative Event Report document plus testimonial and
+          programme pages" while the table below reported that none were
+          found. It now describes the mode the assembler will actually use. -#}
+      {% if preflight.has_authoritative_report %}
+      <p class="mb-2">This PDF is built from the event's authoritative Event Report document, with every appendix listed below appended to it.</p>
+      {% elif preflight.dependencies %}
+      <p class="mb-2">No authoritative Event Report has been indexed for this event, so the PDF opens with a summary generated from the record, followed by the appendices listed below.</p>
+      {% else %}
+      <p class="mb-2">No report or appendix documents have been indexed for this event yet. The PDF will contain only a summary generated from the record — schedule, budget, team and closure state.</p>
+      {% endif %}
+      {% if not preflight.complete %}
+      <div class="alert alert-warning mb-0" role="status">
+        <i class="ph ph-warning" aria-hidden="true"></i>
+        <span>{{ (preflight.missing + preflight.inaccessible + preflight.unsupported)|length|pluralise('source') }} cannot be included. Downloading acknowledges the gap listed below; it does not approve or resolve it, and a missing source is never substituted in the PDF.</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
 
-<div class="aurora-card mb-4">
-  <div class="aurora-card__header"><strong>Report dependencies</strong></div>
-  <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards mb-0"><thead><tr><th>Role</th><th>Document</th><th>Status</th></tr></thead><tbody>
+  {#- The dependency table sits directly under the claim it qualifies. It
+      used to be pushed far below the download button with a large blank gap
+      between the two. -#}
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Sources for this report<span class="ds-rows__n">{{ preflight.included|length }} of {{ preflight.dependencies|length }} usable</span></h2>
+    <div class="ds-rows__head" aria-hidden="true"><span></span><span>Document</span><span>Role</span><span></span><span>Availability</span><span></span><span></span></div>
     {% for dependency in preflight.dependencies %}
-    <tr><td data-label="Role">{{ dependency.role.replace('_', ' ')|title }}</td><td data-label="Document">{{ dependency.title }}</td><td data-label="Status"><span class="aurora-badge aurora-badge--status-{{ dependency.status }}">{{ dependency.status|title }}</span></td></tr>
+    <div class="ds-row ds-row--{{ 'complete' if dependency.status == 'included' else 'overdue' }}">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Document">{{ dependency.title }}</span>
+      <span class="ds-row__desc" data-label="Role">{{ 'Authoritative event report' if dependency.role == 'authoritative_report' else 'Appendix' }}</span>
+      <span class="ds-row__when"></span>
+      {{ dimension_chip(status_of('availability', {'included': 'Available', 'missing': 'Missing', 'inaccessible': 'Inaccessible', 'unsupported': 'Inaccessible'}.get(dependency.status, dependency.status))) }}
+      <span class="ds-row__docs"></span>
+      <span class="ds-row__act">
+        <a class="ds-btn ds-btn--sm" href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='documents') }}#{{ dependency.document_public_id }}">Open</a>
+      </span>
+    </div>
     {% else %}
-    <tr><td colspan="3" class="text-center text-muted py-4">No authoritative report or appendix documents found yet — the download will use a generated summary.</td></tr>
+    <div class="ds-empty ds-empty--block">
+      <i class="ph ph-file-dashed" aria-hidden="true"></i>
+      <div>
+        <h3 class="ds-empty__title">Nothing indexed yet</h3>
+        <p class="ds-empty__body">Index an Event Report on the Documents tab and it will be used here as the authoritative source.</p>
+      </div>
+      <a class="ds-btn" href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='documents') }}">Go to Documents</a>
+    </div>
     {% endfor %}
-  </tbody></table></div>
-</div>
+  </div>
 
-<div class="aurora-card">
-  <div class="aurora-card__header"><strong>Other export formats</strong></div>
-  <div class="aurora-card__body d-flex gap-2 flex-wrap">
-    <a class="aurora-button--small aurora-button--outline-primary" href="{{ url_for('erp.report_preview', public_id=project.public_id) }}">View flattened snapshot preview</a>
-    <span class="text-muted small align-self-center">XLSX, DOCX, and PDF snapshot exports also remain available for integrations that need them.</span>
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Other formats</h2>
+    <div class="ds-rows__foot ds-rows__foot--inline">
+      <a class="ds-btn" href="{{ url_for('erp.report_preview', public_id=project.public_id) }}">Flattened snapshot preview</a>
+      <span class="ds-panel__note">XLSX, DOCX and PDF snapshot exports remain available for integrations.</span>
+    </div>
   </div>
 </div>
 {% endblock %}

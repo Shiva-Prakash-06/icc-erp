@@ -1,0 +1,24 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- status:
+  - generic: Demo environment—data may be reset; do not enter sensitive or personal data.
+- banner:
+  - link "ICC/IGP public overview home":
+    - /url: /public/
+    - generic: OI
+    - text: ICC / IGP
+    - generic: Public overview
+  - navigation "Public site navigation":
+    - link "Events":
+      - /url: /public/events
+    - link "Reports":
+      - /url: /public/reports
+    - link "Return to ERP":
+      - /url: /
+      - text: Return to ERP
+- main:
+  - generic: Institutional memory
+  - heading "Published reports" [level=1]
+  - paragraph: Approved, published reports summarizing ICC and IGP activity.
+  - paragraph: No reports have been published yet.
+- contentinfo: Christ University · Office of International Affairs · Public transparency overview — aggregate and published data only.

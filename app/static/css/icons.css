@@ -10,6 +10,8 @@
 .ph-receipt { --oia-icon: url("../icons/receipt-text.svg"); }
 .ph-sign-in { --oia-icon: url("../icons/log-in.svg"); }
 .ph-activity { --oia-icon: url("../icons/activity.svg"); }
+.ph-circle { --oia-icon: url("../icons/circle.svg"); }
+.ph-dots-three-circle { --oia-icon: url("../icons/circle-ellipsis.svg"); }
 .ph-arrow-left { --oia-icon: url("../icons/arrow-left.svg"); }
 .ph-arrow-right { --oia-icon: url("../icons/arrow-right.svg"); }
 .ph-arrow-square-out { --oia-icon: url("../icons/external-link.svg"); }

@@ -127,6 +127,10 @@
     "file": "assets/circle-check-big-BCAqS4b_.svg",
     "src": "app/static/icons/circle-check-big.svg"
   },
+  "app/static/icons/circle-ellipsis.svg": {
+    "file": "assets/circle-ellipsis-BnFywpX8.svg",
+    "src": "app/static/icons/circle-ellipsis.svg"
+  },
   "app/static/icons/circle-plus.svg": {
     "file": "assets/circle-plus-D4zyO0Le.svg",
     "src": "app/static/icons/circle-plus.svg"
@@ -138,6 +142,10 @@
   "app/static/icons/circle-x.svg": {
     "file": "assets/circle-x-FV-162Hv.svg",
     "src": "app/static/icons/circle-x.svg"
+  },
+  "app/static/icons/circle.svg": {
+    "file": "assets/circle-DLQazeKE.svg",
+    "src": "app/static/icons/circle.svg"
   },
   "app/static/icons/clock.svg": {
     "file": "assets/clock-CnEgkVqp.svg",
@@ -372,7 +380,7 @@
     "src": "app/static/icons/x.svg"
   },
   "frontend/src/entries/aurora.tsx": {
-    "file": "assets/aurora-C81gharM.js",
+    "file": "assets/aurora-DtFblKEB.js",
     "name": "aurora",
     "src": "frontend/src/entries/aurora.tsx",
     "isEntry": true,
@@ -381,7 +389,7 @@
       "frontend/src/islands/shell-motion.ts"
     ],
     "css": [
-      "assets/aurora-qAhy8Ng1.css"
+      "assets/aurora-DE2CxyVr.css"
     ],
     "assets": [
       "assets/download-DzXYrrPz.svg",
@@ -391,40 +399,46 @@
       "assets/key-round-B4_Z5Y94.svg",
       "assets/lock-keyhole-avUpbBoM.svg",
       "assets/receipt-text-DC52tj7b.svg",
-      "assets/log-in-Bc-XhVZx.svg",
-      "assets/arrow-left-Cifcqwuv.svg",
+      "assets/circle-DLQazeKE.svg",
+      "assets/circle-ellipsis-BnFywpX8.svg",
       "assets/arrow-right-CBBZVKin.svg",
+      "assets/external-link-ClhGXIYb.svg",
       "assets/arrow-up-right-CnNsH9hZ.svg",
       "assets/award-CCyhx8Gw.svg",
       "assets/bell-CRYWSwE7.svg",
       "assets/building-DCF29qKM.svg",
       "assets/building-2-DApz11on.svg",
-      "assets/calendar-days-0KQreHDW.svg",
+      "assets/calendar-BNVmUqGe.svg",
       "assets/calendar-check-2-C9zHARpX.svg",
       "assets/chevron-left-BJWUOf3q.svg",
+      "assets/chevron-right-BfvWZFn0.svg",
       "assets/chart-column-big-CHJZSWpK.svg",
+      "assets/message-circle-C41zSFR5.svg",
       "assets/check-C2tN36xL.svg",
       "assets/circle-check-big-BCAqS4b_.svg",
+      "assets/square-check-big-BrAolcJ7.svg",
+      "assets/clock-CnEgkVqp.svg",
       "assets/history-2G2PGc8o.svg",
       "assets/database-DYsced7h.svg",
       "assets/mail-DN5GQiyt.svg",
       "assets/file-up-tq5ULWJI.svg",
       "assets/file-C0khycg1.svg",
       "assets/file-text-DyJGYwLA.svg",
+      "assets/sheet-Bnv4XV3H.svg",
+      "assets/flag-DnryBnHd.svg",
       "assets/folder-open-BXtCDeEh.svg",
       "assets/folder-UkSXRlpN.svg",
-      "assets/gauge-MhZ8eYco.svg",
       "assets/earth-Cm42n7Cl.svg",
-      "assets/image-Cgur-tj8.svg",
       "assets/circle-alert-D3Ua740a.svg",
       "assets/list-DFAhupL8.svg",
       "assets/search-B6JsRoiY.svg",
-      "assets/notebook-DL65SKgL.svg",
       "assets/pen-line-CAWJDZlg.svg",
+      "assets/plus-C6Y3wTca.svg",
       "assets/power-BREdLRDW.svg",
       "assets/shield-check-Ba2XaMkI.svg",
-      "assets/grid-2x2-BPQuUJ-K.svg",
+      "assets/star-CXlKeyri.svg",
       "assets/circle-user-round-CzuJK-4a.svg",
+      "assets/user-round-plus-BbPzz4qh.svg",
       "assets/users-round-DTa8Aszs.svg",
       "assets/triangle-alert-tNOmBVmb.svg",
       "assets/x-VdoQB4qP.svg",
@@ -432,12 +446,12 @@
     ]
   },
   "frontend/src/entries/public.ts": {
-    "file": "assets/public-mj0tPamH.js",
+    "file": "assets/public-B1dp1j-D.js",
     "name": "public",
     "src": "frontend/src/entries/public.ts",
     "isEntry": true,
     "css": [
-      "assets/public-Dyl9xWfK.css"
+      "assets/public-CHmR07AD.css"
     ],
     "assets": [
       "assets/log-in-Bc-XhVZx.svg",

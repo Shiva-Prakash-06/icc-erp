@@ -1107,11 +1107,12 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         self.assertEqual(log.status, "Approved")
 
     def test_oversight_dashboard_gated_and_shows_pending_items(self):
-        # /erp/oversight now redirects into the merged home's decision queue
-        # (?queue=all) -- see
-        # in-the-operation-checklists-crystalline-dongarra.md Step 2. The
-        # 403 gate for non-approvers is preserved on the redirect route
-        # itself, load-bearing for e2e/auth-and-rbac and platform-matrix.
+        # /erp/oversight redirects to the decision queue -- merged into the
+        # home page per in-the-operation-checklists-crystalline-dongarra.md
+        # Step 2, then given its own /queue route when the Tile System made
+        # home the campus tiles. The 403 gate for non-approvers is preserved
+        # on the redirect route itself, load-bearing for e2e/auth-and-rbac
+        # and platform-matrix.
         task = WorkTask(project_id=self.project.id, title="Needs approval", status="Submitted", version=1)
         db.session.add(task)
         db.session.commit()
@@ -1130,7 +1131,7 @@ class ErpTabRoutesTestCase(unittest.TestCase):
             session["session_version"] = self.user.session_version
         redirect_response = self.client.get("/erp/oversight")
         self.assertEqual(redirect_response.status_code, 302)
-        self.assertIn("/?queue=all", redirect_response.headers["Location"])
+        self.assertIn("/queue", redirect_response.headers["Location"])
         response = self.client.get("/erp/oversight", follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Needs approval", response.data)

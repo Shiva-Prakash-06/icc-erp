@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{#- One branded page for every HTTP error the application answers.
+
+    Audit finding P0-01: a 429 discarded the shell, the identity, the
+    navigation and any route back, leaving one sentence of plain text on a
+    white page. Every handler now renders this instead, so an error keeps
+    the reader oriented and always offers a way forward.
+
+    It extends base.html, so a signed-in reader keeps the rail and an
+    anonymous one gets the auth shell -- no separate layout to drift. -#}
+{% block title %}{{ heading }}{% endblock %}
+{% block screen_title %}{{ heading }}{% endblock %}
+{% block crumb %}<span class="ds-crumb__here" aria-current="page">{{ status }}</span>{% endblock %}
+
+{#- `heading_level` keeps the page to exactly one H1. Signed in, base.html
+    already renders the screen title as the H1, so the body must not repeat
+    it; signed out there is no screen head, so the body supplies it. -#}
+{% macro body(own_heading) %}
+<div class="ds-error">
+  <p class="ds-error__code">Error {{ status }}</p>
+  {% if own_heading %}<h1 class="ds-error__title">{{ heading }}</h1>{% endif %}
+  <p class="ds-error__lede">{{ explanation }}</p>
+  {% if retry_after %}
+  <p class="ds-error__retry" role="status">Try again in about {{ retry_after }}.</p>
+  {% endif %}
+  {% if guidance %}<p class="ds-error__hint">{{ guidance }}</p>{% endif %}
+  <div class="ds-error__actions">
+    <a class="ds-btn ds-btn--primary" href="{{ safe_url }}">{{ safe_label }}</a>
+    {% if g.user %}<a class="ds-btn" href="{{ url_for('dashboard.queue') }}">What is waiting on me</a>{% endif %}
+  </div>
+  {% if request_id %}
+  <details class="ds-error__details">
+    <summary>Technical details</summary>
+    <dl class="ds-facts">
+      <div class="ds-facts__row"><dt>Request</dt><dd class="ds-facts__wrap">{{ request_id }}</dd></div>
+      <div class="ds-facts__row"><dt>Address</dt><dd class="ds-facts__wrap">{{ request.path }}</dd></div>
+    </dl>
+    <p class="ds-error__hint">Quote the request reference when you report this.</p>
+  </details>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{#- Signed in: the error sits inside the normal screen body. Signed out:
+    base.html renders the auth shell, whose slot is `auth_content`. -#}
+{% block content %}<div class="ds-scroll ds-scroll--plain ds-scroll--page">{{ body(false) }}</div>{% endblock %}
+{% block auth_content %}{{ body(true) }}{% endblock %}

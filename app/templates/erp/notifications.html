@@ -1,37 +1,83 @@
 {% extends "base.html" %}
-{% block title %}Notifications{% endblock %}
-{% block mobile_title %}Notifications{% endblock %}
+{% from "_tiles.html" import state_chip %}
+{% block title %}Alerts{% endblock %}
+{% block screen_title %}Alerts{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Alerts</span>{% endblock %}
+{#- Audit, Alerts and preferences: "1 records" is grammatically incorrect. -#}
+{% block tools %}<span class="ds-filter__result">{{ notifications|length|pluralise('alert') }}</span>{% endblock %}
 {% block content %}
-<div class="container-fluid">
-  <header class="page-header"><div><h1 class="page-title">Alerts</h1><p class="page-subtitle">Only what needs you. Everything else is in the audit trail.</p></div><span class="aurora-badge">{{ notifications|length }} records</span></header>
-  <div class="aurora-disclosure mb-4" id="deliveryPreference">
-    <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseDeliveryPreference" aria-expanded="false" aria-controls="collapseDeliveryPreference">Delivery preferences</button>
-    <div class="aurora-collapse aurora-disclosure__content" id="collapseDeliveryPreference" data-ui-parent="#deliveryPreference">
-      <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-start" data-ui-pending-submit data-ui-pending-label="Saving…">
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
+
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Recent alerts<span class="ds-rows__n">{{ notifications|selectattr('read_at', 'none')|list|length }} unread</span></h2>
+    {% for item in notifications %}
+    {#- One flat list, newest first, unread marked by a rule rather than a
+        fill (reports-admin override). Each alert links to the record it is
+        about: the audit found alerts that named a problem and offered no
+        way to reach it. -#}
+    <div class="ds-row ds-row--{{ 'overdue' if item.severity in ['Critical', 'Danger'] else ('upcoming' if not item.read_at else 'complete') }}{% if not item.read_at %} is-unread{% endif %}" id="{{ item.public_id }}">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Alert">
+        {%- if item.action_url %}<a href="{{ item.action_url }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif -%}
+      </span>
+      <span class="ds-row__desc" data-label="Detail">{{ item.body }}</span>
+      <span class="ds-row__when" data-label="Received">{{ item.created_at|localdatetime('%d %b %Y, %I:%M %p') }}</span>
+      {{ state_chip('overdue' if item.severity in ['Critical', 'Danger'] else ('upcoming' if not item.read_at else 'complete'),
+                    'Unread' if not item.read_at else 'Read', 'Status') }}
+      <span class="ds-row__docs" data-label="Kind">{{ item.event_type.replace('.', ' · ') }}</span>
+      <span class="ds-row__act">
+        {% if not item.read_at %}
+        <form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="col-md-5">
-          <label class="aurora-label" for="event_type">Event type</label>
-          <select class="aurora-select" id="event_type" name="event_type"><option value="task.deadline">Task deadlines</option><option value="checklist.deadline">Checklist deadlines</option><option value="task.status">Task decisions</option></select>
-          <small class="aurora-file-field__hint">Delivery settings below apply to this alert category.</small>
+          <button class="ds-btn ds-btn--sm" type="submit">Mark read</button>
+        </form>
+        {% endif %}
+        {% if item.action_url %}<a class="ds-btn ds-btn--sm ds-btn--primary" href="{{ item.action_url }}">Open</a>{% endif %}
+      </span>
+    </div>
+    {% else %}
+    <div class="ds-empty ds-empty--block">
+      <i class="ph ph-bell" aria-hidden="true"></i>
+      <div>
+        <h3 class="ds-empty__title">No alerts</h3>
+        <p class="ds-empty__body">Deadlines, decisions and status changes on the events you work on appear here.</p>
+      </div>
+      <a class="ds-btn" href="{{ url_for('dashboard.queue') }}">See what is waiting on you</a>
+    </div>
+    {% endfor %}
+
+    <div class="ds-rows__foot">
+      {#- Delivery preferences sit behind a disclosure (reports-admin
+          override): they are configuration, not the list. -#}
+      <div class="aurora-disclosure" id="deliveryPreference">
+        <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseDeliveryPreference" aria-expanded="false" aria-controls="collapseDeliveryPreference">Delivery preferences</button>
+        <div class="aurora-collapse aurora-disclosure__content" id="collapseDeliveryPreference" data-ui-parent="#deliveryPreference">
+          <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-start" data-ui-pending-submit data-ui-pending-label="Saving…">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-md-5">
+              <label class="aurora-label" for="event_type">Alert type</label>
+              <select class="aurora-select" id="event_type" name="event_type" aria-describedby="event_type_hint">
+                <option value="task.deadline">Task deadlines</option>
+                <option value="checklist.deadline">Checklist deadlines</option>
+                <option value="task.status">Task decisions</option>
+              </select>
+              <p class="aurora-file-field__hint" id="event_type_hint">These three categories are the ones you can turn off. Every other alert is treated as critical.</p>
+            </div>
+            <div class="col-md-4" role="group" aria-label="Delivery channels">
+              <span class="aurora-label d-block">Delivery channels</span>
+              <div class="d-flex gap-3 flex-wrap">
+                <div class="aurora-choice"><input class="aurora-choice__input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="aurora-choice__label" for="email_enabled">Email</label></div>
+                <div class="aurora-choice"><input class="aurora-choice__input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="aurora-choice__label" for="in_app_enabled">In app</label></div>
+              </div>
+              {#- Audit: the copy said critical alerts always stay enabled
+                  without saying which ones those are. It now names them. -#}
+              <p class="aurora-file-field__hint">Critical alerts — security events, an account or role change, and anything assigned directly to you — are always delivered and cannot be switched off here.</p>
+            </div>
+            <div class="col-md-3 align-self-end"><button class="aurora-button--primary" type="submit">Save preference</button></div>
+          </form>
         </div>
-        <div class="col-md-4" role="group" aria-label="Delivery channels">
-          <span class="aurora-label d-block">Delivery channels</span>
-          <div class="d-flex gap-3 flex-wrap">
-            <div class="aurora-choice"><input class="aurora-choice__input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="aurora-choice__label" for="email_enabled">Email</label></div>
-            <div class="aurora-choice"><input class="aurora-choice__input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="aurora-choice__label" for="in_app_enabled">In app</label></div>
-          </div>
-          <small class="aurora-file-field__hint">Critical security and direct-assignment alerts always stay enabled.</small>
-        </div>
-        <div class="col-md-3"><button class="aurora-button--primary w-100" type="submit">Save preference</button></div>
-      </form>
+      </div>
     </div>
   </div>
-  <div><div class="aurora-list notification-list">
-    {% for item in notifications %}
-    <article class="aurora-list__item{% if not item.read_at %} is-unread{% endif %}">
-      <div class="d-flex justify-content-between gap-3"><div><h2 class="h6 mb-1">{{ item.title }}</h2><p class="mb-1">{{ item.body }}</p><small class="text-muted">{{ item.created_at }}</small></div>{% if not item.read_at %}<form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}"><button class="aurora-button--small aurora-button--outline-primary">Mark read</button></form>{% endif %}</div>
-    </article>
-    {% else %}<div class="empty-state"><i class="ph ph-bell" aria-hidden="true"></i><p class="mb-0">No notifications.</p></div>{% endfor %}
-  </div></div>
 </div>
 {% endblock %}

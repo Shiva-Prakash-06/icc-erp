@@ -1,3 +1,4 @@
+from flask import current_app, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
@@ -13,7 +14,40 @@ csrf = CSRFProtect()
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message_category = "warning"
-limiter = Limiter(key_func=get_remote_address, default_limits=["300 per hour"])
+
+
+def rate_limit_key() -> str:
+    """Bill a signed-in request to the account, and only anonymous traffic
+    to the IP.
+
+    Audit finding P0-01: the default limit was one ``300 per hour`` bucket
+    keyed by ``get_remote_address`` and **shared across every endpoint**
+    (Flask-Limiter's default limits are not per-route). Every campus user
+    is behind one NAT, so the whole institution shared five requests a
+    minute, and the first route anyone loaded after the budget ran out --
+    in practice ``/``, the destination of every sign-in redirect -- served
+    a raw 429 while the window drained.
+
+    ``session`` is read directly rather than via ``g.user`` because the
+    limiter runs before the request-context loader that populates it, and
+    it costs no database query.
+    """
+    user_id = session.get("user_id")
+    if user_id:
+        return f"user:{user_id}"
+    return f"ip:{get_remote_address()}"
+
+
+def _default_limits() -> str:
+    # A working ERP session is far denser than five requests a minute: a
+    # setup step is six page loads, and a roll call posts once per save.
+    # The abuse surface (sign-in, password recovery, registration, the
+    # write API) keeps its own much tighter explicit limits, which this
+    # does not touch.
+    return current_app.config.get("RATELIMIT_DEFAULT", "1200 per hour;120 per minute")
+
+
+limiter = Limiter(key_func=rate_limit_key, default_limits=[_default_limits])
 
 
 @event.listens_for(Engine, "connect")

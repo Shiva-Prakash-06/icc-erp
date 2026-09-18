@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 
 {% block title %}User Management & Approvals - OIA Project Intelligence{% endblock %}
-{% block mobile_title %}User management{% endblock %}
+{% block screen_title %}User management{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Administration</span>{% endblock %}
 
 {% block content %}
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 {% macro assignment_fields(user, id_suffix='') %}
 <select name="role" class="aurora-select aurora-select--small" aria-label="Role for {{ user.username }}" required>
   {% if user.role and user.role not in role_options and user.role != 'Pending' %}<option value="{{ user.role }}" selected>{{ user.role }} (legacy label)</option>{% endif %}
@@ -37,18 +39,13 @@
 {% endif %}
 {% endmacro %}
 
-<div class="page-header">
-    <h1 class="page-title">User Approvals & Role Assignments</h1>
-    <p class="page-subtitle">Faculty and ICC Core Committee dashboard to verify registrations and grant system clearance.</p>
-</div>
-
 <!-- Pending Registrations Panel -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="aurora-card--padded">
             <div class="aurora-card__heading-row">
                 <div>
-                    <h5 class="aurora-card__heading"><i class="ph ph-clock-counter-clockwise text-warning" aria-hidden="true"></i> Pending registrations</h5>
+                    <h2 class="aurora-card__heading"><i class="ph ph-clock-counter-clockwise text-warning" aria-hidden="true"></i> Pending registrations</h2>
                     <p class="page-section__hint">Review the requested role, home campus, and volunteer profile before granting or rejecting access.</p>
                 </div>
                 <span class="aurora-badge">{{ pending_users | length }} pending</span>
@@ -151,7 +148,7 @@
         <div class="aurora-card--padded">
             <div class="aurora-card__heading-row">
                 <div>
-                    <h5 class="aurora-card__heading"><i class="ph ph-users-three text-primary" aria-hidden="true"></i> Active user directory</h5>
+                    <h2 class="aurora-card__heading"><i class="ph ph-users-three text-primary" aria-hidden="true"></i> Active user directory</h2>
                     <p class="page-section__hint">Current role and scope for every approved user. Edit to change permissions.</p>
                 </div>
                 <span class="aurora-badge">{{ approved_users | length }} users</span>
@@ -236,5 +233,6 @@
             {% endif %}
         </div>
     </div>
+</div>
 </div>
 {% endblock %}

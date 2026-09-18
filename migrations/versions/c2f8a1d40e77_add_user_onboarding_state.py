@@ -30,11 +30,20 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('users') as batch_op:
-        batch_op.add_column(sa.Column('onboarding_seen', sa.Boolean(), nullable=False, server_default=sa.false()))
-        batch_op.add_column(sa.Column('onboarding_step', sa.Integer(), nullable=False, server_default='0'))
-        batch_op.add_column(sa.Column('onboarding_dismissed_at', sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(sa.Column('onboarding_signals', sa.JSON(), nullable=False, server_default='{}'))
+    # Plain ADD COLUMN, not batch_alter_table. Adding a column is the one
+    # schema change SQLite supports natively, and batch mode instead
+    # recreates the table -- copy out, DROP, rename in. With
+    # `PRAGMA foreign_keys=ON` (app/database.py sets it on every
+    # connection) that DROP runs an implicit DELETE and trips every
+    # non-cascading reference to `users`, so upgrading a populated SQLite
+    # database died with "FOREIGN KEY constraint failed" on a migration
+    # that only adds columns. CI missed it because its fixtures hold too
+    # few referencing rows. PostgreSQL is unaffected either way: batch
+    # mode degrades to exactly these ALTERs there.
+    op.add_column('users', sa.Column('onboarding_seen', sa.Boolean(), nullable=False, server_default=sa.false()))
+    op.add_column('users', sa.Column('onboarding_step', sa.Integer(), nullable=False, server_default='0'))
+    op.add_column('users', sa.Column('onboarding_dismissed_at', sa.DateTime(timezone=True), nullable=True))
+    op.add_column('users', sa.Column('onboarding_signals', sa.JSON(), nullable=False, server_default='{}'))
     op.execute("UPDATE users SET onboarding_seen = 1" if op.get_bind().dialect.name == "sqlite"
                else "UPDATE users SET onboarding_seen = TRUE")
 

@@ -1,17 +1,12 @@
 {% extends "base.html" %}
+{% from "_tiles.html" import file_picker %}
 {% block title %}New Project{% endblock %}
 {% block mobile_title %}Create project{% endblock %}
-{% block crumb %}<a href="{{ url_for('erp.projects') }}">Projects</a> <span aria-hidden="true">/</span> New{% endblock %}
+{% block screen_title %}Create a project{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">New</span>{% endblock %}
 {% block back_url %}{{ url_for('erp.projects') }}{% endblock %}
 {% block content %}
-<header class="page-header">
-  <div>
-    <div class="page-eyebrow">Start from a source</div>
-    <h1 class="page-title">Create a project</h1>
-    <p class="page-subtitle">Confirm what's inferred from your upload instead of retyping it. Pick the action that matches what you already have.</p>
-  </div>
-</header>
-
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 <div class="row g-4">
   <div class="col-lg-6">
     <div class="aurora-card--padded">
@@ -27,12 +22,7 @@
       <p class="text-muted">Upload a day-by-day itinerary (.xlsx or .csv). The program title and dates are inferred from the file, and every session is imported immediately.</p>
       <form method="POST" action="{{ url_for('erp.quick_create_from_itinerary') }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="aurora-file-field mb-3">
-          <label class="aurora-label" for="itinerary_source_file">Itinerary file</label>
-          <input id="itinerary_source_file" class="aurora-input" type="file" name="source_file" accept=".xlsx,.csv" required data-ui-toggle="file-field" data-ui-target="#itinerary_source_file_name">
-          <span class="aurora-file-field__hint">Accepted formats: .xlsx or .csv, up to 16MB.</span>
-          <span class="aurora-file-field__name" id="itinerary_source_file_name" data-empty="true">No file selected</span>
-        </div>
+        {{ file_picker('itinerary_source_file', 'source_file', 'Itinerary file', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='mb-3') }}
         <button class="aurora-button--primary w-100">Create IGP project</button>
       </form>
     </div>
@@ -55,12 +45,7 @@
         </fieldset>
         <fieldset class="aurora-fieldset">
           <legend class="aurora-fieldset__legend">Documents</legend>
-          <div class="aurora-file-field">
-            <label class="aurora-label" for="doc_files">Documents</label>
-            <input id="doc_files" class="aurora-input" type="file" name="source_files" multiple required data-ui-toggle="file-field" data-ui-target="#doc_files_name">
-            <span class="aurora-file-field__hint">Select one or more files; each is classified automatically. Up to 16MB per upload.</span>
-            <span class="aurora-file-field__name" id="doc_files_name" data-empty="true">No file selected</span>
-          </div>
+          {{ file_picker('doc_files', 'source_files', 'Documents', 'Choose one or more files; each is classified automatically.', multiple=true) }}
         </fieldset>
         <button class="aurora-button--primary w-100">Create &amp; upload</button>
       </form>
@@ -95,5 +80,6 @@
       </form>
     </div>
   </div>
+</div>
 </div>
 {% endblock %}

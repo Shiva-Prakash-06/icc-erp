@@ -1,0 +1,68 @@
+{#- One dashboard: four KPIs and one chart. Used by both division dashboards
+    and by an event's Analytics tab -- they differ only in the query behind
+    them, so they must not differ in layout. -#}
+
+{%- macro kpis(items) -%}
+<div class="ds-kpis">
+  {% for kpi in items %}
+  {% if kpi.href %}
+  <a class="ds-kpi" href="{{ url_for(kpi.href[0], **kpi.href[1]) }}">
+    <span class="ds-kpi__label">{{ kpi.label }}</span>
+    <span class="ds-kpi__value{% if kpi.tone == 'overdue' and kpi.value %} ds-kpi__value--overdue{% endif %}">{{ kpi.value }}</span>
+    <span class="ds-kpi__foot">{{ kpi.foot_before }}<b>{{ kpi.foot_value }}</b>{{ kpi.foot_after }}</span>
+  </a>
+  {% else %}
+  {#- A count with no destination is set as plain text rather than given a
+      false affordance. -#}
+  <div class="ds-kpi">
+    <span class="ds-kpi__label">{{ kpi.label }}</span>
+    <span class="ds-kpi__value{% if kpi.tone == 'overdue' and kpi.value %} ds-kpi__value--overdue{% endif %}">{{ kpi.value }}</span>
+    <span class="ds-kpi__foot">{{ kpi.foot_before }}<b>{{ kpi.foot_value }}</b>{{ kpi.foot_after }}</span>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{%- endmacro -%}
+
+{%- macro chart(data) -%}
+{#- A stacked bar drawn as inline SVG. The four series are the reserved
+    status palette being used for status; each is named in the legend and
+    the whole figure carries an aria-label stating the figures, so identity
+    is never colour alone. Segments take a 2px gap and 3px ends. -#}
+{% set row_h = 28 %}
+{% set plot_h = data.bars|length * row_h %}
+<div class="ds-panel">
+  <div class="ds-panel__head">
+    <h2 class="ds-panel__title">{{ data.title }}</h2>
+    <span class="ds-panel__note">{{ data.note }}</span>
+  </div>
+  <div class="ds-panel__plot">
+    <svg viewBox="0 0 660 {{ plot_h + 8 }}" role="img" preserveAspectRatio="xMinYMin meet"
+         aria-label="{{ data.title }}. {% for bar in data.bars %}{{ bar.label }}: {{ bar.total }} items{% for seg in bar.segments %}, {{ seg.count }} {{ seg.label|lower }}{% endfor %}. {% endfor %}">
+      <rect x="180" y="4" width="1" height="{{ plot_h }}" class="ds-chart__axis"/>
+      {% for bar in data.bars %}
+      {% set y = loop.index0 * row_h %}
+      {#- `truncate` keeps a string that is within `leeway` (5 by default) of
+          the limit, so a 30-character programme name came through whole, and
+          an end-anchored label wider than the 172-unit gutter runs off the
+          left edge of the viewBox: "Summer School Exchange Program" rendered
+          as "mer School Exchange Program". The cap is now enforced. -#}
+      <text x="172" y="{{ y + 21 }}" text-anchor="end" class="ds-chart__label">{{ bar.label|truncate(22, true, '…', leeway=0) }}<title>{{ bar.label }}</title></text>
+      {% set ns = namespace(x=181) %}
+      {% for seg in bar.segments %}
+      {% set w = (seg.width * 4.5)|round(2) %}
+      <rect x="{{ ns.x }}" y="{{ y + 7 }}" width="{{ w }}" height="17" rx="3" class="ds-chart__seg ds-chart__seg--{{ seg.state }}"/>
+      {% set ns.x = ns.x + w + 2 %}
+      {% endfor %}
+      <text x="{{ ns.x + 6 }}" y="{{ y + 21 }}" class="ds-chart__value">{{ bar.total }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+  <div class="ds-legend">
+    <span><i class="ds-chart__key ds-chart__key--complete"></i>Complete</span>
+    <span><i class="ds-chart__key ds-chart__key--active"></i>Active</span>
+    <span><i class="ds-chart__key ds-chart__key--upcoming"></i>Upcoming</span>
+    <span><i class="ds-chart__key ds-chart__key--overdue"></i>Overdue</span>
+  </div>
+</div>
+{%- endmacro -%}

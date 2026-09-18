@@ -12,8 +12,14 @@ test("authentication handles invalid login, valid login, logout, and session pur
   await page.getByLabel(/^password/i).fill(acceptancePassword);
   await page.getByRole("button", { name: /access platform/i }).click();
   await expect(page).toHaveURL("http://127.0.0.1:5010/");
-  if ((page.viewportSize()?.width || 1440) < 1024) {
-    await page.getByRole("button", { name: "Open navigation" }).first().click();
+  // The phone bar carries four destinations plus Menu (audit P0-05), so
+  // below 860px sign-out lives in the Menu drawer rather than as a ninth
+  // icon on the bar. Opening it is part of what this test proves: every
+  // destination the bar dropped is still one tap away.
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width <= 860) {
+    await page.locator("summary.ds-menu__trigger").click();
+    await expect(page.locator(".ds-menu__drawer")).toBeVisible();
   }
   await page.getByRole("link", { name: /log out/i }).first().click();
   await expect(page).toHaveURL(/\/login/);

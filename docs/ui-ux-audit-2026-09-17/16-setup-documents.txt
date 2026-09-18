@@ -1,0 +1,113 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- navigation "Sections":
+  - link "ICC and OIA home":
+    - /url: /
+    - generic: ICC
+  - link "Campuses":
+    - /url: /
+    - generic: Campuses
+    - generic: Campuses
+  - link "Events":
+    - /url: /erp/projects
+    - generic: Events
+    - generic: Events
+  - link "Analytics":
+    - /url: /erp/analytics
+    - generic: Analytics
+    - generic: Analytics
+  - link "Published reports":
+    - /url: /public/reports
+    - generic: Published reports
+    - generic: Published reports
+  - link "Data imports":
+    - /url: /erp/imports
+    - generic: Data imports
+    - generic: Data imports
+  - button "Search or jump to":
+    - generic: Search
+  - link "Notification centre":
+    - /url: /erp/notifications
+    - generic: Notification centre
+    - generic: Notification centre
+  - link "My account":
+    - /url: /profile
+    - generic: My account
+    - generic: My account
+  - button "Replay the guided tour":
+    - generic: "?"
+    - generic: Replay the tour
+  - link "Log out":
+    - /url: /logout
+    - generic: Log out
+    - generic: Log out
+- main:
+  - navigation "Breadcrumb":
+    - link "Events":
+      - /url: /erp/projects
+    - generic: /
+    - link "IGP-2026-CEN-001":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c
+    - generic: /
+    - generic: Setup
+  - heading "Summer School Exchange Program" [level=1]
+  - link "Skip to the event":
+    - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c
+  - list "Setup progress":
+    - link "Basics":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=basics
+      - text: Basics
+    - link "Sessions":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=sessions
+      - text: Sessions
+    - link "Team":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=team
+      - text: Team
+    - link "Checklist":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=checklist
+      - text: Checklist
+    - link "Documents":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=documents
+      - text: Documents
+    - link "Budget":
+      - /url: /erp/projects/7f4d43fb-d1d5-4068-a6b1-692cd447d74c/setup?step=budget
+      - text: Budget
+  - paragraph: Step 5 of 6 · already completed — you can revise it below.
+  - heading "Documents" [level=2]
+  - paragraph: Index the key documents this project will produce (posters, reports, schedules).
+  - table:
+    - rowgroup:
+      - row "Document Category Status":
+        - columnheader "Document"
+        - columnheader "Category"
+        - columnheader "Status"
+    - rowgroup:
+      - row "Partner MoU addendum 2026 Agreement Approved":
+        - cell "Partner MoU addendum 2026"
+        - cell "Agreement"
+        - cell "Approved"
+      - row "Visa and insurance pack Compliance Approved":
+        - cell "Visa and insurance pack"
+        - cell "Compliance"
+        - cell "Approved"
+      - row "Final academic timetable Academic Approved":
+        - cell "Final academic timetable"
+        - cell "Academic"
+        - cell "Approved"
+      - row "Mobility report to partner Report Submitted":
+        - cell "Mobility report to partner"
+        - cell "Report"
+        - cell "Submitted"
+  - generic: Title
+  - textbox "Title"
+  - generic: Category
+  - combobox "Category":
+    - option "Schedule" [selected]
+    - option "Report"
+    - option "Poster"
+    - option "Presentation"
+    - option "Other"
+  - generic: Google Drive link (optional)
+  - textbox "Google Drive link (optional)"
+  - button "Add document"
+- status: Demo environment—data may be reset; do not enter sensitive or personal data.

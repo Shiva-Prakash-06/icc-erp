@@ -72,18 +72,56 @@
 @media (max-width: 767px) { .d-md-down-none { display: none !important; } }
 @media (max-width: 1199px) { .content-grid > .col-span-3 { grid-column: span 6; } .content-grid > .col-span-4, .content-grid > .col-span-8 { grid-column: span 12; } }
 @media (max-width: 767px) { .content-grid > [class*="col-span-"] { grid-column: span 12; } }
+/* ── Print ─────────────────────────────────────────────────────────────
+   Every selector in this block used to name the pre-Tile shell --
+   .app-rail, .app-topbar, .mobile-bottom-nav, .app-shell, .app-content --
+   none of which exists any more. The consequence was worse than a missing
+   rule: `.ds-app` is `height: 100dvh; overflow: hidden` with a single
+   inner `.ds-scroll`, so a report printed the navigation rail and exactly
+   one viewport of content, and everything below the fold was silently
+   dropped. The acceptance check "reports, audit and summaries have usable
+   print styles" could not have passed. */
 @media print {
   :root { color-scheme: light; }
   body { color: #111827; background: #fff !important; font-size: 11pt; }
-  .app-rail, .app-topbar, .mobile-header, .mobile-bottom-nav, .command-trigger, button, .aurora-button, .no-print, #aurora-atmosphere-root { display: none !important; }
-  .app-shell, .app-main { display: block; margin: 0 !important; }
-  .app-content { width: 100%; max-width: none; padding: 0; }
-  .aurora-card, .aurora-card--padded, .aurora-card { color: #111827; background: #fff !important; border-color: #9ca3af; box-shadow: none; break-inside: avoid; }
-  h1, h2, h3, h4, h5, h6, p, td, th, .text-muted { color: #111827 !important; }
+
+  /* Interactive-only chrome never prints. */
+  .ds-rail, .ds-menu, .ds-demo-banner, .ds-flash, .ds-aside, .ds-tabs, .ds-filter,
+  .ds-screen__tools, .ds-review, .ds-search, .onb-card, .onb-spotlight, .onb-scrim,
+  .ds-sections, .ds-pager, .ds-modal, .ds-panel__act,
+  .command-trigger, .command-scrim, button, .aurora-button, [class*="aurora-button--"],
+  .no-print, #aurora-atmosphere-root, .skip-link { display: none !important; }
+
+  /* Unclamp the one-screen frame so the whole record prints, not the first
+     viewport of it. */
+  .ds-app, .ds-screen, .ds-screen__body, .ds-scroll,
+  .ds-work, .ds-panel, .ds-panel__body, .ds-forms {
+    display: block !important;
+    height: auto !important; max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important; margin: 0 !important;
+  }
+  .ds-screen__head { padding: 0 0 8pt !important; border-bottom: 1px solid #9ca3af; }
+  .ds-rows, .ds-panel, .ds-kpi, .ds-tile, .aurora-card, .aurora-card--padded {
+    color: #111827; background: #fff !important; border-color: #9ca3af;
+    box-shadow: none !important; break-inside: avoid;
+  }
+  /* A record card prints as a block, not as a seven-column grid squeezed
+     onto a page. */
+  .ds-row, .ds-rows__head { display: block !important; padding: 6pt 0 !important; }
+  .ds-row > [data-label]::before { content: attr(data-label) ": "; font-weight: 600; }
+  .ds-chip { border: 1px solid #9ca3af; background: #fff !important; color: #111827 !important; }
+  /* A disclosure prints open: provenance and settled records are exactly
+     what a printed ledger is for. */
+  details > *:not(summary) { display: revert !important; }
+
+  h1, h2, h3, h4, h5, h6, p, td, th, dd, dt, .text-muted { color: #111827 !important; }
   table { border-collapse: collapse !important; }
   thead { display: table-header-group; }
   tr { break-inside: avoid; }
   a { color: #111827; text-decoration: underline; }
+  /* A printed link is useless without its target. */
+  .ds-scroll a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 9pt; word-break: break-all; }
 }
 
 /* Public transparency site (no authenticated app-shell). */

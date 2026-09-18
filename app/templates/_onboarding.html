@@ -8,13 +8,15 @@
     anchors to an element that exists only on a project page, so it carries the
     project the home page picked -- and when there is no project in scope it
     stays null and onboarding.js drops the step rather than drawing a tooltip
-    pointing at nothing. -#}
+    pointing at nothing. It carries `tab=analytics` because that is where the
+    closure blockers live now; without it the tour lands on Logistics, finds
+    no anchor, and silently drops its own fourth step. -#}
 {% if onboarding %}
 {% set step_urls = {
-  'queue': url_for('dashboard.index'),
-  'counters': url_for('dashboard.index'),
+  'queue': url_for('dashboard.queue'),
+  'counters': url_for('dashboard.queue'),
   'checklist': url_for('dashboard.index'),
-  'blockers': url_for('erp.project_detail', public_id=onboarding_tour_project) if onboarding_tour_project|default(none) else none
+  'blockers': url_for('erp.project_detail', public_id=onboarding_tour_project, tab='analytics') if onboarding_tour_project|default(none) else none
 } %}
 {% set ns = namespace(steps=[]) %}
 {% for step in onboarding.steps %}{% set ns.steps = ns.steps + [dict(step, url=step_urls.get(step.target))] %}{% endfor %}

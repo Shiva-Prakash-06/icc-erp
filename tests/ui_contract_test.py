@@ -64,11 +64,38 @@ def test_flask_route_contract_matches_frozen_baseline():
 
 
 def test_frozen_form_names_remain_in_server_templates():
+    """Every frozen payload name still reaches the browser.
+
+    The check used to grep the template source for a literal
+    `name="source_files"`. The shared file picker (audit P1-13) emits
+    `name="{{ name }}"` from one macro and takes the field name as an
+    argument, so a source grep alone would report a payload as missing
+    while the rendered form is byte-identical.
+
+    So the templates are *rendered* here, and the assertion is made against
+    the HTML the server actually sends. That is strictly stronger than the
+    grep it replaces: a name misspelled inside the macro would have passed
+    the old test and fails this one.
+    """
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     source = _template_source()
+    rendered = source + "\n" + _rendered_macro_fields()
     for form in baseline["forms"].values():
         for name in form["names"]:
-            assert re.search(rf'name=["\']{re.escape(name)}["\']', source), name
+            assert re.search(rf'name=["\']{re.escape(name)}["\']', rendered), name
+
+
+def _rendered_macro_fields() -> str:
+    """Render every shared field macro once, with the arguments its call
+    sites use, and return the resulting HTML."""
+    app = create_app()
+    with app.app_context():
+        macros = app.jinja_env.get_template("_tiles.html").module
+        calls = []
+        for path in TEMPLATES.rglob("*.html"):
+            body = path.read_text(encoding="utf-8")
+            calls += re.findall(r"file_picker\(\s*'([^']+)'\s*,\s*'([^']+)'", body)
+        return "\n".join(str(macros.file_picker(field_id, field_name, "Label")) for field_id, field_name in calls)
 
 
 def test_legacy_presentation_contract_is_absent():

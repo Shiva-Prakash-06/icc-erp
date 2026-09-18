@@ -18,9 +18,9 @@
   --color-text-secondary: #424244;
   --color-text-tertiary: #5d5d60;
   --color-text-disabled: #7a7a7d;
-  --color-primary: #5980a6;
-  --color-primary-hover: #416180;
-  --color-primary-pressed: #2c455d;
+  --color-primary: #416180;
+  --color-primary-hover: #2c455d;
+  --color-primary-pressed: #1f3446;
   --color-primary-soft: #eef6ff;
   --color-decorative-sky: #94bce3;
   --color-secondary: #728fab;
@@ -102,4 +102,68 @@
   --z-dialog: 700;
   --z-toast: 800;
   --z-command: 900;
+
+  /* ── Tile System ──────────────────────────────────────────────────────
+     Added 2026-09-17. The blueprint tokens above are unchanged and still
+     authoritative for forms, tables and the print sheet; these carry the
+     two new surfaces (the navigation tile and the one-line work row) and
+     the geometry that makes a screen fit the viewport. Spec:
+     design-system "ICC ERP Tile System". */
+
+  /* Radius encodes what a surface does. --radius-tile is reserved for
+     navigation tiles and appears nowhere else: the corner IS the signal
+     that a surface drills down. */
+  --radius-chip: 4px;
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --radius-tile: 16px;
+
+  /* Elevation belongs to navigational and floating surfaces only. A work
+     row never casts. */
+  --shadow-tile: 0 1px 2px rgb(29 31 32 / 7%), 0 8px 20px rgb(29 31 32 / 8%);
+  --shadow-tile-raised: 0 2px 4px rgb(29 31 32 / 8%), 0 16px 32px rgb(29 31 32 / 13%);
+
+  /* The four reserved states. Each is always rendered beside its own word,
+     so the colour is never the only carrier. */
+  --state-upcoming: #416180;
+  --state-upcoming-tint: #eef6ff;
+  --state-active: #3d6b57;
+  --state-active-tint: #e8eeeb;
+  --state-complete: #5d5d60;
+  --state-complete-tint: #e9e9ea;
+  --state-overdue: #8f3d38;
+  --state-overdue-tint: #f1e8e7;
+  --state-locked: #7a7a7d;
+  --surface-locked: #ebebec;
+
+  /* Identity. A family keeps its hue from the tile you click through to
+     the dashboard you land on. All three carry white at 6.3:1 or better. */
+  /* Foreground for anything drawn ON one of those three grounds. It exists
+     as a token because the bug it fixes was inheritance being silently
+     overridden: `h1..h6 { color: var(--color-text) }` in base.css is
+     (0,0,1) and beat the tile's inherited white, so every tile heading
+     rendered near-black -- 1.67:1 on indigo. Audit P1-06.
+     Measured against the three grounds: white 6.33-9.92:1, muted (88%)
+     5.33-8.14:1. Both clear WCAG 2.2 AA at every size. */
+  --on-accent: #ffffff;
+  --on-accent-muted: rgb(255 255 255 / 88%);
+  --tile-pine: #1f5f4e;
+  --tile-pine-tint: #e6efeb;
+  --tile-indigo: #2c455d;
+  --tile-indigo-tint: #e8edf2;
+  --tile-brass: #7a5a24;
+  --tile-brass-tint: #f2ece1;
+
+  /* Geometry. These are tokens because the one-screen rule is a contract:
+     a screen body is 100dvh minus the fixed tracks below it. */
+  --rail-width: 72px;
+  --screen-head: 64px;
+  --tab-height: 44px;
+  --filter-height: 36px;
+  --row-height: 44px;
+  --row-height-dense: 36px;
+  --tile-min: 264px;
+  --tile-height-lg: 216px;
+  --tile-height-sm: 148px;
+  --screen-pad: 24px;
 }

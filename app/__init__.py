@@ -8,7 +8,7 @@ import os
 import uuid
 from pathlib import Path
 
-from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, g, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_wtf.csrf import CSRFError
 from markupsafe import Markup
 from sqlalchemy import text
@@ -52,6 +52,25 @@ def create_app(config_object=None):
     # storage stays UTC. See app/services/timeutil.py and audit finding B09.
     from app.services.timeutil import register_filters
     register_filters(app)
+
+    # Money, counts and the status vocabulary are shared the same way, so a
+    # convention lives in one module instead of in forty template
+    # expressions. Audit findings P0-04, P1-07, P1-08.
+    from app.services.formatting import register_filters as register_format_filters
+    from app.services.glossary import register_globals as register_glossary
+    from app.services.status import register_globals as register_status
+
+    register_format_filters(app)
+    register_status(app)
+    register_glossary(app)
+
+    # The four reserved states are read by the directory, both dashboards
+    # and every work row. Exposing the mapping rather than pre-computing it
+    # per view is what keeps a card and the counter above it in agreement.
+    from app.services.hierarchy import STATE_LABELS, event_state
+
+    app.jinja_env.globals["event_state"] = event_state
+    app.jinja_env.globals["STATE_LABELS"] = STATE_LABELS
 
     # Server duration and query counts for the beta latency work (audit B13).
     # Off unless REQUEST_TIMING_ENABLED is set.
@@ -170,8 +189,15 @@ def create_app(config_object=None):
         if not user:
             return {"primary_nav": []}
         from app.services.navigation import build_nav
+        from app.services.roles import role_context
 
-        return {"primary_nav": build_nav(user, request.endpoint, request.blueprint)}
+        return {
+            "primary_nav": build_nav(user, request.endpoint, request.blueprint),
+            # Audit P1-10: the shell states which role and scope the screen
+            # is being read through, so identical-looking directories stop
+            # being unexplained.
+            "role_context": role_context(user),
+        }
 
     @app.context_processor
     def shell_notifications():
@@ -336,13 +362,24 @@ def create_app(config_object=None):
     def forbidden(error):
         if request.path.startswith("/api/v1/"):
             return _problem(403, "Access denied")
-        return ("Access denied", 403)
+        return _error_page(
+            403,
+            "You do not have access to this",
+            "Your account does not carry the permission this screen needs. "
+            "Access follows your role and campus assignment, not the link you followed.",
+            guidance="If you should have access, ask an administrator to review your role assignment.",
+        )
 
     @app.errorhandler(404)
     def not_found(error):
         if request.path.startswith("/api/v1/"):
             return _problem(404, "Resource not found")
-        return ("Not found", 404)
+        return _error_page(
+            404,
+            "That page does not exist",
+            "The address is wrong, or the record it pointed at has been removed or renamed.",
+            guidance="Check the link, or use search to find the record by title or code.",
+        )
 
     @app.errorhandler(PermissionError)
     def internal_permission_denied(error):
@@ -355,17 +392,31 @@ def create_app(config_object=None):
         # handler that surfaced as a raw Werkzeug page.
         if request.path.startswith("/api/v1/"):
             return _problem(400, "CSRF token missing or expired")
-        return (
-            "Your session expired before this form was submitted. "
-            "Reload the page and try again.",
+        return _error_page(
             400,
+            "This form expired before it was submitted",
+            "For security, a form can only be submitted for two hours after the page is opened. "
+            "Nothing was saved.",
+            guidance="Open the record again and re-enter the change. Copy anything you typed first if the page is still open in another tab.",
         )
 
     @app.errorhandler(429)
     def rate_limited(error):
         if request.path.startswith("/api/v1/"):
             return _problem(429, "Too many requests")
-        return ("Too many requests. Wait a moment and try again.", 429)
+        retry_seconds = getattr(error, "retry_after", None) or _retry_after_seconds(error)
+        response = _error_page(
+            429,
+            "Too many requests from this account",
+            "The platform limits how fast one account can load pages, to keep the service "
+            "available for everybody. Nothing you submitted was lost or changed.",
+            guidance="If this keeps happening during ordinary use, report it -- the limit is "
+                     "meant to sit well above normal work.",
+            retry_after=_humanise_seconds(retry_seconds),
+        )
+        if retry_seconds:
+            response.headers["Retry-After"] = str(int(retry_seconds))
+        return response
 
     @app.errorhandler(500)
     @app.errorhandler(Exception)
@@ -385,9 +436,82 @@ def create_app(config_object=None):
         app.logger.exception("Unhandled application error")
         if request.path.startswith("/api/v1/"):
             return _problem(500, "Internal server error")
-        return ("Something went wrong. The error has been logged.", 500)
+        return _error_page(
+            500,
+            "Something went wrong at our end",
+            "The request could not be completed. The failure has been logged with the "
+            "reference below; no partial change was saved.",
+            guidance="Try again in a moment. If it keeps failing, report it with the request reference.",
+        )
 
     return app
+
+
+def _retry_after_seconds(error):
+    """Seconds Flask-Limiter is willing to disclose, if any.
+
+    The exception carries the window description rather than a number, so
+    the value is only used when the limiter attached a real one; a guess
+    printed as a deadline would be worse than no deadline.
+    """
+    description = getattr(error, "description", "") or ""
+    for window, seconds in (("second", 1), ("minute", 60), ("hour", 3600), ("day", 86400)):
+        if window in str(description):
+            return seconds
+    return None
+
+
+def _humanise_seconds(seconds) -> str:
+    if not seconds:
+        return ""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds} seconds"
+    if seconds < 3600:
+        minutes = max(1, round(seconds / 60))
+        return f"{minutes} minute" + ("s" if minutes != 1 else "")
+    hours = max(1, round(seconds / 3600))
+    return f"{hours} hour" + ("s" if hours != 1 else "")
+
+
+def _error_page(status: int, heading: str, explanation: str, *, guidance: str = "", retry_after: str = ""):
+    """Render an error inside the application shell.
+
+    Falls back to plain text only if the template itself cannot render --
+    an error page that raises is how a 500 becomes an infinite loop.
+    """
+    # `g.user` is populated by `load_request_context`, which is registered
+    # *after* Flask-Limiter's own before_request hook. A rate-limited signed
+    # in reader therefore reaches this function with `g.user` unset and used
+    # to be handed the anonymous auth shell -- losing the identity and
+    # navigation that audit finding P0-01 specifically asks the error page
+    # to keep. The session is re-read here, on the error path only.
+    from app.models.user import User
+
+    user = getattr(g, "user", None)
+    if user is None and session.get("user_id"):
+        try:
+            user = db.session.get(User, session["user_id"])
+            g.user = user
+        except Exception:  # pragma: no cover - a failing lookup must not mask the error
+            user = None
+    safe_url, safe_label = ("/", "Go to campuses") if user else ("/login", "Go to sign in")
+    try:
+        body = render_template(
+            "error.html",
+            status=status,
+            heading=heading,
+            explanation=explanation,
+            guidance=guidance,
+            retry_after=retry_after,
+            safe_url=safe_url,
+            safe_label=safe_label,
+            request_id=getattr(g, "request_id", None),
+            hide_sidebar=False,
+        )
+    except Exception:  # pragma: no cover - defensive
+        return make_response((f"{heading}. {explanation}", status))
+    return make_response((body, status))
 
 
 def _problem(status: int, detail: str):

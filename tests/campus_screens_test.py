@@ -61,12 +61,12 @@ class CampusScreensTestCase(unittest.TestCase):
 
     def test_project_basics_card_shows_campus_program_year_wing(self):
         # The two "Project Basics" / "Project record" definition lists were
-        # merged into one "Record" facts panel in the blueprint redesign;
-        # the facts it must carry are unchanged.
+        # merged into one "Record" facts panel in the blueprint redesign,
+        # and the Tile System moved that panel to the Logistics tab when it
+        # deleted Overview. The facts it must carry are unchanged.
         self.login()
-        response = self.client.get(f"/erp/projects/{self.project.public_id}")
+        response = self.client.get(f"/erp/projects/{self.project.public_id}?tab=logistics")
         html = response.get_data(as_text=True)
-        self.assertIn("Record", html)
         self.assertIn("Academic year", html)
         self.assertIn("Central", html)
         self.assertIn("ICC", html)
@@ -85,11 +85,36 @@ class CampusScreensTestCase(unittest.TestCase):
         response = self.client.get(f"/erp/campuses/{self.other_campus.public_id}")
         self.assertEqual(response.status_code, 404)
 
-    def test_campus_detail_shows_scoped_projects(self):
+    def test_campus_detail_offers_both_divisions(self):
+        """Level two of the drill-down is divisions, not a project list.
+
+        The campus screen used to be a flat list of every project on the
+        campus; the Tile System puts IGP and ICC between the campus and its
+        events, so what this screen must show is the two divisions and a
+        live count for each.
+        """
         self.login()
         response = self.client.get(f"/erp/campuses/{self.campus.public_id}")
         html = response.get_data(as_text=True)
+        self.assertIn("India Gateway Program", html)
+        self.assertIn("International Christite Community", html)
+        self.assertIn(f"/erp/campuses/{self.campus.public_id}/icc", html)
+        self.assertIn(f"/erp/campuses/{self.campus.public_id}/igp", html)
+
+    def test_division_screen_lists_that_divisions_events_only(self):
+        self.login()
+        response = self.client.get(f"/erp/campuses/{self.campus.public_id}/icc")
+        html = response.get_data(as_text=True)
         self.assertIn("Basics scoped project", html)
+        self.assertNotIn("Other campus project", html)
+
+    def test_division_screen_rejects_an_unknown_division(self):
+        self.login()
+        self.assertEqual(self.client.get(f"/erp/campuses/{self.campus.public_id}/xyz").status_code, 404)
+
+    def test_division_screen_denies_out_of_scope_campus(self):
+        self.login()
+        self.assertEqual(self.client.get(f"/erp/campuses/{self.other_campus.public_id}/icc").status_code, 404)
 
 
 if __name__ == "__main__":

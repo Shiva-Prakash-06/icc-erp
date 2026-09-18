@@ -67,7 +67,10 @@ class ActionQueueTestCase(unittest.TestCase):
         db.session.commit()
         client = self.app.test_client()
         client.post("/login", data={"username": "approver", "password": "A-secure-test-password-2026"})
-        response = client.get(f"/erp/projects/{self.project.public_id}?tab=finance")
+        # The queue links with `focus=<public_id>`, which resolves to the
+        # section and the page that actually contain the record -- landing on
+        # page 1 of a list the row is not in is the same as not arriving.
+        response = client.get(f"/erp/projects/{self.project.public_id}?tab=finance&focus={item.public_id}")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Mark completed", response.data)
         self.assertNotIn(b"Show 1 settled request", response.data)
@@ -148,7 +151,8 @@ class ActionQueueTestCase(unittest.TestCase):
         self.assertIn("Queue test project", item["title"])
         self.assertIn("opreqapprover", item["title"])  # names the requester
         self.assertEqual(item["project"].public_id, self.project.public_id)
-        self.assertEqual((item["tab"], item["anchor"]), ("overview", "publication"))
+        # Public disclosure is decided beside the report it publishes.
+        self.assertEqual((item["tab"], item["anchor"]), ("documents", "publication"))
 
     def test_a_reviewer_is_not_offered_their_own_publication_request(self):
         """`decide_project_publication` refuses self-review, so queueing it
@@ -203,18 +207,25 @@ class ActionQueueTestCase(unittest.TestCase):
         self.assertEqual(build_action_queue(self.no_permission_user), [])
 
     def test_queue_items_use_new_tab_values(self):
+        """Every row lands on one of the Tile System's five tabs.
+
+        Re-pointed on 2026-09-17 with the seven-tab workspace: delivery ->
+        logistics, contributions -> people, resources -> documents, and
+        insights split (feedback is People's, a report is Documents').
+        """
         queue = build_action_queue(self.approver)
         by_kind = {item["kind"]: item["tab"] for item in queue}
-        self.assertEqual(by_kind["Task"], "delivery")
-        self.assertEqual(by_kind["Checklist"], "delivery")
-        self.assertEqual(by_kind["Contribution"], "contributions")
-        self.assertEqual(by_kind["Buddy log"], "contributions")
+        self.assertEqual(by_kind["Task"], "logistics")
+        self.assertEqual(by_kind["Checklist"], "logistics")
+        self.assertEqual(by_kind["Contribution"], "people")
+        self.assertEqual(by_kind["Buddy log"], "people")
         self.assertEqual(by_kind["Operational request"], "finance")
         self.assertEqual(by_kind["Budget line"], "finance")
-        self.assertEqual(by_kind["Document"], "resources")
-        self.assertEqual(by_kind["Feedback moderation"], "insights")
-        self.assertEqual(by_kind["Report approval"], "insights")
+        self.assertEqual(by_kind["Document"], "documents")
+        self.assertEqual(by_kind["Feedback moderation"], "people")
+        self.assertEqual(by_kind["Report approval"], "documents")
         self.assertEqual(by_kind["Recruitment"], "people")
+        self.assertTrue(set(by_kind.values()) <= {"logistics", "finance", "documents", "people", "analytics"})
 
 
 if __name__ == "__main__":

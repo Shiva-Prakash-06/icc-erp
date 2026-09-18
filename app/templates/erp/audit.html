@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Audit History{% endblock %}
-{% block mobile_title %}Audit history{% endblock %}
+{% block screen_title %}Audit history{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Audit</span>{% endblock %}
+{% block tools %}<span class="ds-filter__result">Latest {{ events|length|pluralise('event') }} · times in {{ timezone_label() }}</span>{% endblock %}
 {% block content %}
-<header class="page-header"><div><h1 class="page-title">Audit history</h1><p class="page-subtitle">Append-only. Raw ids are one click away, not on the page.</p></div><span class="aurora-badge">Latest {{ events|length }} events</span></header>
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 <div>
   <div class="page-section__bar mb-3">
     <h2 class="page-section__title">Operational events</h2>
@@ -13,37 +15,45 @@
   </div>
   <div class="aurora-table-scroll" tabindex="0">
     <table class="aurora-table--cards align-middle mb-0" id="auditTable">
-      <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What happened</th><th scope="col">Entity</th><th scope="col">Request</th></tr></thead>
+      {#- When / Who / What happened (reports-admin override). The raw
+          action string, the entity class name and the request id are
+          provenance, not the headline: the audit found `Report Generate`
+          and `ReportSnapshot` as primary copy, and three separate
+          disclosures whose labels said nothing about what was inside. -#}
+      <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What happened</th><th scope="col">Technical details</th></tr></thead>
       <tbody>
         {% for event in events %}
         <tr>
-          <td data-label="Time" class="font-monospace text-xs">{{ event.occurred_at }}</td>
-          <td data-label="Actor">
+          <td data-label="When" class="font-monospace text-xs">{{ event.occurred_at|localdatetime('%d %b %Y, %I:%M %p', label=False) }}</td>
+          <td data-label="Who">
             {% if event.actor_user_id and actors.get(event.actor_user_id) %}
               <span>{{ actors.get(event.actor_user_id) }}</span>
             {% elif event.actor_user_id %}
-              <span class="small font-monospace text-muted" title="Raw actor id">Actor #{{ event.actor_user_id }}</span>
+              <span class="text-muted">An account no longer on the platform</span>
             {% else %}
-              <span class="text-muted">System</span>
+              <span class="text-muted">The platform itself</span>
             {% endif %}
           </td>
-          <td data-label="Action">
-            {{ event.action.replace('.', ' ').replace('_', ' ')|title }}
-            <details><summary class="small text-muted">Raw value</summary><code class="small aurora-wrap-anywhere">{{ event.action }}</code></details>
+          <td data-label="What happened" class="aurora-wrap-anywhere">
+            {{ audit_action(event.action) }}{% if event.entity_type %} <span class="text-muted">({{ audit_entity(event.entity_type) }})</span>{% endif %}
           </td>
-          <td data-label="Entity" class="aurora-wrap-anywhere">
-            {{ event.entity_type }}
-            {% if event.entity_public_id %}<details><summary class="small text-muted">Record id</summary><code class="small aurora-wrap-anywhere">{{ event.entity_public_id }}</code></details>{% endif %}
-          </td>
-          <td data-label="Request" class="aurora-wrap-anywhere">
-            {% if event.request_id %}<details><summary class="small text-muted">Request id</summary><code class="small aurora-wrap-anywhere">{{ event.request_id }}</code></details>{% else %}<span class="text-muted">—</span>{% endif %}
+          <td data-label="Technical details" class="aurora-wrap-anywhere">
+            <details>
+              <summary class="small text-muted">Identifiers and raw values</summary>
+              <dl class="small mb-0">
+                <dt>Action</dt><dd><code class="aurora-wrap-anywhere">{{ event.action }}</code></dd>
+                <dt>Entity</dt><dd><code class="aurora-wrap-anywhere">{{ event.entity_type or '—' }}{% if event.entity_public_id %} {{ event.entity_public_id }}{% endif %}</code></dd>
+                <dt>Request</dt><dd><code class="aurora-wrap-anywhere">{{ event.request_id or '—' }}</code></dd>
+              </dl>
+            </details>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-5">No audit events recorded.</td></tr>
+        <tr><td colspan="4" class="text-center text-muted py-5">No audit events recorded.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+</div>
 </div>
 {% endblock %}

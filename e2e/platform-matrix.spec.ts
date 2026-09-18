@@ -55,31 +55,34 @@ test("protected workflow resources reject generic PATCH and return RFC 7807 erro
 });
 
 test("home decision queue includes every pending category and each review link resolves to its exact item", async ({ page }) => {
-  // /erp/oversight now redirects into the merged home's full decision
-  // queue (?queue=all) -- see
-  // in-the-operation-checklists-crystalline-dongarra.md Step 2. This is
-  // also the regression net for the summary-first workspace restructure
-  // (Step 8): every kind here must resolve to a row rendered outside any
-  // collapsed disclosure.
+  // /erp/oversight redirects into the full decision queue at /queue -- see
+  // in-the-operation-checklists-crystalline-dongarra.md Step 2 and the Tile
+  // System entry in UI_LEGACY_LEDGER.md. This is also the regression net
+  // for the summary-first workspace restructure (Step 8): every kind here
+  // must resolve to a row rendered outside any collapsed disclosure.
+  //
+  // The open-record link is named for what it does ("Send back", "Query",
+  // "Hold") rather than the old generic "Review", so it is located by its
+  // position in the row's action cell.
   await signIn(page, "e2e_faculty");
-  await page.goto("/?queue=all");
+  await page.goto("/queue");
   const expectedKinds = ["Task", "Checklist", "Document", "Contribution", "Operational request", "Budget line", "Buddy log", "Feedback moderation", "Recruitment", "Report approval"];
   for (const kind of expectedKinds) {
-    const row = page.getByRole("row").filter({ has: page.getByText(kind, { exact: true }) }).first();
+    const row = page.locator(".ds-row").filter({ has: page.getByText(kind, { exact: true }) }).first();
     await expect(row, kind).toBeVisible();
-    const href = await row.getByRole("link", { name: "Review" }).getAttribute("href");
+    const href = await row.locator(".ds-row__act a").first().getAttribute("href");
     expect(href, kind).toMatch(/#[0-9a-f-]{36}$/);
     await page.goto(href!);
     const anchor = new URL(page.url()).hash.slice(1);
     await expect(page.locator(`[id="${anchor}"]`), kind).toBeVisible();
-    await page.goto("/?queue=all");
+    await page.goto("/queue");
   }
 });
 
 test("authenticated and public page-state matrix meets structural and axe gates", async ({ page }, testInfo) => {
   const javascriptDisabled = testInfo.project.name === "javascript-disabled";
   await signIn(page, "e2e_faculty");
-  const routes = ["/", "/?queue=all", "/erp/projects", "/erp/imports", "/erp/notifications", "/erp/audit", "/profile", "/admin/users"];
+  const routes = ["/", "/queue", "/erp/analytics", "/erp/analytics/icc", "/erp/projects", "/erp/imports", "/erp/notifications", "/erp/audit", "/profile", "/admin/users"];
   for (const route of routes) {
     const response = await page.goto(route);
     expect(response?.status(), route).toBe(200);
@@ -91,7 +94,7 @@ test("authenticated and public page-state matrix meets structural and axe gates"
   }
   await openProject(page, "E2E-ICC-EVENT");
   const base = page.url().split("?")[0];
-  for (const tab of ["overview", "people", "delivery", "contributions", "finance", "insights", "resources"]) {
+  for (const tab of ["logistics", "finance", "documents", "people", "analytics"]) {
     await page.goto(`${base}?tab=${tab}`);
     await expect(page.locator("h1")).toHaveCount(1);
     if (!javascriptDisabled) {

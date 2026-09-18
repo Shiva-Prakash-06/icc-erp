@@ -101,6 +101,10 @@ class BaseConfig:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    # Blanket per-caller ceiling, shared across every endpoint. Keyed by
+    # account for signed-in traffic (see app.database.rate_limit_key), so a
+    # shared campus NAT no longer pools one allowance. Audit P0-01.
+    RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "1200 per hour;120 per minute")
     # Per-IP cap on sign-in attempts. Configurable because a pilot group
     # sharing one campus NAT presents as a single IP, and the default trips
     # on ordinary simultaneous logins rather than on an attack.

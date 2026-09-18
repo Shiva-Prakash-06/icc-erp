@@ -1,0 +1,215 @@
+{#- Tile System macros. Kept here so the artwork geometry, the state chip and
+    the one-line row's empty cell are defined once: three screens draw tiles
+    and four tabs draw rows, and a second copy is how they drift. -#}
+
+{%- macro tile_art(accent) -%}
+{#- Two to four blocks cut from the tile's own accent, bleeding off the
+    bottom-right. White at 12-26% on a filled tile, ink at 4-7% on a locked
+    one. Geometry comes from the radius scale; it is never an image and
+    never an illustration. -#}
+{%- if accent == 'brass' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="6" y="46" width="52" height="66" rx="10" fill="#ffffff" opacity=".16"/>
+  <rect x="64" y="14" width="44" height="98" rx="10" fill="#ffffff" opacity=".26"/>
+  <rect x="114" y="58" width="44" height="54" rx="10" fill="#ffffff" opacity=".13"/>
+  <circle cx="86" cy="42" r="13" fill="#ffffff" opacity=".2"/>
+</svg>
+{%- elif accent == 'indigo' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="10" y="62" width="40" height="50" rx="10" fill="#ffffff" opacity=".14"/>
+  <rect x="58" y="34" width="40" height="78" rx="10" fill="#ffffff" opacity=".24"/>
+  <rect x="106" y="6" width="40" height="106" rx="10" fill="#ffffff" opacity=".12"/>
+</svg>
+{%- elif accent == 'pine' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="8" y="30" width="56" height="82" rx="16" fill="#ffffff" opacity=".2"/>
+  <rect x="72" y="66" width="34" height="46" rx="16" fill="#ffffff" opacity=".13"/>
+  <circle cx="122" cy="88" r="24" fill="#ffffff" opacity=".22"/>
+</svg>
+{%- else -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="6" y="46" width="52" height="66" rx="10" fill="#1d1f20" opacity=".05"/>
+  <rect x="64" y="14" width="44" height="98" rx="10" fill="#1d1f20" opacity=".07"/>
+  <rect x="114" y="58" width="44" height="54" rx="10" fill="#1d1f20" opacity=".04"/>
+</svg>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro state_chip(state, label, dimension='Status') -%}
+{#- Colour and the word, always together. Complete takes a check and Overdue
+    a triangle because those are the two people scan for; the other two take
+    the plain pip.
+
+    `dimension` names *which question this chip answers*. A document showing
+    "No file" beside "Approved" is not a contradiction -- one is about the
+    bytes and the other about a decision -- but nothing on the row said so,
+    which is audit finding P0-04. The word is read out by assistive tech and
+    becomes the visible label when the row folds into a card on a phone. -#}
+{#- The dimension sits on the wrapper, not inside the chip. One element
+    carries it for both audiences: it is visually hidden on a wide screen
+    and becomes the card's visible column label on a phone, so assistive
+    tech hears "Kind: Task" exactly once and the chip's own text stays
+    exactly the state word. -#}
+<span class="ds-row__state"><span class="ds-chip__dimension">{{ dimension }}<span class="visually-hidden">:</span> </span><span class="ds-chip ds-chip--{{ state }}">
+  {%- if state == 'complete' -%}<i class="ph ph-check" aria-hidden="true"></i>
+  {%- elif state == 'overdue' -%}<i class="ph ph-warning" aria-hidden="true"></i>
+  {%- else -%}<i class="ds-chip__pip" aria-hidden="true"></i>{%- endif -%}
+  {{ label }}</span></span>
+{%- endmacro -%}
+
+{%- macro dimension_chip(status) -%}
+{#- A chip straight from app/services/status.py, carrying its dimension, its
+    label and an explanation of what the dimension means. Used wherever two
+    states of the same record sit side by side. -#}
+<span class="ds-row__state"><span class="ds-chip__dimension">{{ DIMENSION_LABELS.get(status.dimension, status.dimension) }}<span class="visually-hidden">:</span> </span><span class="ds-chip ds-chip--{{ status.state }}" title="{{ status.hint }}">
+  <i class="ph {{ status.icon }}" aria-hidden="true"></i>
+  {{ status.label }}</span></span>
+{%- endmacro -%}
+
+{%- macro progress_bar(done, total) -%}
+{#- An SVG rather than a styled div: the contract test forbids inline
+    `style=`, and a width attribute is the honest way to draw a real
+    fraction without generating a class per decile. -#}
+<svg class="ds-event__progress" viewBox="0 0 100 4" preserveAspectRatio="none" role="img"
+     aria-label="{{ done }} of {{ total }} items complete">
+  <rect width="100" height="4" rx="2" class="ds-event__progress-track"/>
+  <rect width="{{ (done * 100 / total)|round(1) }}" height="4" rx="2" class="ds-event__progress-fill"/>
+</svg>
+{%- endmacro -%}
+
+{%- macro empty_cell() -%}<span class="ds-row__empty" aria-hidden="true">—</span>{%- endmacro -%}
+
+{%- macro file_picker(id, name, label, hint='', accept='', multiple=false, required=true, wrapper='') -%}
+{#- One file picker for the whole application. Audit P1-13: creation and
+    import screens showed unstyled native "Choose file" controls, two
+    different markup shapes, and a duplicated "No file selected" readout.
+
+    The native <input type="file"> is the control -- it is never hidden
+    behind a fake button -- so keyboard operation, the OS picker, drag and
+    drop and forced-colors all keep working, and the form submits with
+    JavaScript off. app.js only replaces the filename readout. -#}
+<div class="aurora-file-field{% if wrapper %} {{ wrapper }}{% endif %}">
+  <label class="aurora-label" for="{{ id }}">{{ label }}</label>
+  <div class="aurora-file-field__control">
+    <i class="ph ph-file-arrow-up" aria-hidden="true"></i>
+    <input id="{{ id }}" type="file" name="{{ name }}"
+           {% if accept %}accept="{{ accept }}"{% endif %}
+           {% if multiple %}multiple{% endif %}
+           {% if required %}required{% endif %}
+           aria-describedby="{{ id }}-hint {{ id }}-name">
+  </div>
+  <p class="aurora-file-field__hint" id="{{ id }}-hint">{{ hint }}{% if hint %} {% endif %}Up to 16MB per upload.</p>
+  {#- Empty until a file is chosen. The native control already says "No
+      file chosen"; printing it again beside it is the duplicate readout the
+      audit found on the creation and import screens. -#}
+  <p class="aurora-file-field__name" id="{{ id }}-name" data-file-field-name role="status"></p>
+</div>
+{%- endmacro -%}
+
+{#- ────────────────────────────────────────────────────────────────────────
+    A tab of the event workspace: its section strip, its pager and its
+    modals. Added 17 September 2026.
+
+    The workspace used to print every list a tab owned, one under the next,
+    inside a single scrolling column -- forty rows at once on Logistics, five
+    stacked lists on People. Three things came out of that: the reader met
+    everything instead of the one thing they came for, the screen scrolled
+    (which the one-screen rule forbids), and the only design element carrying
+    any of it was a hairline rule.
+
+    A tab is now a strip of section tiles and exactly one open section, paged
+    to the number of rows that fit. The tiles carry the family accents, so the
+    counts that used to justify the scroll are readable at a glance without
+    opening anything. -#}
+
+{%- macro section_tiles(sections, active_section, project, tab) -%}
+{#- The accent rotates by position, not by meaning: a strip reads as a set
+    rather than as a wall of one colour. State is still carried by the four
+    reserved colours, on the tile's own "open" pip and nowhere else. -#}
+<nav class="ds-sections" aria-label="Sections of this tab">
+  {% for item in sections %}
+  <a class="ds-section ds-section--{{ ['pine', 'indigo', 'brass'][loop.index0 % 3] }}{% if item.key == active_section %} is-active{% endif %}"
+     href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab, section=item.key) }}"
+     title="{{ item.label }}"
+     {% if item.key == active_section %}aria-current="true"{% endif %}>
+    <span class="ds-section__label">{{ item.label }}</span>
+    <span class="ds-section__figure">
+      {%- if item.count is not none %}<span class="ds-section__n">{{ item.count }}</span>{% endif -%}
+      {%- if item.note %}<span class="ds-section__note">{{ item.note }}</span>{% endif -%}
+    </span>
+    {%- if item.open %}<span class="ds-section__open"><i class="ph ph-circle" aria-hidden="true"></i>{{ item.open }} open</span>{% endif -%}
+  </a>
+  {% endfor %}
+</nav>
+{%- endmacro -%}
+
+{%- macro pager(page, project, tab, section, label) -%}
+{#- Ordinary links, resolved on the server. The pager works with JavaScript
+    off, is keyboard operable for free, and a page can be bookmarked or sent
+    to somebody. A single page keeps its count line and drops the steps --
+    "1-6 of 6" is the reassurance that nothing is hidden. -#}
+<nav class="ds-pager" aria-label="{{ label }} pages">
+  <p class="ds-pager__count">
+    {%- if page.total -%}
+    <span class="ds-pager__range">{{ page.first }}–{{ page.last }}</span> of {{ page.total }}
+    {%- else -%}Nothing here yet{%- endif -%}
+  </p>
+  {% if page.multi %}
+  <div class="ds-pager__steps">
+    {% if page.has_prev %}
+    <a class="ds-pager__step" rel="prev" href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab, section=section, page=page.prev) }}"><i class="ph ph-caret-left" aria-hidden="true"></i><span class="visually-hidden">Previous page of {{ label }}</span></a>
+    {% else %}<span class="ds-pager__step is-off" aria-hidden="true"><i class="ph ph-caret-left"></i></span>{% endif %}
+    {% for number in page.numbers %}
+      {%- if number is none %}<span class="ds-pager__gap" aria-hidden="true">…</span>
+      {%- elif number == page.number %}<span class="ds-pager__n is-active" aria-current="page">{{ number }}</span>
+      {%- else %}<a class="ds-pager__n" href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab, section=section, page=number) }}"><span class="visually-hidden">{{ label }} page </span>{{ number }}</a>{% endif -%}
+    {% endfor %}
+    {% if page.has_next %}
+    <a class="ds-pager__step" rel="next" href="{{ url_for('erp.project_detail', public_id=project.public_id, tab=tab, section=section, page=page.next) }}"><i class="ph ph-caret-right" aria-hidden="true"></i><span class="visually-hidden">Next page of {{ label }}</span></a>
+    {% else %}<span class="ds-pager__step is-off" aria-hidden="true"><i class="ph ph-caret-right"></i></span>{% endif %}
+  </div>
+  {% endif %}
+</nav>
+{%- endmacro -%}
+
+{%- macro modal_open(id, label, icon='ph-plus', primary=false) -%}
+{#- The trigger is a link to the dialog's own id. That is the whole
+    mechanism: `.ds-modal:target` is what shows it, so opening and closing
+    need no JavaScript and no inline handler -- the contract test forbids the
+    second and the no-JS contract forbids depending on the first. -#}
+<a class="ds-btn ds-btn--sm{% if primary %} ds-btn--primary{% endif %}" href="#{{ id }}"><i class="ph {{ icon }}" aria-hidden="true"></i>{{ label }}</a>
+{%- endmacro -%}
+
+{%- macro modal(id, title, hint='') -%}
+{#- Every "add", "import" and "open a form" that used to sit at the foot of
+    a list lives in one of these. Those forms are three to six fields tall;
+    inline, they were most of the reason a tab could not fit its viewport,
+    and they pushed the rows the reader came for off the bottom.
+
+    `role="dialog"` without `aria-modal`: the page behind is still reachable
+    by tab, and claiming otherwise would be a lie to assistive technology.
+    The scrim and the close control are both plain links back to `#`. -#}
+<div class="ds-modal" id="{{ id }}" role="dialog" aria-labelledby="{{ id }}-title" tabindex="-1">
+  <a class="ds-modal__scrim" href="#" tabindex="-1" aria-hidden="true"></a>
+  <div class="ds-modal__panel">
+    <header class="ds-modal__head">
+      <h2 class="ds-modal__title" id="{{ id }}-title">{{ title }}</h2>
+      <a class="ds-modal__close" href="#" aria-label="Close “{{ title }}”"><i class="ph ph-x" aria-hidden="true"></i></a>
+    </header>
+    {% if hint %}<p class="ds-modal__hint">{{ hint }}</p>{% endif %}
+    <div class="ds-modal__body">{{ caller() }}</div>
+  </div>
+</div>
+{%- endmacro -%}
+
+{%- macro fact(label, value, accent='') -%}
+{#- The record's own attributes. They were a ten-row definition list at the
+    top of Logistics, above the work: the densest thing on the screen and the
+    least often read, because nothing there is actionable. As cards in their
+    own section they are legible, they carry colour, and they are one click
+    away instead of permanently in the way. -#}
+<div class="ds-fact{% if accent %} ds-fact--{{ accent }}{% endif %}">
+  <dt class="ds-fact__label">{{ label }}</dt>
+  <dd class="ds-fact__value">{{ value }}</dd>
+</div>
+{%- endmacro -%}

@@ -66,19 +66,31 @@ class MissionControlTestCase(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn("Home", html)
 
-    def test_mission_control_shows_scoped_project_session_and_own_request(self):
+    def test_queue_shows_scoped_project_session_and_own_request(self):
+        """The scoped work moved from "/" to "/queue".
+
+        The Tile System made the home screen the campus tiles and gave
+        everything waiting on you its own route; the data behind it, and
+        the scope rules that pick it, are unchanged.
+        """
         self.login(self.usc)
-        response = self.client.get("/")
+        response = self.client.get("/queue")
         html = response.get_data(as_text=True)
         self.assertIn("Mission control project", html)
         self.assertIn("Kickoff", html)
         self.assertIn("Airport pickup", html)
 
+    def test_home_offers_the_campus_drill_down(self):
+        self.login(self.usc)
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("Opening soon", html)      # the three campuses that are not live
+        self.assertIn("ds-tile", html)
+
     def test_usc_does_not_receive_approval_queue_or_oversight_navigation(self):
         db.session.add(WorkTask(project_id=self.project.id, title="Awaiting review", status="Submitted"))
         db.session.commit()
         self.login(self.usc)
-        html = self.client.get("/").get_data(as_text=True)
+        html = self.client.get("/queue").get_data(as_text=True)
         self.assertNotIn("Needs your attention", html)
         self.assertNotIn(">Oversight<", html)
 
@@ -87,7 +99,7 @@ class MissionControlTestCase(unittest.TestCase):
         db.session.add(WorkTask(project_id=self.project.id, title="Awaiting review", status="Submitted"))
         db.session.commit()
         self.login(self.usc)
-        response = self.client.get("/?queue=all")
+        response = self.client.get("/queue?queue=all")
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertNotIn("Awaiting review", html)

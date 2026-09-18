@@ -8,7 +8,7 @@ test("approved Aurora desktop and mobile home states remain visually stable", as
   // this change and after the opaque-card/font-wiring CSS changes in
   // Step 6/7; the old oversight-*.png baselines no longer apply.
   await signIn(page, "e2e_faculty");
-  await page.goto("/?queue=all");
+  await page.goto("/queue");
   await expect(page).toHaveScreenshot("home-desktop.png", {
     animations: "disabled",
     fullPage: true,

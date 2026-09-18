@@ -1,66 +1,115 @@
 {% extends "base.html" %}
-{% block title %}Staged Imports{% endblock %}
-{% block mobile_title %}Imports{% endblock %}
+{% from "_tiles.html" import file_picker, state_chip %}
+{% block title %}Imports{% endblock %}
+{% block screen_title %}Imports{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Imports</span>{% endblock %}
+{% block tools %}<span class="ds-filter__result">{{ batches|length|pluralise('batch', 'batches') }}</span>{% endblock %}
 {% block content %}
-<header class="page-header"><div><h1 class="page-title">Imports</h1><p class="page-subtitle">Nothing is written until you commit it. Re-uploading the same file is always safe.</p></div>{% if supplied_sources %}<form method="POST" action="{{ url_for('erp.stage_import') }}" class="aurora-inline-decision"><span class="aurora-inline-field"><label class="aurora-inline-label" for="import_type">Source</label><select class="aurora-select" id="import_type" name="import_type">{% for value, label in supplied_sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></span><button class="aurora-button--primary text-nowrap"><i class="ph ph-file-arrow-up" aria-hidden="true"></i>Stage source</button></form>{% endif %}</header>
-<div class="alert alert-info"><i class="ph ph-shield-check" aria-hidden="true"></i><div><strong>Safety:</strong> staging never writes source rows directly to operational tables.<details class="mt-1"><summary class="small text-muted">More about staging safety</summary><p class="small text-muted mb-0 mt-1">Repeated staging of the same source checksum returns the existing batch instead of creating a duplicate, so re-uploading an unchanged file is always safe.</p></details></div></div>
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 
-<div class="aurora-card--padded blueprint mb-4">
-  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-  <div>
-    <p class="text-muted">Upload your own spreadsheet (.xlsx or .csv) against one of the standard column templates.{% if not supplied_sources %} No pre-supplied source is bundled with this deployment, so this is the way to bring data in.{% endif %}</p>
-    <p class="text-muted small"><i class="ph ph-download-simple" aria-hidden="true"></i> Need the column headings? <a href="{{ url_for('api_v1.import_template', import_type='people') }}">Download a starter template</a>, or pick a template below and download the matching one from the API.</p>
-    <form method="POST" action="{{ url_for('erp.upload_import') }}" enctype="multipart/form-data" class="row g-3 align-items-start">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="col-md-4"><label class="aurora-label" for="import_type_upload">Template</label><select class="aurora-select" id="import_type_upload" name="import_type">{% for import_type in standard_import_types %}<option value="{{ import_type }}">{{ import_type.replace('_', ' ')|title }}</option>{% endfor %}</select></div>
-      <div class="col-md-6 aurora-file-field"><label class="aurora-label" for="source_file">Spreadsheet</label><div class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input type="file" id="source_file" name="source_file" accept=".xlsx,.csv" required></div><p class="aurora-file-field__hint">Accepted formats: .xlsx or .csv, up to 16MB.</p><p class="aurora-file-field__name" data-file-field-name>No file selected</p></div>
-      <div class="col-md-2 mt-4"><button class="aurora-button--primary w-100">Upload</button></div>
-    </form>
-  </div>
-</div>
-<section class="page-section" aria-label="Import batches">
-  <div class="page-section__bar">
-    <h2 class="page-section__title">Batches</h2>
-    <span class="page-section__count">{{ batches|length }} batch{{ '' if batches|length == 1 else 'es' }}</span>
-  </div>
-  <div class="queue-list">
-    {% for batch in batches %}
-    <div class="queue-item">
-      <div class="queue-item__text">
-        <div class="queue-item__title">{{ batch.import_type.replace('_',' ')|title }}</div>
-        <div class="queue-item__meta">
-          {{ batch.staged_count }} row{{ '' if batch.staged_count == 1 else 's' }} ·
-          {% if batch.error_count %}{{ batch.error_count }} need attention{% else %}all valid{% endif %} ·
-          {{ batch.status|lower }}
-        </div>
-        <details class="mt-1">
-          <summary class="small text-muted">Provenance</summary>
-          <div class="facts-list mt-2">
-            <div class="facts-list__row"><span class="facts-list__key">File</span><span class="facts-list__value aurora-wrap-anywhere">{{ batch.source_file }}</span></div>
-            <div class="facts-list__row"><span class="facts-list__key">Checksum</span><span class="facts-list__value font-monospace aurora-wrap-anywhere">{{ batch.source_sha256 }}</span></div>
-            <div class="facts-list__row"><span class="facts-list__key">Staged</span><span class="facts-list__value font-monospace">{{ batch.staged_count }}</span></div>
-            <div class="facts-list__row"><span class="facts-list__key">Valid</span><span class="facts-list__value font-monospace">{{ batch.valid_count }}</span></div>
-            <div class="facts-list__row"><span class="facts-list__key">Errors</span><span class="facts-list__value font-monospace">{{ batch.error_count }}</span></div>
-            <div class="facts-list__row"><span class="facts-list__key">Committed</span><span class="facts-list__value font-monospace">{{ batch.committed_count }}</span></div>
-          </div>
-        </details>
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Bring data in</h2>
+    <div class="ds-rows__foot">
+      <p class="mb-2">Upload a spreadsheet (.xlsx or .csv) against one of the standard column templates.{% if not supplied_sources %} No pre-supplied source is bundled with this deployment, so this is the way to bring data in.{% endif %}</p>
+
+      {#- Audit, Imports: "Download a starter template always points to the
+          people template while the visible selector may be Attendance or
+          another type", and "template download and upload controls are
+          separated, making it hard to understand which schema applies".
+          Each template now names itself and links to its own file, beside
+          the selector that uses it. -#}
+      <p class="aurora-label mb-1" id="template_downloads_label">Column templates</p>
+      <div class="ds-chipbar mb-3" role="group" aria-labelledby="template_downloads_label">
+        {% for import_type in standard_import_types %}
+        <a class="ds-btn ds-btn--sm" href="{{ url_for('api_v1.import_template', import_type=import_type) }}" download>
+          <i class="ph ph-download-simple" aria-hidden="true"></i>{{ import_type.replace('_', ' ')|title }}
+        </a>
+        {% endfor %}
       </div>
-      <div class="queue-item__action">
+
+      <form method="POST" action="{{ url_for('erp.upload_import') }}" enctype="multipart/form-data" class="row g-3 align-items-start">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-4">
+          <label class="aurora-label" for="import_type_upload">Template this file follows</label>
+          <select class="aurora-select" id="import_type_upload" name="import_type">
+            {% for import_type in standard_import_types %}<option value="{{ import_type }}">{{ import_type.replace('_', ' ')|title }}</option>{% endfor %}
+          </select>
+        </div>
+        {{ file_picker('source_file', 'source_file', 'Spreadsheet', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='col-md-5') }}
+        <div class="col-md-3 align-self-end mb-3"><button class="aurora-button--primary">Upload and stage</button></div>
+      </form>
+
+      {% if supplied_sources %}
+      <form method="POST" action="{{ url_for('erp.stage_import') }}" class="row g-3 align-items-start">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-4">
+          <label class="aurora-label" for="import_type">Or stage a bundled source</label>
+          <select class="aurora-select" id="import_type" name="import_type">
+            {% for value, label in supplied_sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 align-self-end mb-3"><button class="aurora-button--secondary">Stage source</button></div>
+      </form>
+      {% endif %}
+
+      {#- The safety note is true and worth reading once. It sits under the
+          form rather than above it: the audit found the panel "visually
+          dominates the form" it is meant to qualify. -#}
+      <p class="ds-review__hint"><i class="ph ph-shield-check" aria-hidden="true"></i> Staging never writes source rows straight into operational tables, and re-staging an unchanged file returns the existing batch rather than duplicating it. Nothing reaches the records until somebody commits the batch below.</p>
+    </div>
+  </div>
+
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Batches<span class="ds-rows__n">{{ batches|length }}</span></h2>
+    <div class="ds-rows__head" aria-hidden="true"><span></span><span>Batch</span><span>Rows</span><span></span><span>State</span><span></span><span></span></div>
+    {% for batch in batches %}
+    {#- One row per batch: name, one metadata line, one action. Checksum,
+        row counts and file provenance live behind a per-row disclosure and
+        never stand between the operator and the Commit (reports-admin
+        override, "Imports"). -#}
+    <div class="ds-row ds-row--{{ 'complete' if batch.status == 'Committed' else ('overdue' if batch.error_count else 'active') }}">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Batch">{{ batch.import_type.replace('_',' ')|title }}</span>
+      <span class="ds-row__desc" data-label="Source">{{ batch.source_file }}</span>
+      <span class="ds-row__when" data-label="Rows">{{ batch.staged_count|pluralise('row') }}</span>
+      {{ state_chip('complete' if batch.status == 'Committed' else ('overdue' if batch.error_count else 'active'), batch.status, 'State') }}
+      <span class="ds-row__docs" data-label="Errors">{% if batch.error_count %}{{ batch.error_count }} need attention{% else %}all valid{% endif %}</span>
+      <span class="ds-row__act">
         {% if batch.status != 'Committed' and batch.error_count == 0 %}
           {% if can_commit %}
-          <form method="POST" action="{{ url_for('erp.commit_import', public_id=batch.public_id) }}"><button class="aurora-button--primary aurora-button--small">Commit {{ batch.valid_count }}</button></form>
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <form method="POST" action="{{ url_for('erp.commit_import', public_id=batch.public_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="ds-btn ds-btn--sm ds-btn--primary">Commit {{ batch.valid_count }}</button>
+          </form>
           {% else %}
-          <span class="aurora-badge aurora-badge--role">Awaiting faculty commit</span>
+          <span class="ds-row__empty">Awaiting faculty commit</span>
           {% endif %}
-        {% else %}
-        <span class="aurora-badge aurora-badge--status-{{ batch.status|lower }}">{{ batch.status }}</span>
         {% endif %}
-      </div>
+      </span>
+      <details class="ds-review ds-review--wide">
+        <summary class="ds-review__trigger">Provenance</summary>
+        <div class="ds-review__panel">
+          <h3 class="ds-review__title">Where this batch came from</h3>
+          <dl class="ds-facts">
+            <div class="ds-facts__row"><dt>File</dt><dd class="ds-facts__wrap">{{ batch.source_file }}</dd></div>
+            <div class="ds-facts__row"><dt>Checksum</dt><dd class="ds-facts__wrap">{{ batch.source_sha256 }}</dd></div>
+            <div class="ds-facts__row"><dt>Staged</dt><dd>{{ batch.staged_count }}</dd></div>
+            <div class="ds-facts__row"><dt>Valid</dt><dd>{{ batch.valid_count }}</dd></div>
+            <div class="ds-facts__row"><dt>Errors</dt><dd>{{ batch.error_count }}</dd></div>
+            <div class="ds-facts__row"><dt>Committed</dt><dd>{{ batch.committed_count }}</dd></div>
+          </dl>
+        </div>
+      </details>
     </div>
     {% else %}
-    <div class="empty-state"><i class="ph ph-database" aria-hidden="true"></i><p class="mb-0">No sources staged.</p></div>
+    <div class="ds-empty ds-empty--block">
+      <i class="ph ph-database" aria-hidden="true"></i>
+      <div>
+        <h3 class="ds-empty__title">Nothing staged yet</h3>
+        <p class="ds-empty__body">Download the template that matches your data, fill it in, and upload it above. The rows are checked and shown here before anything is written.</p>
+      </div>
+    </div>
     {% endfor %}
   </div>
-</section>
+</div>
 {% endblock %}

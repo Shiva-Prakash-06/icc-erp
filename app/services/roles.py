@@ -112,7 +112,8 @@ ONBOARDING_VOLUNTEER = "volunteer"
 # Copy for the four shared steps is taken verbatim from the redesign artboard's
 # TOUR constant ("ICC ERP Redesign.dc.html"); `nav` and `checklist` are new,
 # written to the same voice, because the artboard's tour was four fixed cards
-# and had no anchored navigation or checklist step.
+# and had no anchored navigation or checklist step. `nav` was rewritten for
+# the Tile System rail -- it used to describe a top bar that no longer exists.
 _STEPS = {
     "queue": {
         "title": "Everything waiting on you is here",
@@ -135,9 +136,9 @@ _STEPS = {
         "placement": "bottom",
     },
     "nav": {
-        "title": "Everything else is one row up",
-        "body": "Projects, reports and your account sit in the top bar. On a phone they are along the bottom.",
-        "placement": "bottom",
+        "title": "Everything else is in the rail",
+        "body": "Campuses, events, analytics and your account sit down the left edge. On a phone they run along the bottom.",
+        "placement": "right",
     },
     "checklist": {
         "title": "A short list to start with",
@@ -229,3 +230,98 @@ def onboarding_tour_steps(audience):
     """Return the ordered step definitions for an audience, each carrying the
     `data-tour` target it anchors to."""
     return [{"target": key, **_STEPS[key]} for key in ONBOARDING_TOURS.get(audience, [])]
+
+
+# ── Whose view is this? ─────────────────────────────────────────────────
+# Audit finding P1-10: an Events Head, a Media Head and the USC each saw a
+# near-identical directory and nothing on screen said why those records and
+# not others. The answer is always the active role assignment and the scope
+# on it, which the server already holds -- it was simply never rendered.
+
+#: The rail is 72px wide, so the full title needs a short form beside it.
+#: The full one is still what the phone drawer, the account screen and
+#: assistive tech read; this is only the badge.
+ROLE_SHORT = {
+    "SYSTEM_ADMINISTRATOR": "Admin",
+    "OIA_FACULTY_ADMINISTRATOR": "OIA admin",
+    "FACULTY_COORDINATOR": "Faculty",
+    "ICC_SECRETARY_USC": "ICC USC",
+    "ICC_EVENTS_HEAD": "ICC events",
+    "ICC_CULTURALS_HEAD": "ICC culturals",
+    "ICC_MEDIA_HEAD": "ICC media",
+    "ICC_ASSOCIATE": "ICC assoc.",
+    "IGP_HEAD": "IGP head",
+    "IGP_PROGRAM_LEAD": "IGP lead",
+    "VOLUNTEER": "Volunteer",
+    "BUDDY": "Buddy",
+    "PARTICIPANT": "Participant",
+    "AUDITOR": "Read-only",
+}
+
+ROLE_TITLES = {
+    "SYSTEM_ADMINISTRATOR": "System administrator",
+    "OIA_FACULTY_ADMINISTRATOR": "OIA faculty administrator",
+    "FACULTY_COORDINATOR": "Faculty coordinator",
+    "ICC_SECRETARY_USC": "ICC Secretary / USC",
+    "ICC_EVENTS_HEAD": "ICC Events head",
+    "ICC_CULTURALS_HEAD": "ICC Culturals head",
+    "ICC_MEDIA_HEAD": "ICC Media head",
+    "ICC_ASSOCIATE": "ICC associate",
+    "IGP_HEAD": "IGP head",
+    "IGP_PROGRAM_LEAD": "IGP programme lead",
+    "VOLUNTEER": "Volunteer",
+    "BUDDY": "Buddy",
+    "PARTICIPANT": "Participant",
+    "AUDITOR": "Auditor (read-only)",
+}
+
+
+def role_context(user):
+    """One line per active assignment: the title, then what it covers.
+
+    Returns ``[{"title": ..., "scope": ..., "sensitive": bool}]``, newest
+    scope first. Never invents an assignment: a user with none gets an empty
+    list and the shell says so rather than implying a permission.
+    """
+    from app.services.authorization import LEGACY_ROLE_MAP, _active_assignments
+    from app.services.glossary import division_name
+
+    # RoleAssignment carries scope as foreign keys with no relationships
+    # declared, so each one is resolved here rather than by adding ORM
+    # attributes for a caption.
+    def _load(model, identifier):
+        return db.session.get(model, identifier) if identifier else None
+
+    rows = []
+    for assignment in _active_assignments(user):
+        scope_parts = []
+        campus = _load(Campus, assignment.campus_id)
+        unit = _load(OperatingUnit, assignment.operating_unit_id)
+        wing = _load(Wing, assignment.wing_id)
+        year = _load(AcademicYear, assignment.academic_year_id)
+        project = _load(Project, assignment.project_id)
+        if campus is not None:
+            scope_parts.append(campus.name)
+        if unit is not None:
+            scope_parts.append(division_name(unit))
+        if wing is not None:
+            scope_parts.append(f"{wing.name} wing")
+        if year is not None:
+            scope_parts.append(year.name)
+        if project is not None:
+            scope_parts.append(project.code or project.title)
+        rows.append({
+            "title": ROLE_TITLES.get(assignment.role_code, assignment.role_code.replace("_", " ").title()),
+            "short": ROLE_SHORT.get(assignment.role_code, assignment.role_code.split("_")[0].title()),
+            # "Every campus" is the truthful reading of an unscoped
+            # assignment; an empty string would read as a missing value.
+            "scope": " · ".join(scope_parts) if scope_parts else "Every campus and division",
+            "sensitive": bool(assignment.can_view_sensitive_links),
+        })
+    if not rows:
+        legacy = LEGACY_ROLE_MAP.get(getattr(user, "role", None))
+        if legacy:
+            rows.append({"title": ROLE_TITLES.get(legacy, legacy.replace("_", " ").title()),
+                         "short": ROLE_SHORT.get(legacy, legacy.split("_")[0].title()),
+                         "scope": "No scope recorded", "sensitive": False})
+    return rows

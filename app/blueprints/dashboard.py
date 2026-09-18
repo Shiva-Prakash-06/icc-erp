@@ -6,7 +6,8 @@ from app.models.erp import Person, RoleAssignment, Wing
 from app.services.audit import record_audit
 from app.services.account import build_account_activity
 from app.services.authorization import has_any_permission, has_permission, invalidate_assignment_cache
-from app.services.home import build_home
+from app.services.home import build_campus_home, build_home
+from app.services.hierarchy import campus_tiles
 from app.services.roles import replace_scoped_assignment
 from app.blueprints.auth import login_required
 from datetime import datetime, timezone
@@ -35,20 +36,57 @@ ACCOUNT_ROLE_OPTIONS = [
 @dashboard_bp.route('/')
 @login_required
 def index():
-    """The single home page: role-aware, absorbing what used to be Mission
-    Control, the ERP hub, and Oversight (see PLAN.md "USC dashboard/Mission
-    Control" finding, and in-the-operation-checklists-crystalline-dongarra.md
-    Step 2). USC and other scoped roles see their own projects, sessions,
-    tasks, and requests; anyone holding the `approve` permission
-    additionally sees portfolio metrics and the full decision queue; IGP
-    roles see participant/buddy/closure indicators.
+    """The first screen after sign-in: one tile per campus.
 
-    ``?queue=all`` is a mode switch, not an expansion: it renders the full
-    decision queue in place of the KPI/projects/sessions regions rather
-    than appending to them, so the page never shows everything at once.
+    Central is open and is the only tile with an href; the other three are
+    plain content. Everything the old home page carried -- the decision
+    queue, the user's own open work, the sessions coming up -- moved to
+    ``dashboard.queue``, which is reachable from this screen's head and is
+    the same data in one-line rows. Splitting them is what lets both fit a
+    viewport: the old page had six regions and ran three screens deep.
     """
-    show_all_queue = request.args.get("queue") == "all"
-    return render_template('dashboard/home.html', **build_home(g.user, show_all_queue=show_all_queue))
+    hour = datetime.now(timezone.utc).astimezone().hour
+    day_part = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
+    return render_template(
+        'dashboard/home.html',
+        campus_tiles=campus_tiles(g.user),
+        day_part=day_part,
+        **build_campus_home(g.user),
+    )
+
+
+@dashboard_bp.route('/queue')
+@login_required
+def queue():
+    """Everything waiting on you, as one list of one-line rows.
+
+    ``?queue=all`` is kept as an accepted argument so the links the old home
+    page emitted (and the onboarding checklist's first task) still resolve;
+    this screen always shows the full queue, so it is a no-op rather than a
+    mode switch.
+    """
+    context = build_home(g.user, show_all_queue=True)
+
+    # Audit, Decision queue: "Twenty-three unrelated decision types are
+    # placed in one ungrouped table. Users must scan the Kind column to
+    # understand each action." `kind` is a query argument on the existing
+    # route -- the URL map is untouched -- and the all-items view stays the
+    # default, so nothing is hidden by a filter nobody chose.
+    queue = context.get("action_queue") or []
+    counts = {}
+    for item in queue:
+        counts[item["kind"]] = counts.get(item["kind"], 0) + 1
+    kind_filter = (request.args.get("kind") or "").strip()
+    if kind_filter and kind_filter in counts:
+        context["action_queue"] = [item for item in queue if item["kind"] == kind_filter]
+    else:
+        kind_filter = ""
+    context["queue_kind_filter"] = kind_filter
+    # Busiest first: the filter exists to make a long list tractable, so the
+    # segments that would shorten it most are offered first.
+    context["queue_kinds"] = sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+    context["queue_total"] = len(queue)
+    return render_template('dashboard/queue.html', **context)
 
 
 @dashboard_bp.route('/admin/users', methods=['GET', 'POST'])

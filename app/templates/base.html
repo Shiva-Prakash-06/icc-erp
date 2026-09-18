@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   {#- viewport-fit=cover is what makes env(safe-area-inset-*) non-zero. The CSS
-      already uses those insets for the bottom nav; without this they are 0 and
-      the nav sits under the home indicator on a notched phone. -#}
+      already uses those insets for the bottom rail; without this they are 0 and
+      the rail sits under the home indicator on a notched phone. -#}
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="ICC and IGP operational intelligence platform for Christ University.">
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -25,116 +25,129 @@
 <body>
   <!-- {% block back_url %}{% endblock %} -->
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  {% if config.DEMONSTRATOR %}
-  <div class="environment-banner{% if g.user and not hide_sidebar %} environment-banner--authenticated{% endif %} alert alert-warning rounded-0 border-0 text-center fw-bold py-2 mb-0" role="status">
-    <i class="ph ph-warning" aria-hidden="true"></i>
-    <span>Demo environment—data may be reset; do not enter sensitive or personal data.</span>
-  </div>
-  {% endif %}
 
   {% if g.user and not hide_sidebar %}
-  <div class="app-shell">
-    <div class="app-main">
-      <header class="mobile-header">
-        <div class="mobile-header-left">
-          {% if request.endpoint == 'dashboard.index' %}
-          <button class="mobile-header-back-btn" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false" aria-label="Open navigation"><i class="ph ph-list" aria-hidden="true"></i></button>
-          {% else %}
-          {% set back_url = self.back_url()|trim %}
-          <a class="mobile-header-back-btn" href="{{ back_url or url_for('dashboard.index') }}" aria-label="Back"><i class="ph ph-caret-left" aria-hidden="true"></i></a>
-          {% endif %}
-          <div class="ms-2"><h2 class="mobile-header-title">{% block mobile_title %}Home{% endblock %}</h2><span class="mobile-header-subtitle">Christ University</span></div>
-        </div>
-        <button class="icon-action" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false" aria-label="Open navigation"><i class="ph ph-squares-four" aria-hidden="true"></i></button>
-      </header>
-
-      <header class="app-topbar">
-        <a class="brand-lockup" href="{{ url_for('dashboard.index') }}" aria-label="ICC and OIA home">
-          <span class="brand-mark" aria-hidden="true">ICC</span>
-          <span class="brand-copy">ICC / OIA</span>
+  {#- The Tile System shell. .ds-app is overflow:hidden and fills exactly one
+      viewport; the single .ds-scroll a screen declares is the only thing that
+      moves. A screen supplies its own fixed track via `body_class`. -#}
+  <div class="ds-app">
+    {% if config.DEMONSTRATOR %}
+    {#- First in the DOM and first in the grid: a warning nobody reaches
+        until they have scrolled past the record is not a warning. It is a
+        24px strip in the shell grid, so it reserves its own space and
+        covers nothing (audit P0-05, P1-14). -#}
+    <p class="ds-demo-banner" role="status">Demo environment—data may be reset; do not enter sensitive or personal data.</p>
+    {% endif %}
+    <nav class="ds-rail" aria-label="Sections">
+      <a class="ds-rail__brand" href="{{ url_for('dashboard.index') }}" aria-label="ICC and OIA home"><span aria-hidden="true">ICC</span></a>
+      <div class="ds-rail__nav" data-tour="nav">
+        {% for item in primary_nav if item.rail and not item.foot %}
+        {#- A destination without `bottom_nav` leaves the bar on a phone:
+            eleven 48px targets do not fit 375px. Each one is reachable from
+            the Account screen, which lists them. -#}
+        <a href="{{ url_for(item.endpoint) }}" class="ds-rail__item{% if not item.bottom_nav %} ds-rail__item--desk{% endif %}{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
+          <i class="ph {{ item.icon }}" aria-hidden="true"></i>
+          <span class="ds-rail__label" aria-hidden="true">{{ item.label }}</span>
+          <span class="visually-hidden">{{ item.label }}</span>
         </a>
-        <nav class="app-topbar__nav" aria-label="Primary navigation" data-tour="nav">
-          {% for item in primary_nav if item.topnav %}
-          <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
-          {% endfor %}
-        </nav>
-        <div class="app-topbar__spacer"></div>
-        <div class="topbar-actions">
-          <button class="command-trigger" type="button" data-command-open data-tour="search" aria-label="Command palette"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span>Search or jump to…</span><kbd aria-hidden="true">⌘K</kbd></button>
-          <span class="aurora-badge"><i class="ph ph-calendar-blank" aria-hidden="true"></i>{{ current_academic_year_label }}</span>
-          <button class="icon-action position-relative" type="button" data-notification-toggle aria-controls="notificationPanel" aria-expanded="false" aria-label="Open notifications{% if shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}">
-            <i class="ph ph-bell" aria-hidden="true"></i>
-            {% if shell_unread_count %}<span class="notification-count" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
-          </button>
-          <button class="icon-action onb-help" type="button" data-onboarding-replay aria-label="Replay the guided tour"><span aria-hidden="true">?</span></button>
-          <div class="topbar-user-chip" data-tour="role" aria-label="Signed in as {{ g.user.username }}, {{ g.user.role }}">
-            <div class="user-avatar" aria-hidden="true">{{ g.user.username[0].upper() }}</div>
-            <span class="topbar-user-chip__copy"><strong>{{ g.user.username }}</strong><small>{{ g.user.role }}</small></span>
-          </div>
-          <a class="icon-action text-danger" href="{{ url_for('auth.logout') }}" aria-label="Log out"><i class="ph ph-power" aria-hidden="true"></i></a>
-        </div>
-      </header>
-
-      <main id="main-content" class="app-content" tabindex="-1">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-          <div class="flash-stack" aria-label="System messages">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible" role="{{ 'alert' if category in ['danger', 'error'] else 'status' }}">
-              <i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-warning' if category == 'warning' else 'ph-check-circle' if category == 'success' else 'ph-info' }}" aria-hidden="true"></i>
-              <span>{{ message }}</span>
-              <button class="icon-action" type="button" data-ui-dismiss="alert" aria-label="Dismiss message"><i class="ph ph-x" aria-hidden="true"></i></button>
-            </div>
-            {% endfor %}
-          </div>
-          {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-      </main>
-    </div>
-
-    <nav class="mobile-bottom-nav" aria-label="Mobile navigation" data-tour="nav">
-      {% for item in primary_nav if item.bottom_nav %}
-      <a href="{{ url_for(item.endpoint) }}" class="mobile-nav-link{% if item.active %} active{% endif %}"{% if item.active %} aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i><span>{{ item.mobile_label }}</span></a>
-      {% endfor %}
-      <button class="mobile-nav-link" type="button" data-ui-drawer-toggle aria-controls="mobileNavDrawer" aria-expanded="false"><i class="ph ph-list" aria-hidden="true"></i><span>Menu</span></button>
-    </nav>
-
-    <div class="drawer-scrim" data-ui-drawer-close></div>
-    <aside class="mobile-drawer" id="mobileNavDrawer" aria-label="Mobile navigation drawer" aria-hidden="true" inert>
-      <div class="d-flex align-items-center justify-content-between mb-4"><div><span class="page-eyebrow">Navigation</span><h2 class="h4 mb-0">ICC / OIA</h2></div><button class="icon-action" type="button" data-ui-drawer-close aria-label="Close navigation"><i class="ph ph-x" aria-hidden="true"></i></button></div>
-      <nav class="flex-grow-1">
-        <div class="nav-list">
-          {% set ns = namespace(current_group=None) %}
-          {% for item in primary_nav %}
-          {% if item.group != ns.current_group %}{% if not loop.first %}<div class="nav-group-label">{{ item.group }}</div>{% endif %}{% set ns.current_group = item.group %}{% endif %}
-          <a href="{{ url_for(item.endpoint) }}" class="app-nav-link" {% if item.active %}aria-current="page"{% endif %}><i class="ph {{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</a>
-          {% endfor %}
-          <a class="app-nav-link" href="{{ url_for('public.landing') }}" target="_blank" rel="noopener noreferrer"><i class="ph ph-globe" aria-hidden="true"></i><span>Public site</span></a>
-        </div>
-      </nav>
-      <button class="aurora-button--secondary w-100" type="button" data-command-open><i class="ph ph-magnifying-glass" aria-hidden="true"></i>Open command palette</button>
-      <a href="{{ url_for('auth.logout') }}" class="aurora-button--outline-danger w-100 mt-3"><i class="ph ph-power" aria-hidden="true"></i>Log out</a>
-    </aside>
-
-    <div class="notification-scrim" data-notification-close></div>
-    <aside class="notification-panel" id="notificationPanel" aria-labelledby="notificationPanelTitle" aria-hidden="true" inert>
-      <div class="notification-panel__header">
-        <div><span class="page-eyebrow">Latest activity</span><h2 id="notificationPanelTitle">Notifications</h2></div>
-        <button class="icon-action" type="button" data-notification-close aria-label="Close notifications"><i class="ph ph-x" aria-hidden="true"></i></button>
-      </div>
-      <div class="notification-preview">
-        {% for item in shell_notifications %}
-        <article class="notification-preview__item{% if item.read_at %} is-read{% endif %}">
-          <span class="notification-preview__dot" aria-hidden="true"></span>
-          <div><strong>{{ item.title }}</strong><p>{{ item.body|truncate(120) }}</p><small class="text-muted">{{ item.created_at }}</small></div>
-        </article>
-        {% else %}
-        <div class="empty-state"><i class="ph ph-bell" aria-hidden="true"></i><p class="mb-0">No notifications yet.</p></div>
         {% endfor %}
       </div>
-      <a class="aurora-button--secondary w-100 mt-3" href="{{ url_for('erp.notifications') }}">Open notification centre <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-    </aside>
+      <div class="ds-rail__nav ds-rail__spacer">
+        {% if role_context %}
+        {#- Audit P1-10: an Events Head, a Media Head and the USC saw
+            near-identical screens with nothing to say why. This is the
+            answer, and it is the same answer the phone drawer gives. -#}
+        <p class="ds-rail__scope ds-rail__item--desk" title="{{ role_context[0].title }} · {{ role_context[0].scope }}">{{ role_context[0].short }}{% if role_context|length > 1 %} +{{ role_context|length - 1 }}{% endif %}<span class="visually-hidden">. Signed in as {{ role_context[0].title }}, scoped to {{ role_context[0].scope }}.</span></p>
+        {% endif %}
+        <button class="ds-rail__item ds-rail__item--desk" type="button" data-command-open data-tour="search" aria-label="Search or jump to">
+          <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+          <span class="ds-rail__label" aria-hidden="true">Search</span>
+        </button>
+        {#- The foot entries are desktop-rail only. On a phone they are in
+            the Menu drawer below, because the bar holds four destinations
+            plus Menu and nothing else. -#}
+        {% for item in primary_nav if item.rail and item.foot %}
+        <a href="{{ url_for(item.endpoint) }}" class="ds-rail__item ds-rail__item--desk{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
+          <i class="ph {{ item.icon }}" aria-hidden="true"></i>
+          {% if item.key == 'notifications' and shell_unread_count %}<span class="ds-rail__badge" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
+          <span class="ds-rail__label" aria-hidden="true">{{ item.label }}</span>
+          <span class="visually-hidden">{{ item.label }}{% if item.key == 'notifications' and shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}</span>
+        </a>
+        {% endfor %}
+        <button class="ds-rail__item ds-rail__item--desk onb-help" type="button" data-onboarding-replay aria-label="Replay the guided tour">
+          <span aria-hidden="true">?</span>
+          <span class="ds-rail__label" aria-hidden="true">Replay the tour</span>
+        </button>
+        <a class="ds-rail__item ds-rail__item--desk" href="{{ url_for('auth.logout') }}">
+          <i class="ph ph-power" aria-hidden="true"></i>
+          <span class="ds-rail__label" aria-hidden="true">Log out</span>
+          <span class="visually-hidden">Log out</span>
+        </a>
+
+        {#- The fifth phone destination. A native <details>, so it opens,
+            closes, traps nothing and needs no JavaScript; hidden entirely
+            on desktop, where every one of these is already in the rail. -#}
+        <details class="ds-menu">
+          <summary class="ds-rail__item ds-menu__trigger">
+            <i class="ph ph-list" aria-hidden="true"></i>
+            {% if shell_unread_count %}<span class="ds-rail__badge" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
+            <span class="visually-hidden">Menu{% if shell_unread_count %}, {{ shell_unread_count }} unread alerts{% endif %}</span>
+          </summary>
+          <div class="ds-menu__drawer">
+            <h2 class="ds-menu__title">Everything else</h2>
+            {% if role_context %}
+            {#- Audit P1-10: why these records and not others. The server
+                already knows; it simply never said. -#}
+            <div class="ds-menu__scope">
+              {% for role in role_context %}
+              <p class="ds-menu__role"><b>{{ role.title }}</b><span>{{ role.scope }}</span></p>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <ul class="ds-menu__list">
+              {% for item in primary_nav if item.rail and not item.bottom_nav %}
+              <li><a class="ds-menu__link{% if item.active %} is-active{% endif %}" href="{{ url_for(item.endpoint) }}"{% if item.active %} aria-current="page"{% endif %}>
+                <i class="ph {{ item.icon }}" aria-hidden="true"></i>{{ item.label }}
+                {%- if item.key == 'notifications' and shell_unread_count %} <span class="ds-menu__count">{{ shell_unread_count }} unread</span>{% endif %}
+              </a></li>
+              {% endfor %}
+              <li><a class="ds-menu__link" href="{{ url_for('auth.logout') }}"><i class="ph ph-power" aria-hidden="true"></i>Log out</a></li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </nav>
+
+    <main class="ds-screen" id="main-content" tabindex="-1">
+      <header class="ds-screen__head">
+        <div class="ds-screen__heading">
+          <nav class="ds-crumb" aria-label="Breadcrumb">{% block crumb %}{% endblock %}</nav>
+          <h1 class="ds-screen__title">{% block screen_title %}{{ self.title() }}{% endblock %}</h1>
+        </div>
+        <div class="ds-screen__tools">{% block tools %}{% endblock %}</div>
+      </header>
+
+      <div class="ds-screen__body {% block body_class %}{% endblock %}">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      {#- Fixed, not in flow: a flash must never consume screen height, or the
+          one-screen budget changes depending on whether you just saved. -#}
+      <div class="ds-flash" aria-label="System messages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible" role="{{ 'alert' if category in ['danger', 'error'] else 'status' }}">
+          <i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-warning' if category == 'warning' else 'ph-check-circle' if category == 'success' else 'ph-info' }}" aria-hidden="true"></i>
+          <span>{{ message }}</span>
+          <button class="icon-action" type="button" data-ui-dismiss="alert" aria-label="Dismiss message"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
   </div>
   {% else %}
   <main id="main-content" class="auth-wrapper" tabindex="-1">
@@ -142,7 +155,7 @@
       <div class="auth-form-column">
         <div class="auth-lockup">
           <span class="brand-mark" aria-hidden="true">ICC</span>
-          <span class="brand-copy">Christ University<small>International Christite Community</small></span>
+          <span class="brand-copy">{{ ORGANISATION }}<small>{{ OFFICE }}</small></span>
         </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}<div class="auth-flash-stack mb-4">{% for category, message in messages %}<div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="{{ 'alert' if category in ['danger','error'] else 'status' }}"><i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-info' }}" aria-hidden="true"></i><span>{{ message }}</span></div>{% endfor %}</div>{% endif %}

@@ -89,7 +89,7 @@ class ChecklistEvidenceTestCase(unittest.TestCase):
         self.login(self.manager)
         response = self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
         self.assertEqual(response.status_code, 302)
-        self.assertIn("tab=delivery", response.headers["Location"])
+        self.assertIn("tab=logistics", response.headers["Location"])
         db.session.refresh(self.document)
         self.assertEqual(self.document.checklist_status_id, self.item.id)
         self.assertEqual(list(self.item.evidence_documents), [self.document])
@@ -178,7 +178,13 @@ class ChecklistEvidenceTestCase(unittest.TestCase):
     def test_rendering_shows_linked_document_and_open_link(self):
         self.login(self.manager)
         self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        response = self.client.get(f"/erp/projects/{self.project.public_id}?tab=delivery")
+        # A tab is a strip of sections with one of them open, so the request
+        # names the checklist whose evidence it is asserting; the evidence
+        # itself is in that section's dialog rather than at the foot of the
+        # list, because it needs a full title, an open link and an unlink
+        # control -- more than a 44px row can carry.
+        section = f"checklist-{self.item.checklist.public_id}"
+        response = self.client.get(f"/erp/projects/{self.project.public_id}?tab=logistics&section={section}")
         html = response.get_data(as_text=True)
         self.assertIn("Screen banner", html)
         self.assertIn(f"/erp/documents/{self.document.public_id}/open", html)

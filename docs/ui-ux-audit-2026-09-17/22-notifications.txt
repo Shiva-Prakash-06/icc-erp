@@ -1,0 +1,57 @@
+- link "Skip to main content":
+  - /url: "#main-content"
+- navigation "Sections":
+  - link "ICC and OIA home":
+    - /url: /
+    - generic: ICC
+  - link "Campuses":
+    - /url: /
+    - generic: Campuses
+    - generic: Campuses
+  - link "Events":
+    - /url: /erp/projects
+    - generic: Events
+    - generic: Events
+  - link "Analytics":
+    - /url: /erp/analytics
+    - generic: Analytics
+    - generic: Analytics
+  - link "Published reports":
+    - /url: /public/reports
+    - generic: Published reports
+    - generic: Published reports
+  - link "Data imports":
+    - /url: /erp/imports
+    - generic: Data imports
+    - generic: Data imports
+  - button "Search or jump to":
+    - generic: Search
+  - link "Notification centre":
+    - /url: /erp/notifications
+    - generic: Notification centre
+    - generic: Notification centre
+  - link "My account":
+    - /url: /profile
+    - generic: My account
+    - generic: My account
+  - button "Replay the guided tour":
+    - generic: "?"
+    - generic: Replay the tour
+  - link "Log out":
+    - /url: /logout
+    - generic: Log out
+    - generic: Log out
+- main:
+  - navigation "Breadcrumb":
+    - link "Campuses":
+      - /url: /
+    - generic: /
+    - generic: Alerts
+  - heading "Alerts" [level=1]
+  - generic: 1 records
+  - button "Delivery preferences ⌄"
+  - article:
+    - heading "Mobility report awaiting approval" [level=2]
+    - paragraph: The Summer School mobility report has been submitted and needs faculty approval.
+    - text: 2026-09-16 04:25:13
+- status: Demo environment—data may be reset; do not enter sensitive or personal data.

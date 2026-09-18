@@ -22,7 +22,6 @@
 .aurora-card__heading { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--color-text); font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; letter-spacing: -.01em; text-transform: none; }
 .aurora-card__value, .display-6 { display: block; color: var(--color-text); font: 400 2rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
 .aurora-card__description { margin-top: 8px; color: var(--color-text-tertiary); font-size: .8125rem; line-height: 1.5; }
-.aurora-card__icon { width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; color: var(--color-decorative-sky); }
 .aurora-card__heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
 .aurora-card__heading-row > div:first-child { display: grid; gap: 3px; min-width: 0; }
 .aurora-card__heading-row .aurora-card__heading, .aurora-card__heading-row .page-section__hint { margin: 0; }
@@ -35,7 +34,6 @@
   color: inherit; text-decoration: none; background: transparent;
 }
 a.kpi-card:hover { color: inherit; border-color: var(--color-border-strong); }
-.kpi-card__meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; width: 100%; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
 .aurora-button, [class*="aurora-button--"] {
@@ -79,17 +77,42 @@ textarea.aurora-input, textarea { min-height: 88px; resize: vertical; }
 .aurora-input:hover, .aurora-select:hover, input:hover, select:hover, textarea:hover { border-color: var(--color-text-tertiary); }
 .aurora-input:focus, .aurora-select:focus, input:focus, select:focus, textarea:focus { border-color: var(--color-focus); }
 .aurora-input--small, .aurora-select--small { min-height: var(--hit-min); padding-block: 5px; font-size: .8125rem; }
+/* A disabled control reads as disabled. The audit found correction-reason
+   fields that were disabled but "look nearly identical to enabled fields",
+   so the surface and the border both change, not just the text colour. */
 .aurora-input:disabled, .aurora-input[readonly], .aurora-select:disabled, input:disabled, select:disabled, textarea:disabled, input[readonly], textarea[readonly] {
-  background: var(--color-surface-2); color: var(--color-text-disabled); border-color: var(--color-border); cursor: not-allowed;
+  background: var(--color-surface-2); color: var(--color-text-disabled);
+  border-color: var(--color-border); border-style: dashed; cursor: not-allowed;
 }
 .aurora-input:disabled::placeholder, input:disabled::placeholder, textarea:disabled::placeholder { color: var(--color-text-disabled); }
-.academic-year-select { min-width: 150px; }
-.aurora-file-field { display: grid; gap: 6px; margin-bottom: 16px; }
-.aurora-file-field__control { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 8px 12px; border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md); background: transparent; }
+/* One file picker (audit P1-13). The native control is kept and styled in
+   place rather than hidden behind a fake button, so the OS picker, drag and
+   drop, keyboard operation, forced-colors and no-JS submission all keep
+   working; app.js only rewrites the filename readout. */
+.aurora-file-field { display: grid; gap: 6px; margin-bottom: 16px; min-width: 0; }
+.aurora-file-field__control {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  min-height: 38px; padding: 8px 12px;
+  border: 1px dashed var(--color-border-strong); border-radius: var(--radius-control);
+  background: var(--color-surface-1);
+}
+.aurora-file-field__control:focus-within { border-style: solid; border-color: var(--color-focus); }
 .aurora-file-field__control i { flex: 0 0 auto; color: var(--color-primary); width: 18px; height: 18px; }
-.aurora-file-field input[type="file"] { flex: 1 1 auto; min-height: 0; padding: 4px 0; border: 0; background: transparent; }
-.aurora-file-field__hint, .aurora-file-field__name { margin: 0; color: var(--color-text-tertiary); font-size: .8125rem; }
+.aurora-file-field input[type="file"] { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 4px 0; border: 0; background: transparent; font-size: .8125rem; }
+.aurora-file-field input[type="file"]::file-selector-button {
+  margin-right: 10px; padding: 5px 11px;
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-chip);
+  background: var(--color-surface-2); color: var(--color-text-secondary);
+  font-family: var(--font-display); font-size: .75rem; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; cursor: pointer;
+}
+.aurora-file-field input[type="file"]:hover::file-selector-button { border-color: var(--color-text); color: var(--color-text); }
+.aurora-file-field__hint, .aurora-file-field__name { margin: 0; color: var(--color-text-tertiary); font-size: .8125rem; line-height: 1.4; overflow-wrap: anywhere; }
 .aurora-file-field__name { font-weight: 500; }
+/* The submit beside a picker is a button, not a banner. "Very large
+   full-width submit buttons" was the other half of P1-13. */
+.aurora-file-field + .align-self-end > .aurora-button--primary,
+.aurora-file-field + .align-self-end > .aurora-button--secondary { width: auto !important; }
 .aurora-fieldset--framed { margin: 10px 0 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .aurora-fieldset--framed > legend { padding: 0 4px; color: var(--color-text-tertiary); }
 input::placeholder, textarea::placeholder { color: var(--color-text-disabled); opacity: 1; }
@@ -142,7 +165,6 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 .alert-danger, .alert-error { color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); border-left-color: var(--color-danger); background: var(--color-danger-bg); }
 .alert-info { color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 40%, transparent); border-left-color: var(--color-primary); background: var(--color-info-bg); }
 .alert .icon-action { position: absolute; top: 6px; right: 6px; border-color: transparent; }
-.flash-stack { margin-bottom: var(--space-5); }
 
 /* ── Auth ─────────────────────────────────────────────────────────────────
    One centred column. The marketing panel is gone: six things to read
@@ -165,28 +187,6 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 /* Wider auth forms (registration) need more than the 380px sign-in column. */
 .auth-stage:has(.auth-card--wide) { max-width: 620px; }
 
-/* ── Section switch ───────────────────────────────────────────────────── */
-/* overflow must stay visible: the "More" popover is absolutely positioned
-   inside this bar and an overflow-x:auto ancestor would clip it. The bar
-   is desktop-only (d-none d-md-flex) and the four primary tabs fit, so
-   there is nothing to scroll. */
-.aurora-tabs { display: flex; align-items: center; gap: 2px; margin-bottom: 22px; overflow: visible; border-bottom: 1px solid var(--color-border); }
-.aurora-tab {
-  display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; margin-bottom: -1px;
-  border: 0; border-bottom: 2px solid transparent; color: var(--color-text-tertiary); background: transparent; text-decoration: none;
-  font-family: var(--font-display); font-size: .9375rem; font-weight: 600; white-space: nowrap;
-}
-.aurora-tab:hover { color: var(--color-text); }
-.aurora-tab.active { color: var(--color-text); border-bottom-color: var(--color-primary); }
-.aurora-tab.active .aurora-tab__count { border-color: var(--color-primary); color: var(--color-primary); }
-/* The three low-traffic sections live behind "More". Every link stays in
-   the DOM so no-JS navigation and deep links keep working. */
-.aurora-tabs__more { position: relative; margin-left: auto; }
-.aurora-tabs__overflow { position: absolute; z-index: var(--z-popover); top: calc(100% + 1px); right: 0; min-width: 200px; display: grid; padding: 4px; border: 1px solid var(--color-border-strong); background: var(--color-canvas); box-shadow: var(--shadow-2); }
-.has-ui-controller .aurora-tabs__overflow:not(.is-open) { display: none; }
-.aurora-tabs__overflow .aurora-tab { width: 100%; margin: 0; padding: 9px 11px; border-bottom: 0; border-left: 2px solid transparent; }
-.aurora-tabs__overflow .aurora-tab.active { border-left-color: var(--color-primary); }
-
 .progress, .progress-container-custom { height: 4px; overflow: hidden; background: var(--color-border); }
 .progress-bar, .progress-bar-custom { height: 100%; transform-origin: left center; background: var(--color-primary); }
 
@@ -196,17 +196,8 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 .aurora-disclosure__trigger[aria-expanded="true"]::after { transform: rotate(180deg); }
 .aurora-disclosure__content { padding: 0 0 14px; }
 .has-ui-controller .aurora-collapse:not(.is-open) { display: none !important; }
-.aurora-menu { position: relative; }
 .aurora-menu__popover { position: absolute; z-index: var(--z-popover); top: calc(100% + 4px); right: 0; min-width: 220px; display: none; padding: 4px; border: 1px solid var(--color-border-strong); background: var(--color-canvas); box-shadow: var(--shadow-2); }
 .aurora-menu__popover.is-open { display: grid; }
-.aurora-menu__item { min-height: 36px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 0; color: var(--color-text-secondary); background: transparent; text-decoration: none; cursor: pointer; }
-.aurora-menu__item:hover { color: var(--color-text); background: var(--color-surface-2); }
-
-/* ── Command palette ──────────────────────────────────────────────────── */
-.command-trigger { display: inline-flex; align-items: center; gap: 8px; min-width: 190px; min-height: 30px; padding: 7px 10px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); color: var(--color-text-tertiary); background: var(--color-surface-1); cursor: pointer; text-align: left; font-size: .8125rem; }
-.command-trigger > span { flex: 1 1 auto; }
-.command-trigger:hover { color: var(--color-text); border-color: var(--color-text); }
-.command-trigger kbd { padding: 1px 5px; border: 1px solid var(--color-border); color: var(--color-text-tertiary); font-size: .6875rem; }
 .command-scrim { position: fixed; z-index: var(--z-command); inset: 0; display: grid; align-items: start; justify-items: center; padding: 12vh 16px 16px; background: rgb(29 31 32 / 34%); animation: fade .15s ease both; }
 .command-dialog { width: min(100%, 560px); border: 1px solid var(--color-border-strong); background: var(--color-canvas); box-shadow: var(--shadow-3); animation: rise .18s ease both; }
 .command-dialog__header { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 12px; padding: 14px 16px 10px; }
@@ -231,11 +222,7 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
    Delivery/Budget sections, Imports and Admin approvals. */
 .queue-list { display: grid; }
 .queue-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--color-border-subtle); }
-.queue-item__body { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
 .queue-item__text { min-width: 0; flex: 1 1 auto; }
-.queue-item__kind { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-.queue-item__kind-label { color: var(--color-primary); font-family: var(--font-display); font-size: .6875rem; font-weight: 500; letter-spacing: .09em; text-transform: uppercase; }
-.queue-item__code { color: var(--color-text-tertiary); font-size: .75rem; }
 .queue-item__title { margin: 4px 0 0; color: var(--color-text); font-weight: 500; font-size: .9375rem; line-height: 1.35; }
 .queue-item__meta { margin: 2px 0 0; color: var(--color-text-tertiary); font-size: .8125rem; }
 .queue-item__action { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
@@ -253,34 +240,6 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 .facts-list__row:last-child { border-bottom: 0; }
 .facts-list__key { flex: 0 0 auto; color: var(--color-text-tertiary); }
 .facts-list__value { min-width: 0; color: var(--color-text); font-size: .875rem; text-align: right; }
-
-/* ── Project workspace ────────────────────────────────────────────────── */
-.project-stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; margin-bottom: 22px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
-.project-stat-item { padding: 12px 16px 12px 0; }
-.project-stat-label { color: var(--color-text-tertiary); }
-.project-stat-value { margin-top: 2px; color: var(--color-text); font: 400 1.5rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
-@media (max-width: 767px) {
-  .project-stats-bar { grid-template-columns: repeat(2, 1fr); }
-  .project-stat-item:nth-child(5) { grid-column: 1 / -1; }
-}
-/* Sticky identity + action bar. Scrolling a long workspace should never
-   lose you the project you are in or the action that closes it. */
-.project-context { position: sticky; top: var(--topbar-height); z-index: var(--z-sticky); margin-bottom: 18px; padding: 14px 0; border-bottom: 1px solid var(--color-border); background: var(--color-canvas); }
-.project-context__row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
-.project-context__title { margin: 4px 0 0; font-size: clamp(1.5rem, 2.8vw, 2rem); }
-.project-context__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; color: var(--color-text-tertiary); font-size: .8125rem; }
-.project-context__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.project-context__blockers { margin: 12px 0 0; }
-.project-context__clear { margin: 12px 0 0; }
-.project-tab-select { margin-bottom: 18px; }
-.project-tab-select__row { display: flex; align-items: flex-end; gap: 8px; }
-.project-tab-select__field { flex: 1 1 auto; min-width: 0; }
-.project-view-switch { display: none; gap: 2px; }
-.has-ui-controller .project-view-switch { display: inline-flex; }
-.project-view-switch button { min-width: 30px; min-height: 30px; border: 1px solid var(--color-border); color: var(--color-text-tertiary); background: transparent; cursor: pointer; }
-.project-view-switch button.is-active { color: var(--color-text); border-color: var(--color-text); }
-.project-view { display: none; }
-.project-view.is-active { display: block; }
 /* Dense portfolio row. Replaces the uniform 188px card grid: finding the
    one project you own meant reading every card. */
 .project-row { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.3fr) minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--color-border-subtle); color: inherit; text-decoration: none; }
@@ -289,11 +248,8 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 .project-row__id { min-width: 0; display: grid; gap: 2px; }
 .project-row__code { color: var(--color-text-tertiary); font: 400 .75rem/1.2 var(--font-mono); }
 .project-row__title { color: var(--color-text); font-size: .9375rem; font-weight: 500; }
-.project-row__dates { color: var(--color-text-tertiary); font-size: .75rem; }
 .project-row__cell { min-width: 0; color: var(--color-text-secondary); font-size: .8125rem; }
 .project-row__cell small { display: block; color: var(--color-text-tertiary); }
-.project-row__progress { display: grid; gap: 4px; }
-.project-row__progress small { color: var(--color-text-tertiary); font-size: .75rem; }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
 .filter-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--color-border); color: var(--color-text-tertiary); text-decoration: none; font-family: var(--font-display); font-size: .8125rem; font-weight: 500; letter-spacing: .04em; }
 .filter-chip:hover { color: var(--color-text); border-color: var(--color-text); }
@@ -301,7 +257,6 @@ a.aurora-badge { min-height: 24px; padding-block: 4px; padding-right: 4px; }
 @media (max-width: 767px) {
   .project-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; }
   .project-row__head { display: none; }
-  .project-row__progress { grid-column: 1 / -1; }
 }
 
 /* ── Misc ─────────────────────────────────────────────────────────────── */
@@ -352,7 +307,17 @@ a.aurora-list__item:hover { color: var(--color-text); }
    real inputs (same status_<id> field the server reads); the visible
    letter is the label. */
 .roll-options { display: inline-flex; margin: 0; padding: 0; border: 0; }
-.roll-options label { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 34px; padding: 5px 10px; border: 1px solid var(--color-border-strong); margin-left: -1px; color: var(--color-text-tertiary); cursor: pointer; font-family: var(--font-display); font-size: .8125rem; font-weight: 600; letter-spacing: .05em; }
+.roll-options label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 40px; min-height: 34px; padding: 5px 10px; border: 1px solid var(--color-border-strong); margin-left: -1px; color: var(--color-text-tertiary); cursor: pointer; font-family: var(--font-display); font-size: .8125rem; font-weight: 600; letter-spacing: .05em; border-radius: 0; }
+/* The word, not the initial. `P/A/E/L` needed the scheme explained before
+   it could be read, and the full label was only inside the control's title
+   (audit, Attendance). The initial survives as a compact prefix. */
+.roll-options__short { opacity: .55; }
+.roll-options__full { text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* A row nobody has saved says so beside the control that defaults to
+   Present, so a default can never be mistaken for a record. */
+.roll-row__unsaved { display: inline-block; margin-left: 10px; color: var(--color-warning); font-family: var(--font-display); font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+/* A disabled correction field must not look like an empty enabled one. */
+.roll-options + .roll-row__unsaved { vertical-align: middle; }
 .roll-options label:first-of-type { margin-left: 0; }
 .roll-options input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
 .roll-options label:has(input:checked) { color: var(--color-canvas); background: var(--color-primary); border-color: var(--color-primary); }
@@ -371,49 +336,8 @@ a.aurora-list__item:hover { color: var(--color-text); }
   .aurora-table--cards td::before { content: attr(data-label); color: var(--color-text-tertiary); font-family: var(--font-display); font-size: .6875rem; font-weight: 500; letter-spacing: .09em; text-transform: uppercase; }
   .command-scrim { padding-top: max(16px, env(safe-area-inset-top)); }
   .command-dialog { max-height: calc(100dvh - 32px); }
-  .project-context { position: static; }
-}
-
-/* ── Home queue table ─────────────────────────────────────────────────────
-   Semantically a table -- one record per row, with a header row the eye
-   does not need but assistive tech and the e2e row matcher do -- laid out
-   as the artboard's stacked rows rather than as columns. */
-.counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-.counter-grid .kpi-card { text-decoration: none; }
-.counter-grid .aurora-card__value { font-size: 2rem; }
-.counter-grid .aurora-card__title { margin-top: 4px; }
-
-.queue-table, .queue-table tbody, .queue-table tr, .queue-table td { display: block; width: 100%; }
-.queue-table td { padding: 0; border: 0; }
-.queue-table .queue-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 14px 0; border-bottom: 1px solid var(--color-border-subtle); }
-/* The kind and project code read as one eyebrow above the title. They are
-   a separate cell only so the row keeps its table semantics. */
-.queue-row__kind { order: -1; flex: 1 1 100%; display: flex; align-items: center; gap: 9px; }
-.queue-row__item { min-width: 0; flex: 1 1 16rem; display: grid; gap: 2px; }
-.queue-row__item .queue-item__title, .queue-row__item .queue-item__meta { margin: 0; }
-.queue-row__decision { flex: 0 0 auto; width: auto; }
-.queue-table .queue-item__action { flex-wrap: wrap; }
-@media (max-width: 640px) {
-  .queue-row__decision { flex: 1 1 100%; }
-  .queue-table .queue-item__action > * { flex: 1 1 auto; }
 }
 .notification-list .is-unread { border-left: 2px solid var(--color-primary); padding-left: 12px; }
-
-/* The system's one micro-label: condensed, uppercase, tracked. Column
-   heads, field labels, eyebrows and key names all share it. */
-.aurora-card__title,
-.aurora-fieldset__legend,
-.aurora-label,
-.aurora-fieldset--framed > legend,
-.facts-list__key,
-.project-stat-label,
-.project-row__head {
-  font-family: var(--font-display);
-  font-size: .75rem;
-  font-weight: 500;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-}
 
 /* ── First-run onboarding ─────────────────────────────────────────────────
    Welcome modal, anchored spotlight tour, getting-started checklist.

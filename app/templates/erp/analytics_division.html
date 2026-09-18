@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_dashboard.html" import kpis, chart %}
+{% block title %}{{ division.short }} dashboard{% endblock %}
+{% block screen_title %}{{ division.short }} · all {{ division.noun }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.analytics') }}">Analytics</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ division.short }}</span>{% endblock %}
+{% block back_url %}{{ url_for('erp.analytics') }}{% endblock %}
+{% block body_class %}ds-screen__body--analytics{% endblock %}
+{% block content %}
+{{ kpis(dashboard.kpis) }}
+{% if dashboard.chart %}
+<div class="ds-scroll ds-scroll--plain">{{ chart(dashboard.chart) }}</div>
+{% else %}
+<p class="ds-empty">No {{ division.noun }} with tracked items yet.</p>
+{% endif %}
+{% endblock %}

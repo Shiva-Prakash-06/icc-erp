@@ -17,7 +17,7 @@ test("project setup exposes Basics and remains usable with browser history", asy
 
 test("operational request completes Draft to Submitted to Approved to Completed", async ({ page }, testInfo) => {
   await signIn(page, "e2e_events");
-  await openProject(page, "E2E-ICC-EVENT", "Budget");
+  await openProject(page, "E2E-ICC-EVENT", "Finance");
   const title = `Equipment request ${testInfo.project.name}`;
   // Creating a request is a secondary action on this tab: the form lives
   // behind "Create a request" so the section opens on what needs deciding.
@@ -25,22 +25,28 @@ test("operational request completes Draft to Submitted to Approved to Completed"
   await page.getByLabel("Request type").selectOption({ label: "Equipment" });
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByRole("button", { name: "Create draft" }).click();
-  await page.getByRole("row").filter({ hasText: title }).getByRole("button", { name: /submit for approval/i }).click();
+  // The Tile System renders each item as one `.ds-row` rather than a table
+  // row, and keeps settled items in the same list instead of behind a
+  // disclosure -- so the row is located the same way at every stage.
+  const rowFor = (text: string) => page.locator(".ds-row").filter({ hasText: text });
+  await rowFor(title).getByRole("button", { name: /submit for approval/i }).click();
 
   // Maker/checker is a release control: the Events Head who creates and
-  // submits the request must not be offered its approval action.
-  await expect(page.getByRole("row").filter({ hasText: title }).getByLabel(new RegExp(`Decision for ${title}`))).toHaveCount(0);
+  // submits the request must not be offered its approval action. Since the
+  // audit's P1-04 rework the decision form opens from a "Review"
+  // disclosure, so the absence to assert is the disclosure itself -- an
+  // assertion on the hidden select inside it would pass either way.
+  await expect(rowFor(title).locator("details.ds-review")).toHaveCount(0);
   await page.goto("/logout");
   await signIn(page, "e2e_faculty");
-  await openProject(page, "E2E-ICC-EVENT", "Budget");
-  const row = page.getByRole("row").filter({ hasText: title });
-  await row.getByLabel(new RegExp(`Decision for ${title}`)).selectOption("Approved");
-  await row.getByRole("button", { name: "Save" }).click();
-  await row.getByRole("button", { name: /mark completed/i }).click();
-  // A completed request is settled, so it leaves the "needs action" list
-  // and joins the settled table behind its disclosure.
-  await page.getByRole("button", { name: /^Show \d+ settled/i }).click();
-  await expect(page.getByRole("row").filter({ hasText: title })).toContainText("Completed");
+  await openProject(page, "E2E-ICC-EVENT", "Finance");
+  // A native <summary> is the disclosure's control. Its computed ARIA
+  // role differs between engines, so it is located as the element it is.
+  await rowFor(title).locator("summary.ds-review__trigger").click();
+  await rowFor(title).getByLabel(new RegExp(`Decision for ${title}`)).selectOption("Approved");
+  await rowFor(title).getByRole("button", { name: "Save" }).click();
+  await rowFor(title).getByRole("button", { name: /mark completed/i }).click();
+  await expect(rowFor(title)).toContainText("Completed");
 });
 
 test("dynamic feedback stores canonical rating and chart table stays in parity", async ({ page }, testInfo) => {
@@ -50,11 +56,14 @@ test("dynamic feedback stores canonical rating and chart table stays in parity",
   test.slow();
   const responseText = `Clear schedule and roles — ${testInfo.project.name}`;
   await signIn(page, "e2e_volunteer");
-  await openProject(page, "E2E-ICC-EVENT", "Insights");
+  await openProject(page, "E2E-ICC-EVENT", "People");
+  // Responding is a secondary action on this tab: the list of responses is
+  // what needs moderating, so the form sits behind its own disclosure.
+  await page.getByRole("button", { name: /^Respond to/i }).click();
   await page.getByLabel(/overall rating/i).selectOption("5");
   await page.getByLabel("What worked well?").fill(responseText);
   await page.getByRole("button", { name: /submit feedback/i }).click();
-  await expect(page.getByRole("row").filter({ hasText: responseText })).toContainText("Pending");
+  await expect(page.locator(".ds-row").filter({ hasText: responseText })).toContainText("Pending");
 });
 
 test("public site exposes published content without operational or personal data", async ({ page }) => {

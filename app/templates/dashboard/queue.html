@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% from "_tiles.html" import state_chip, empty_cell %}
+{% block title %}Waiting on you{% endblock %}
+{% block screen_title %}Waiting on you{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Queue</span>{% endblock %}
+{% block back_url %}{{ url_for('dashboard.index') }}{% endblock %}
+{% block tools %}
+  {% if portfolio.active %}<a class="ds-btn" href="{{ url_for('erp.projects', state='active') }}"><i class="ph ph-calendar" aria-hidden="true"></i>{{ portfolio.active }} events in flight</a>{% endif %}
+{% endblock %}
+{% block content %}
+{#- Everything that needs you, in one list of one-line rows. Approving is a
+    single click from here because approval needs no reason; sending back
+    opens the record, because every reject path requires a written one. -#}
+<div class="ds-scroll" data-tour="queue">
+  {% if can_view_decision_queue %}
+  <div class="ds-rows" data-tour="counters">
+    <h2 class="ds-rows__title">Decisions<span class="ds-rows__n">{{ action_queue|length }}{% if queue_kind_filter %} of {{ queue_total }}{% endif %}</span></h2>
+    {% if queue_kinds|length > 1 %}
+    {#- Plain links carrying the existing query params, so filtering works
+        with JavaScript disabled and every state is a shareable URL. The
+        all-items view is the default and is never taken away. -#}
+    <div class="ds-rows__foot ds-chipbar" role="group" aria-label="Filter decisions by kind">
+      <a class="ds-btn ds-btn--sm{% if not queue_kind_filter %} ds-btn--primary{% endif %}" href="{{ url_for('dashboard.queue') }}"{% if not queue_kind_filter %} aria-current="page"{% endif %}>All {{ queue_total }}</a>
+      {% for kind, count in queue_kinds %}
+      <a class="ds-btn ds-btn--sm{% if queue_kind_filter == kind %} ds-btn--primary{% endif %}" href="{{ url_for('dashboard.queue', kind=kind) }}"{% if queue_kind_filter == kind %} aria-current="page"{% endif %}>{{ kind }} {{ count }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="ds-rows__head" aria-hidden="true"><span></span><span>Item</span><span>Project</span><span>Due</span><span>Kind</span><span></span><span></span></div>
+    {% for item in action_queue %}
+    <div class="ds-row ds-row--active">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Decision" title="{{ item.title }}">{{ item.title }}</span>
+      <span class="ds-row__desc" data-label="Event" title="{{ item.project.code or '' }}">{{ item.project.title }}{% if item.meta %} · {{ item.meta }}{% endif %}</span>
+      <span class="ds-row__when" data-label="Due">{% if item.due_at %}{{ item.due_at|localdate('%d %b %Y') }}{% else %}{{ empty_cell() }}{% endif %}</span>
+      {{ state_chip('upcoming', item.kind, 'Kind') }}
+      <span class="ds-row__docs"></span>
+      <span class="ds-row__act">
+        <form method="POST" action="{{ url_for(item.decide_endpoint, **item.decide_params) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if item.version is not none %}<input type="hidden" name="version" value="{{ item.version }}">{% endif %}
+          <input type="hidden" name="{{ item.decide_field }}" value="{{ item.approve_value }}">
+          <input type="hidden" name="return_to" value="{{ request.full_path }}">
+          <button class="ds-btn ds-btn--primary ds-btn--sm" type="submit">{{ item.approve_label }}</button>
+        </form>
+        <a class="ds-btn ds-btn--sm" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab=item.tab, focus=item.anchor) }}#{{ item.anchor }}">{{ item.reject_label }}</a>
+      </span>
+    </div>
+    {% else %}
+    <p class="ds-empty">Nothing is waiting on your decision.</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">My open work<span class="ds-rows__n">{{ my_tasks|length + my_requests|length }}</span></h2>
+    {% for task in my_tasks %}
+    <div class="ds-row{% if task.due_at and task.due_at < now %} ds-row--overdue{% else %} ds-row--active{% endif %}">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Task" title="{{ task.title }}">{{ task.title }}</span>
+      <span class="ds-row__desc" data-label="Event" title="{{ task.project.code or '' }}">{{ task.project.title }}</span>
+      <span class="ds-row__when" data-label="Due">{% if task.due_at %}{{ task.due_at|localdate('%d %b %Y') }}{% else %}{{ empty_cell() }}{% endif %}</span>
+      {{ state_chip(review_state(task.status), task.status, 'Status') }}
+      <span class="ds-row__docs"></span>
+      <span class="ds-row__act"><a class="ds-btn ds-btn--sm" href="{{ url_for('erp.project_detail', public_id=task.project.public_id, tab='logistics') }}#{{ task.public_id }}">Open</a></span>
+    </div>
+    {% endfor %}
+    {% for item in my_requests %}
+    <div class="ds-row ds-row--upcoming">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Request" title="{{ item.title }}">{{ item.title }}</span>
+      <span class="ds-row__desc" data-label="Event" title="{{ item.project.code or '' }}">{{ item.project.title }} · {{ item.request_type }}</span>
+      <span class="ds-row__when" data-label="Due">{{ empty_cell() }}</span>
+      {{ state_chip(review_state(item.status), item.status, 'Status') }}
+      <span class="ds-row__docs"></span>
+      <span class="ds-row__act"><a class="ds-btn ds-btn--sm" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab='finance') }}#{{ item.public_id }}">Open</a></span>
+    </div>
+    {% endfor %}
+    {% if not my_tasks and not my_requests %}
+    <p class="ds-empty">Nothing open against your name.</p>
+    {% endif %}
+  </div>
+
+  <div class="ds-rows">
+    <h2 class="ds-rows__title">Sessions coming up<span class="ds-rows__n">{{ upcoming_sessions|length }}</span></h2>
+    {% for session in upcoming_sessions %}
+    <div class="ds-row ds-row--upcoming">
+      <i class="ds-row__pip" aria-hidden="true"></i>
+      <span class="ds-row__title" data-label="Session" title="{{ session.title }}">{{ session.title }}</span>
+      <span class="ds-row__desc" data-label="Event" title="{{ session.project.code or '' }}">{{ session.project.title }} · {{ session.venue or session.project.venue or 'Venue TBC' }}</span>
+      <span class="ds-row__when" data-label="When">{{ session.starts_at|localdatetime('%d %b %Y, %I:%M %p') }}</span>
+      {{ state_chip('upcoming', session.session_type, 'Type') }}
+      <span class="ds-row__docs"></span>
+      <span class="ds-row__act"><a class="ds-btn ds-btn--sm" href="{{ url_for('erp.attendance_roll_call', public_id=session.project.public_id, session_public_id=session.public_id) }}">Roll call</a></span>
+    </div>
+    {% else %}
+    <p class="ds-empty">No sessions scheduled.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,15 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Set up — {{ project.title }}{% endblock %}
 {% block mobile_title %}{{ project.code }} setup{% endblock %}
-{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Setup{% endblock %}
+{% block screen_title %}{{ project.title }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><a href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">{{ project.code }}</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Setup</span>{% endblock %}
 {% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id) }}{% endblock %}
+{% block tools %}<a class="ds-btn" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Skip to the event</a>{% endblock %}
 {% block content %}
-<nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item" aria-current="page">{{ project.code }} setup</li></ol></nav>
-<header class="page-header">
-  <div><div class="page-eyebrow">Guided setup</div><h1 class="page-title mb-2">{{ project.title }}</h1><p class="page-subtitle">Walk through each step to build out this {{ project.program_type.name }} project, modeled on a complete reference project.</p></div>
-  <a class="aurora-button--secondary" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Skip to full project page</a>
-</header>
-
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 <ol class="aurora-stepper mb-4" aria-label="Setup progress">
   {% for step_key in steps %}
   <li class="aurora-stepper__item{% if step_key == step %} aurora-stepper__item--current{% elif completed[step_key] %} aurora-stepper__item--complete{% endif %}">
@@ -48,8 +45,8 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
     <div class="col-md-4"><label class="aurora-label" for="s_title">Session title</label><input id="s_title" class="aurora-input" name="title" required></div>
-    <div class="col-md-2"><label class="aurora-label" for="s_type">Type</label><select id="s_type" class="aurora-select" name="session_type">{% for option in session_type_options %}<option>{{ option }}</option>{% endfor %}</select></div>
-    <div class="col-md-2"><label class="aurora-label" for="s_type_other">If "Other", specify</label><input id="s_type_other" class="aurora-input" name="session_type_other"></div>
+    <div class="col-md-2 ds-cond"><label class="aurora-label" for="s_type">Type</label><select id="s_type" class="aurora-select" name="session_type">{% for option in session_type_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-2 ds-cond__other"><label class="aurora-label" for="s_type_other">If "Other", specify</label><input id="s_type_other" class="aurora-input" name="session_type_other"></div>
     <div class="col-md-3"><label class="aurora-label" for="s_start">Starts</label><input id="s_start" type="datetime-local" class="aurora-input" name="starts_at" required></div>
     <div class="col-md-3"><label class="aurora-label" for="s_end">Ends</label><input id="s_end" type="datetime-local" class="aurora-input" name="ends_at" required></div>
     <div class="col-12"><button class="aurora-button--primary">Add session</button></div>
@@ -92,8 +89,8 @@
     <div class="col-md-3"><label class="aurora-label" for="t_email">Email</label><input id="t_email" type="email" class="aurora-input" name="email"></div>
     <div class="col-md-3"><label class="aurora-label" for="t_reg">Registration number (optional)</label><input id="t_reg" class="aurora-input" name="registration_number"></div>
     <div class="col-md-3"><label class="aurora-label" for="t_type">Assignment type</label><select id="t_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div>
-    <div class="col-md-3"><label class="aurora-label" for="t_role">Role</label><select id="t_role" class="aurora-select" name="role_label"><option value="">Not specified</option>{% for option in assignment_role_options %}<option>{{ option }}</option>{% endfor %}</select></div>
-    <div class="col-md-3"><label class="aurora-label" for="t_role_other">If "Other", specify</label><input id="t_role_other" class="aurora-input" name="role_label_other"></div>
+    <div class="col-md-3 ds-cond"><label class="aurora-label" for="t_role">Role</label><select id="t_role" class="aurora-select" name="role_label"><option value="">Not specified</option>{% for option in assignment_role_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-3 ds-cond__other"><label class="aurora-label" for="t_role_other">If "Other", specify</label><input id="t_role_other" class="aurora-input" name="role_label_other"></div>
     <div class="col-md-3 align-self-end"><button class="aurora-button--primary w-100">Create &amp; add</button></div>
   </form>
 </div>
@@ -141,8 +138,8 @@
   <form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="setup">
-    <div class="col-md-2"><label class="aurora-label" for="b_category">Category</label><select id="b_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option>{{ option }}</option>{% endfor %}</select></div>
-    <div class="col-md-2"><label class="aurora-label" for="b_category_other">If "Other", specify</label><input id="b_category_other" class="aurora-input" name="category_other"></div>
+    <div class="col-md-2 ds-cond"><label class="aurora-label" for="b_category">Category</label><select id="b_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+    <div class="col-md-2 ds-cond__other"><label class="aurora-label" for="b_category_other">If "Other", specify</label><input id="b_category_other" class="aurora-input" name="category_other"></div>
     <div class="col-md-5"><label class="aurora-label" for="b_description">Description</label><input id="b_description" class="aurora-input" name="description"></div>
     <div class="col-md-3"><label class="aurora-label" for="b_amount">Estimated amount</label><input id="b_amount" type="number" step="0.01" min="0" class="aurora-input" name="estimated_amount"></div>
     <div class="col-12"><button class="aurora-button--primary">Add budget line</button></div>
@@ -150,4 +147,5 @@
   <div class="mt-4"><a class="aurora-button--secondary" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Finish setup — go to full project page</a></div>
 </div>
 {% endif %}
+</div>
 {% endblock %}

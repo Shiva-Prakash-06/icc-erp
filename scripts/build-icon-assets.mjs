@@ -16,6 +16,10 @@ const icons = {
   "ph-receipt": "receipt-text",
   "ph-sign-in": "log-in",
   "ph-activity": "activity",
+  // Status-dimension chips (app/services/status.py): every tone needs a
+  // shape, so the chip never depends on colour alone.
+  "ph-circle": "circle",
+  "ph-dots-three-circle": "circle-ellipsis",
   "ph-arrow-left": "arrow-left",
   "ph-arrow-right": "arrow-right",
   "ph-arrow-square-out": "external-link",

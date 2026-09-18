@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_tiles.html" import state_chip, progress_bar %}
+{% block title %}{{ division.short }} — {{ campus_label }}{% endblock %}
+{% block screen_title %}{{ division.name }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><a href="{{ url_for('erp.campus_detail', public_id=campus.public_id) }}">{{ campus_label }}</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ division.short }}</span>{% endblock %}
+{% block back_url %}{{ url_for('erp.campus_detail', public_id=campus.public_id) }}{% endblock %}
+{% block body_class %}ds-screen__body--filter{% endblock %}
+{% block tools %}
+  <a class="ds-btn" href="{{ url_for('erp.analytics_division', division=division.slug) }}"><i class="ph ph-chart-bar" aria-hidden="true"></i>Dashboard</a>
+  {% if can_create %}<a class="ds-btn ds-btn--primary" href="{{ url_for('erp.new_project') }}"><i class="ph ph-plus" aria-hidden="true"></i>New {{ 'programme' if division.slug == 'igp' else 'event' }}</a>{% endif %}
+{% endblock %}
+{% block content %}
+{#- The counts on the segments describe the whole division and do not change
+    as you filter; ds-filter__result describes the current view and does.
+    Filtering is a round trip on this URL, so the two can never disagree. -#}
+<div class="ds-filter">
+  <div class="ds-filter__set" role="group" aria-label="Filter by state">
+    {% for key, label in segments %}
+    <a class="ds-filter__seg" href="{{ url_for('erp.division', public_id=campus.public_id, division=division.slug, state=key) if key != 'all' else url_for('erp.division', public_id=campus.public_id, division=division.slug) }}"
+       {% if segment == key %}aria-current="page"{% endif %}>{{ label }} <span class="ds-filter__count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </div>
+  <span class="ds-filter__result">{{ cards|length }} of {{ counts['all'] }}</span>
+</div>
+
+<div class="ds-scroll">
+  {% if cards %}
+  <div class="ds-cardgrid">
+    {% for card in cards %}
+    <a class="ds-event ds-event--{{ card.state }}" href="{{ url_for('erp.project_detail', public_id=card.project.public_id) }}">
+      <h2 class="ds-event__title">{{ card.project.title }}</h2>
+      <p class="ds-event__meta">
+        <span>{{ card.project.start_date|localdate('%d %b') }}–{{ card.project.end_date|localdate('%d %b') }}</span>
+        <span>{{ card.owner or 'Unassigned' }}</span>
+      </p>
+      <div class="ds-event__foot">
+        {{ state_chip(card.state, card.state_label) }}
+        {% if card.state in ('active', 'overdue') and card.progress %}
+        {{ progress_bar(card.progress[0], card.progress[1]) }}
+        <span class="ds-event__note">{{ card.progress[0] }}/{{ card.progress[1] }}</span>
+        {% elif card.state == 'upcoming' %}
+        <span class="ds-event__note">{{ card.project.code }}</span>
+        {% else %}
+        <span class="ds-event__note">{{ card.project.code }}</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="ds-empty">No {{ division.noun }} match this filter.</p>
+  {% endif %}
+</div>
+{% endblock %}

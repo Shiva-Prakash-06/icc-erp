@@ -158,6 +158,9 @@ def build_home(user, *, show_all_queue=False):
         }
 
     return {
+        # The queue screen marks a row overdue by comparing against this,
+        # rather than each template re-deriving "now" and disagreeing.
+        "now": now,
         "projects_in_scope": projects_in_scope[:8],
         "project_count": len(projects_in_scope),
         "portfolio": portfolio,
@@ -177,5 +180,27 @@ def build_home(user, *, show_all_queue=False):
         # here because `projects_in_scope` is already in hand; on any other
         # page the step has no destination and is skipped rather than shown
         # pointing at nothing.
+        "onboarding_tour_project": projects_in_scope[0].public_id if projects_in_scope else None,
+    }
+
+
+def build_campus_home(user):
+    """What the campus screen needs beyond its tiles.
+
+    Deliberately much cheaper than :func:`build_home`: the campus screen
+    shows four tiles, a count, and a first-run checklist, so it must not pay
+    for the ten-source decision queue that now lives on ``/queue``. The
+    count is the queue's length, which is the one number that decides
+    whether the head shows a "waiting on you" button at all.
+    """
+    projects_in_scope = visible_projects(user)
+    pending = 0
+    if has_any_permission(user, "approve") or has_any_permission(user, "approve_operational_requests"):
+        pending = len(build_action_queue(user, projects=approvable_projects(user)))
+    return {
+        "pending_decisions": pending,
+        "onboarding_checklist": build_onboarding_checklist(user),
+        # The tour's "blockers" step anchors to an element that only exists
+        # on a project page, so the step needs somewhere to navigate to.
         "onboarding_tour_project": projects_in_scope[0].public_id if projects_in_scope else None,
     }

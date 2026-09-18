@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_tiles.html" import tile_art %}
+{% block title %}Analytics{% endblock %}
+{% block screen_title %}Analytics{% endblock %}
+{% block content %}
+{#- Two dashboards and nothing else. The division's hue carries through from
+    its tile, so the dashboard reads as the same family. -#}
+<div class="ds-tilegrid ds-tilegrid--pair">
+  {% for tile in dashboards %}
+  <a class="ds-tile ds-tile--{{ tile.accent }}" href="{{ url_for('erp.analytics_division', division=tile.slug) }}">
+    <span class="ds-tile__code">{{ tile.short }}</span>
+    <h2 class="ds-tile__title">{{ tile.short }} · all {{ tile.noun }}</h2>
+    <p class="ds-tile__stat">{{ tile.total }} total · {{ tile.active }} active · {{ tile.complete }} closed</p>
+    <span class="ds-tile__go">Open <i class="ph ph-arrow-right" aria-hidden="true"></i></span>
+    {{ tile_art(tile.accent) }}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

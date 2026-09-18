@@ -1,19 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Attendance — {{ session.title }}{% endblock %}
 {% block mobile_title %}Attendance{% endblock %}
-{% block crumb %}<a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}">{{ project.code }}</a> <span aria-hidden="true">/</span> Attendance{% endblock %}
+{% block screen_title %}{{ session.title }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}">{{ project.code }}</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Attendance</span>{% endblock %}
 {% block back_url %}{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}{% endblock %}
+{% block tools %}<span class="ds-filter__result">{{ session.starts_at|localdatetime('%d %b %Y · %I:%M %p', label=False) }} – {{ session.ends_at|localtime }}</span>{% endblock %}
 {% block content %}
-<nav aria-label="Breadcrumb"><ol class="aurora-breadcrumb"><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.projects') }}">Projects</a></li><li class="aurora-breadcrumb__item"><a href="{{ url_for('erp.project_detail', public_id=project.public_id, tab='people') }}">{{ project.code }}</a></li><li class="aurora-breadcrumb__item" aria-current="page">Attendance</li></ol></nav>
-<header class="page-header">
-  <div><div class="page-eyebrow">{{ session.session_type }}</div><h1 class="page-title mb-2">{{ session.title }}</h1><p class="page-subtitle">{{ session.starts_at|localdatetime('%b %d, %Y · %I:%M %p', label=False) }} – {{ session.ends_at|localtime }}</p></div>
-</header>
-
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 <div>
-  <div class="page-section__bar mb-3"><h2 class="page-section__title">Roll call</h2><span class="page-section__count">{{ team|length }} enrolled</span></div>
+  <div class="page-section__bar mb-3"><h2 class="page-section__title">Roll call</h2><span class="page-section__count">{{ team|length|pluralise('person', 'people') }} enrolled · {{ records|length }} already saved</span></div>
   <form method="POST" action="{{ url_for('erp.mark_session_attendance', public_id=project.public_id, session_public_id=session.public_id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <p class="small text-muted mb-3" id="correctionReasonHint">Correction reason is only editable once an attendance record already exists for a participant.</p>
+    <p class="small text-muted mb-3" id="correctionReasonHint">A correction reason applies only to a participant whose attendance was already saved. It is required when you change one.</p>
     <div class="aurora-table-scroll" tabindex="0">
       <table class="aurora-table--hover aurora-table--cards align-middle mb-0">
         <thead><tr><th>Name</th><th>Registration</th><th>Attendance</th><th>Correction reason</th><th>Current verification</th></tr></thead>
@@ -26,13 +24,25 @@
             <td data-label="Attendance">
               <fieldset class="aurora-fieldset roll-options">
                 <legend class="visually-hidden">Attendance for {{ assignment.person.display_name }}</legend>
+                {#- The segment carries its whole word. The single letter
+                    was only ever legible to somebody who already knew the
+                    scheme, and the full label was hidden inside the
+                    control. -#}
                 {% for status in ['Present', 'Absent', 'Excused', 'Late'] %}
-                <label title="{{ status }}"><input type="radio" name="status_{{ assignment.person_id }}" value="{{ status }}"{% if record and record.status == status %} checked{% endif %}{% if not record and status == 'Present' %} checked{% endif %}><span aria-hidden="true">{{ status[0] }}</span><span class="visually-hidden">{{ status }}</span></label>
+                <label title="{{ status }}"><input type="radio" name="status_{{ assignment.person_id }}" value="{{ status }}"{% if record and record.status == status %} checked{% endif %}{% if not record and status == 'Present' %} checked{% endif %}><span aria-hidden="true" class="roll-options__short">{{ status[0] }}</span><span class="roll-options__full">{{ status }}</span></label>
                 {% endfor %}
+                {%- if not record %}<span class="roll-row__unsaved">Not recorded yet</span>{% endif -%}
               </fieldset>
             </td>
             <td data-label="Correction reason"><label class="visually-hidden" for="reason_{{ assignment.person_id }}">Correction reason for {{ assignment.person.display_name }}</label><input class="aurora-input aurora-input--small" id="reason_{{ assignment.person_id }}" name="reason_{{ assignment.person_id }}"{% if record %} placeholder="Required if changing status"{% else %} disabled aria-describedby="correctionReasonHint"{% endif %}></td>
-            <td data-label="Current verification">{% if record %}<span class="aurora-badge">v{{ record.version }}</span><div class="small text-muted">{{ actors.get(record.verified_by_id, 'Unknown verifier') }} · {{ record.verified_at.strftime('%b %d, %Y %I:%M %p') if record.verified_at else 'time unavailable' }}</div>{% else %}<span class="text-muted">Not recorded</span>{% endif %}</td>
+            <td data-label="Current verification">{% if record %}
+              {#- Who and when first, in words. The revision number is
+                  provenance, not the headline, and "Unknown verifier" was a
+                  lookup miss being printed as if it were a fact. -#}
+              <div>{{ actors.get(record.verified_by_id) or 'Recorded during import' }}</div>
+              <div class="small text-muted">{{ record.verified_at|localdatetime('%d %b %Y, %I:%M %p') if record.verified_at else 'Time not recorded' }}</div>
+              <details class="small"><summary class="text-muted">Technical details</summary><p class="mb-0 text-muted">Revision {{ record.version }}</p></details>
+              {% else %}<span class="text-muted">Nothing saved for this person yet</span>{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="5" class="text-center text-muted py-4">No team members enrolled yet.</td></tr>
@@ -40,14 +50,15 @@
         </tbody>
       </table>
     </div>
-    <div class="roll-bar"><span class="page-section__count">Everyone defaults to Present; change only what differs.</span><button class="aurora-button--primary blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Save attendance</button></div>
+    <div class="roll-bar"><span class="page-section__count">Nobody is marked until you save. Every row starts on Present — change what differs, then save.</span><button class="aurora-button--primary blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Save attendance</button></div>
   </form>
 </div>
 
 <details class="aurora-disclosure mt-4">
   <summary class="aurora-disclosure__trigger">Immutable attendance history ({{ events|length }} changes)</summary>
   <div class="aurora-table-scroll" tabindex="0"><table class="aurora-table--cards aurora-table mb-0"><thead><tr><th>When</th><th>Change</th><th>Reason</th><th>Recorded by</th></tr></thead><tbody>
-    {% for event in events %}<tr><td data-label="When">{{ event.occurred_at|localdatetime('%b %d, %Y %I:%M %p') }}</td><td data-label="Change">{{ event.previous_status or 'Not recorded' }} → {{ event.new_status }}</td><td data-label="Reason">{{ event.reason or 'Initial roll call' }}</td><td data-label="Recorded by">{{ actors.get(event.actor_user_id, 'Unknown user') }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No attendance changes recorded yet.</td></tr>{% endfor %}
+    {% for event in events %}<tr><td data-label="When">{{ event.occurred_at|localdatetime('%d %b %Y, %I:%M %p') }}</td><td data-label="Change">{{ event.previous_status or 'Not recorded' }} → {{ event.new_status }}</td><td data-label="Reason">{{ event.reason or 'Initial roll call' }}</td><td data-label="Recorded by">{{ actors.get(event.actor_user_id, 'Unknown user') }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">No attendance changes recorded yet.</td></tr>{% endfor %}
   </tbody></table></div>
 </details>
+</div>
 {% endblock %}

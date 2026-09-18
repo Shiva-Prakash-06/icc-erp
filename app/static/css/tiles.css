@@ -1,0 +1,1414 @@
+/* ICC ERP Tile System — the shell, the tile and the one-line work row.
+   Added 2026-09-17, replacing the blueprint top bar and the multi-line
+   record tables. Two surfaces carry the product: a TILE takes you
+   somewhere, a ROW is a thing you act on. A screen is one or the other.
+
+   Every value is a token from tokens.css. The blueprint component sheet
+   (components.css) still owns forms, inputs, tables, alerts and print;
+   this file owns navigation, density and state. */
+
+/* ── The frame ─────────────────────────────────────────────────────────
+   One screen, one viewport. .ds-app never scrolls; exactly one .ds-scroll
+   inside it does. That is the whole no-scroll rule. */
+
+/* Named areas rather than source order, because the demo banner is a
+   full-width strip that must sit in the grid instead of floating over the
+   record. Audit P1-14: "every fixed element reserves layout space". */
+.ds-app {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "banner banner"
+    "rail   screen";
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+.ds-rail { grid-area: rail; }
+.ds-screen { grid-area: screen; }
+.ds-demo-banner { grid-area: banner; }
+
+.ds-screen {
+  display: grid;
+  /* The column is explicit: an implicit `auto` column sizes to the widest
+     child, so one long title or a wide tools button made the head and the
+     body 485px inside a 375px screen and .ds-app clipped them. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--screen-head) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-screen__head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--screen-pad);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-canvas);
+}
+
+/* The heading is the item that yields. Both it and the tools were plain
+   `0 1 auto`, so a deficit was shared between them: the breadcrumb held the
+   heading at 487px and the tools were handed 401 for 512px of buttons, which
+   cut "Report" off entirely at 1024px. The title already ellipsises and the
+   crumb already wraps, so giving the space back to the actions costs nothing
+   that is not recoverable. */
+.ds-screen__heading { min-width: 0; flex: 1 1 0; }
+
+.ds-screen__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* `overflow: hidden` is what makes the ellipsis work, and it clips the
+     *padding* box -- but a 30px Barlow face draws outside a 32px line box,
+     so every descender was sliced: "Good evening", "Waiting on you",
+     "Summer School Exchange Program". The padding gives the clip box the
+     room the ink needs; the equal negative margin gives it back to the
+     layout, so the title still occupies exactly one 32px line inside the
+     fixed --screen-head. */
+  padding-block: 6px;
+  margin-block: -6px;
+}
+
+/* `auto`, not `hidden`: the narrow-viewport rule below already states the
+   principle -- the row scrolls, it never clips -- and it is just as true at
+   1024px. Nothing shrinks inside it, so on any screen wide enough this is
+   inert, and on one that is not the buttons stay reachable. */
+.ds-screen__tools { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; flex: 0 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+
+.ds-screen__body {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--screen-pad);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+/* Route-specific fixed tracks. The last track is always minmax(0,1fr):
+   a bare 1fr lets a long list push the grid past the viewport. */
+.ds-screen__body--tabs { grid-template-rows: var(--tab-height) minmax(0, 1fr); }
+/* `minmax`, not a fixed track: the filter bar wraps on a narrow screen and
+   a 36px row cannot hold two lines of it. On any screen where it does not
+   wrap this resolves to exactly --filter-height, as before. */
+.ds-screen__body--filter { grid-template-rows: minmax(var(--filter-height), auto) minmax(0, 1fr); }
+.ds-screen__body--analytics { grid-template-rows: auto minmax(0, 1fr); }
+
+/* The one scrollable element on any screen. */
+.ds-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-canvas-deep);
+  border-radius: var(--radius-panel);
+}
+.ds-scroll--plain { background: transparent; }
+
+/* A screen that has not become a tile/row screen yet still has to obey the
+   one-screen rule: its own content scrolls inside the body rather than the
+   page scrolling under a fixed rail. */
+.ds-scroll--page { padding: 0 var(--space-1) var(--space-4) 0; }
+.ds-scroll--page > :first-child { margin-top: 0; }
+
+/* ── Rail ──────────────────────────────────────────────────────────────── */
+
+.ds-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  background: var(--color-surface-ink);
+  color: #fff;
+  overflow: visible;
+}
+
+.ds-rail__brand {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 700; letter-spacing: .06em;
+  text-decoration: none;
+}
+.ds-rail__brand:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.ds-rail__nav { display: flex; flex-direction: column; gap: var(--space-1); width: 100%; align-items: center; }
+.ds-rail__spacer { margin-top: auto; }
+
+.ds-rail__item {
+  position: relative;
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-control);
+  background: transparent;
+  color: #fff;
+  opacity: .68;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity var(--motion-fast), background-color var(--motion-fast);
+}
+.ds-rail__item:hover { opacity: 1; background: rgb(255 255 255 / 12%); }
+.ds-rail__item.is-active { opacity: 1; background: rgb(255 255 255 / 16%); }
+.ds-rail__item.is-active::before {
+  content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px;
+  width: 3px; border-radius: var(--radius-chip); background: var(--color-decorative-sky);
+}
+.ds-rail__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; opacity: 1; }
+.ds-rail__item .ph { font-size: 20px; }
+
+/* The label is a flyout: it overlays, so the screen beside it never reflows. */
+.ds-rail__label {
+  position: absolute; left: calc(100% + 8px); top: 50%; translate: 0 -50%;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-ink);
+  box-shadow: var(--shadow-3);
+  font-family: var(--font-display);
+  font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  white-space: nowrap; opacity: 0; pointer-events: none;
+  transition: opacity var(--motion-fast);
+  z-index: var(--z-popover);
+}
+.ds-rail__item:hover .ds-rail__label,
+.ds-rail__item:focus-visible .ds-rail__label { opacity: 1; }
+
+/* The rail's two overlays. A flash and the demo banner float over the
+   screen rather than sitting in it: anything in flow would change the
+   one-screen budget depending on whether you had just saved something. */
+
+.ds-rail__badge {
+  position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px;
+  background: var(--color-danger); color: #fff;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; line-height: 16px; text-align: center;
+}
+
+.ds-rail__item.onb-help span[aria-hidden="true"]:first-child {
+  font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1;
+}
+
+.ds-flash {
+  position: fixed; right: var(--space-5); bottom: var(--space-5);
+  z-index: var(--z-toast); width: min(420px, calc(100vw - 2 * var(--space-5)));
+  display: flex; flex-direction: column; gap: var(--space-2);
+  /* The container is a hit-testing hole; only the alerts inside it take
+     the pointer. A fixed overlay that swallows clicks is invisible until
+     something underneath it stops working. */
+  pointer-events: none;
+}
+.ds-flash .alert { margin: 0; box-shadow: var(--shadow-3); pointer-events: auto; }
+
+/* One 24px strip at the top of the shell. It used to be fixed above the
+   bottom navigation, where it covered the last rows and actions of every
+   table on a phone (audit P0-05). In the grid it costs 24px once and
+   covers nothing. */
+.ds-demo-banner {
+  margin: 0; padding: 3px var(--space-4);
+  background: var(--color-warning-bg); color: var(--color-warning);
+  border-bottom: 1px solid var(--color-warning);
+  font-family: var(--font-display); font-size: 11px; line-height: 18px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; text-align: center;
+  /* A status line never takes the pointer. */
+  pointer-events: none;
+}
+
+.ds-crumb:empty { display: none; }
+
+/* ── Breadcrumb ────────────────────────────────────────────────────────── */
+
+/* One line, always. The crumb is a flex row, but nothing stopped the text
+   *inside* a crumb from wrapping: "International Christite Community" and a
+   record code broke over two and three lines, and --screen-head is a fixed
+   64px, so the extra lines were pushed straight out of the top of the
+   header. Each crumb now shrinks with an ellipsis instead, and the strip as
+   a whole stays exactly one line tall whatever the record is called. */
+.ds-crumb {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: nowrap; min-width: 0; overflow: hidden;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+}
+.ds-crumb > * { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ds-crumb__sep { flex: none; }
+.ds-crumb a { color: var(--color-text-tertiary); text-decoration: none; border-bottom: 1px solid transparent; }
+.ds-crumb a:hover { color: var(--color-text); border-bottom-color: var(--color-border-strong); }
+.ds-crumb a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-crumb__sep { color: var(--color-text-disabled); }
+.ds-crumb__here { color: var(--color-text); }
+
+/* ── Tile ──────────────────────────────────────────────────────────────── */
+
+/* The tile count at each level is fixed by the product -- four campuses,
+   two divisions, two dashboards -- so the grid shape is declared rather
+   than guessed from auto-fit. Guessing is what left four tiles as one
+   216px row at the top of an 800px screen with nothing under it. */
+.ds-tilegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--tile-min), 1fr));
+  gap: var(--space-5);
+  align-content: start;
+  grid-auto-rows: var(--tile-height-lg);
+}
+.ds-tilegrid--sm { grid-auto-rows: var(--tile-height-sm); }
+
+/* Four tiles, two by two, filling the screen: "large cards, one per
+   campus". The row floor keeps them readable on a short laptop. */
+.ds-tilegrid--quad {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--tile-height-lg), 1fr);
+  align-content: stretch;
+  height: 100%;
+}
+
+/* Two tiles side by side. They are capped rather than stretched: a pair of
+   790px-tall tiles is a poster, not a choice. */
+.ds-tilegrid--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--tile-height-lg), 340px);
+  align-content: center;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .ds-tilegrid--quad, .ds-tilegrid--pair { grid-template-columns: minmax(0, 1fr); height: auto; align-content: start; }
+  .ds-tilegrid--quad, .ds-tilegrid--pair { grid-auto-rows: var(--tile-height-sm); }
+}
+
+.ds-tile {
+  position: relative; display: flex; flex-direction: column;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-tile);
+  color: inherit; text-decoration: none; overflow: hidden;
+  transition: box-shadow var(--motion-standard), translate var(--motion-standard);
+}
+.ds-tilegrid--sm .ds-tile { padding: var(--space-5); }
+.ds-tile[href]:hover { box-shadow: var(--shadow-tile-raised); translate: 0 -2px; }
+.ds-tile:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.ds-tile__title { font-family: var(--font-display); font-size: 22px; line-height: 24px; font-weight: 600; margin: 0; }
+.ds-tilegrid--sm .ds-tile__title { font-size: 18px; line-height: 20px; }
+.ds-tile__note { margin: var(--space-2) 0 0; max-width: 30ch; font-size: 13px; line-height: 18px; color: var(--color-text-tertiary); }
+.ds-tile__stat { margin: var(--space-3) 0 0; font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
+
+.ds-tile__go {
+  margin-top: auto; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--color-text);
+}
+.ds-tile__go .ph { font-size: 16px; transition: translate var(--motion-standard); }
+.ds-tile[href]:hover .ds-tile__go .ph { translate: 4px 0; }
+
+/* Corner artwork: blocks cut from the tile's own accent, never an image. */
+.ds-tile__art { position: absolute; right: 0; bottom: 0; width: 148px; height: 112px; pointer-events: none; }
+.ds-tilegrid--sm .ds-tile__art { width: 104px; height: 78px; }
+
+.ds-tile--pine   { background: var(--tile-pine);   border-color: var(--tile-pine);   color: var(--on-accent); }
+.ds-tile--indigo { background: var(--tile-indigo); border-color: var(--tile-indigo); color: var(--on-accent); }
+.ds-tile--brass  { background: var(--tile-brass);  border-color: var(--tile-brass);  color: var(--on-accent); }
+/* The heading is listed explicitly and is not optional. `.ds-tile` setting
+   `color` is not enough for it: base.css declares
+   `h1,h2,h3,h4,h5,h6 { color: var(--color-text) }`, and an element
+   selector's explicit colour beats an inherited one no matter how specific
+   the ancestor is. That is the whole of audit finding P1-06 -- a navy tile
+   whose title computed to rgb(29,31,32), 1.67:1. */
+.ds-tile--pine .ds-tile__title, .ds-tile--indigo .ds-tile__title, .ds-tile--brass .ds-tile__title,
+.ds-tile--pine .ds-tile__code, .ds-tile--indigo .ds-tile__code, .ds-tile--brass .ds-tile__code { color: var(--on-accent); }
+.ds-tile--pine .ds-tile__note, .ds-tile--indigo .ds-tile__note, .ds-tile--brass .ds-tile__note,
+.ds-tile--pine .ds-tile__stat, .ds-tile--indigo .ds-tile__stat, .ds-tile--brass .ds-tile__stat { color: var(--on-accent-muted); }
+.ds-tile--pine .ds-tile__go, .ds-tile--indigo .ds-tile__go, .ds-tile--brass .ds-tile__go { color: var(--on-accent); }
+.ds-tile--pine:focus-visible, .ds-tile--indigo:focus-visible, .ds-tile--brass:focus-visible { outline-color: var(--color-text); }
+
+/* Locked: a product state, not a permission error and not a disabled
+   button. Nothing focusable; every word in --color-text-tertiary, which
+   is 5.5:1 on this fill (--color-text-disabled is only 3.6:1). */
+.ds-tile--locked { background: var(--surface-locked); border-color: var(--color-border); box-shadow: none; cursor: default; }
+.ds-tile--locked .ds-tile__title,
+.ds-tile--locked .ds-tile__note,
+.ds-tile--locked .ds-tile__go,
+.ds-tile--locked .ds-tile__code { color: var(--color-text-tertiary); }
+
+.ds-tile__flag {
+  position: absolute; top: var(--space-4); right: var(--space-4);
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 4px var(--space-2); border-radius: var(--radius-chip);
+  background: var(--color-surface-1); color: var(--color-text-tertiary);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+}
+.ds-tile__code {
+  position: absolute; top: var(--space-4); right: var(--space-4);
+  font-family: var(--font-mono); font-size: 12px;
+  /* Colour, not opacity: an opacity here multiplied with the accent rule's
+     white and dropped the division code below AA on the brass ground. */
+  color: var(--color-text-tertiary);
+}
+
+/* ── Status chip ───────────────────────────────────────────────────────── */
+
+.ds-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 3px var(--space-2); border-radius: var(--radius-chip);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; white-space: nowrap;
+}
+.ds-chip__pip { width: 7px; height: 7px; border-radius: 2px; background: currentColor; flex: none; }
+.ds-chip .ph { font-size: 13px; }
+.ds-chip--upcoming { background: var(--state-upcoming-tint); color: var(--state-upcoming); }
+.ds-chip--active   { background: var(--state-active-tint);   color: var(--state-active); }
+.ds-chip--complete { background: var(--state-complete-tint); color: var(--state-complete); }
+.ds-chip--overdue  { background: var(--state-overdue-tint);  color: var(--state-overdue); }
+
+/* ── Filter bar ────────────────────────────────────────────────────────── */
+
+/* The bar already wrapped (`flex-wrap: wrap`, below) but was pinned to one
+   36px line, so on a phone the segmented control overflowed the screen --
+   "COM…" for Complete -- and the search field and result count wrapped onto
+   a second line that had nowhere to go and was painted over by the list
+   beneath. It is a minimum now, not a fixed height. */
+.ds-filter { display: flex; align-items: center; gap: var(--space-2); min-height: var(--filter-height); }
+.ds-filter__set { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: var(--radius-control); background: var(--color-surface-2); }
+
+.ds-filter__seg {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 30px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-chip);
+  background: transparent; color: var(--color-text-secondary); cursor: pointer; text-decoration: none;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+}
+.ds-filter__seg:hover { color: var(--color-text); }
+.ds-filter__seg[aria-current="page"] { background: var(--color-surface-1); color: var(--color-text); box-shadow: 0 1px 2px rgb(29 31 32 / 7%); }
+.ds-filter__seg:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-filter__count {
+  min-width: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--color-surface-3); color: var(--color-text-secondary);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 17px; text-align: center;
+}
+.ds-filter__seg[aria-current="page"] .ds-filter__count { background: var(--color-surface-2); color: var(--color-text); }
+.ds-filter__result { margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+
+/* ── Event card ────────────────────────────────────────────────────────── */
+
+.ds-cardgrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: var(--space-4); align-content: start; padding: var(--space-4);
+}
+
+.ds-event {
+  position: relative; display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-surface-1); box-shadow: var(--shadow-tile);
+  color: inherit; text-decoration: none;
+  transition: box-shadow var(--motion-standard), translate var(--motion-standard);
+}
+.ds-event:hover { box-shadow: var(--shadow-tile-raised); translate: 0 -2px; }
+.ds-event:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* The colour code is a rail down the leading edge; the chip beside it
+   carries the word, so the state survives grayscale. */
+.ds-event::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  border-radius: var(--radius-panel) 0 0 var(--radius-panel); background: var(--state-complete);
+}
+.ds-event--upcoming::before { background: var(--state-upcoming); }
+.ds-event--active::before   { background: var(--state-active); }
+.ds-event--complete::before { background: var(--state-complete); }
+.ds-event--overdue::before  { background: var(--state-overdue); }
+
+.ds-event__title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+.ds-event__meta { display: flex; gap: var(--space-3); margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+.ds-event__foot { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+.ds-event__note { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary); }
+.ds-event__progress { flex: 1; height: 4px; }
+.ds-event__progress-track { fill: var(--color-surface-3); }
+.ds-event__progress-fill { fill: var(--state-active); }
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+
+/* A tab is a tile, revised 17 September 2026. The strip used to be five
+   words in `--color-text-tertiary` on transparent, separated by nothing and
+   marked only by a 2px underline on the active one: on the `--color-canvas`
+   ground the resting tabs read as page furniture rather than as controls,
+   and the reader could not see where the strip began or ended.
+
+   Each tab now carries a fill. The hue is the RECORD'S FAMILY -- pine for an
+   ICC event, indigo for an IGP programme -- which keeps colour inside its
+   one permitted job (identity) instead of handing five tabs five decorative
+   hues. It is also the hue the reader clicked through to get here, from the
+   division tile onward. Resting tabs take the family tint, the open one the
+   solid accent; the underline is gone, because a filled tab does not need a
+   second marker. */
+.ds-tabs {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: var(--tab-height); border-bottom: 1px solid var(--color-border);
+  min-width: 0;
+}
+.ds-tab {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 32px; padding: 0 var(--space-4);
+  border: 1px solid transparent; border-radius: var(--radius-control);
+  background: var(--tab-tint); color: var(--color-text);
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+  transition: background var(--motion-fast);
+}
+.ds-tab:hover { background: var(--tab-tint-hover); }
+.ds-tab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-tab__count { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); letter-spacing: 0; }
+
+/* The open tab. `--on-accent` is named on every child that has a colour rule
+   of its own -- the count does, and an inherited white loses to it (the same
+   trap as audit P1-06). */
+.ds-tab.is-active { background: var(--tab-accent); border-color: var(--tab-accent); color: var(--on-accent); }
+.ds-tab.is-active:hover { background: var(--tab-accent); }
+.ds-tab.is-active .ds-tab__count { color: var(--on-accent-muted); }
+.ds-tab.is-active:focus-visible { outline-color: var(--color-text); }
+
+/* The family, set once on the strip. The bare `.ds-tabs` fallback is declared
+   FIRST on purpose: it and the modifiers are both one class, so at equal
+   specificity the later rule wins -- put it after and every strip would be
+   brand blue no matter which family it carries. */
+.ds-tabs { --tab-accent: var(--color-primary); --tab-tint: var(--color-primary-soft); --tab-tint-hover: #e0edfb; }
+.ds-tabs--pine   { --tab-accent: var(--tile-pine);   --tab-tint: var(--tile-pine-tint);   --tab-tint-hover: #d8e6e0; }
+.ds-tabs--indigo { --tab-accent: var(--tile-indigo); --tab-tint: var(--tile-indigo-tint); --tab-tint-hover: #dae3ec; }
+
+.ds-tab--analytics { margin-left: auto; }
+.ds-tab--analytics .ph { font-size: 15px; }
+
+/* ── Work row — one item, one line, six cells ──────────────────────────── */
+
+/* `overflow: hidden` used to clip children to the rounded corners. It also
+   clipped the review panel, which is anchored to its row and has to escape
+   the list. The corners are rounded on the first and last child instead. */
+.ds-rows { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-panel); }
+.ds-rows > :first-child { border-top-left-radius: var(--radius-panel); border-top-right-radius: var(--radius-panel); }
+.ds-rows > :last-child { border-bottom-left-radius: var(--radius-panel); border-bottom-right-radius: var(--radius-panel); }
+.ds-rows + .ds-rows { margin-top: var(--space-4); }
+.ds-rows__title {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin: 0; padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-display); font-size: 17px; line-height: 20px; font-weight: 600;
+}
+.ds-rows__title .ds-rows__n { margin-left: auto; font-family: var(--font-mono); font-size: 13px; font-weight: 400; color: var(--color-text-tertiary); }
+
+/* The last column used to reserve 336px for a select, a text input and a
+   verb on every single row. That is what squeezed the two text columns
+   until every title ellipsised (audit P1-03) and what pushed the controls
+   off-canvas on a phone (P0-02). A row now carries one compact verb and
+   the form lives in the panel below it (P1-04). */
+.ds-rows__head, .ds-row {
+  display: grid;
+  /* The "when" and "docs" tracks were fixed at 104px and 64px. A due date
+     fits; the alert feed's full timestamp and its event kind do not, and a
+     grid item's default `min-width: auto` meant they did not shrink either --
+     they overflowed their track and were painted over by the chip and the
+     button beside them ("16 Sep 2026, 0!", "approval_p"). Both tracks now
+     grow to their content, and the cells below contain themselves. */
+  grid-template-columns: 8px minmax(160px, 1.5fr) minmax(0, 1.6fr) minmax(104px, max-content) minmax(104px, max-content) minmax(64px, max-content) minmax(84px, max-content);
+  align-items: center; gap: var(--space-2);
+  padding: 0 var(--space-4);
+}
+.ds-rows__head {
+  height: 32px; background: var(--color-surface-2); border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--color-text-tertiary);
+}
+/* A column head is one line like the cells under it: uppercase at .09em
+   tracking overruns a 92px column and collides with its neighbour. */
+.ds-rows__head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-row { position: relative; min-height: var(--row-height); border-bottom: 1px solid var(--color-border-subtle); background: var(--color-surface-1); }
+/* A row with its review panel open sits above its neighbours, or the panel
+   is painted under the next row's background. */
+.ds-row:has(.ds-review[open]) { z-index: 1; }
+.ds-row:last-child { border-bottom: 0; }
+.ds-row:hover { background: var(--color-surface-2); }
+.ds-row:focus-within { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+.ds-row__pip { width: 8px; height: 8px; border-radius: 2px; background: var(--state-complete); }
+.ds-row--upcoming .ds-row__pip { background: var(--state-upcoming); }
+.ds-row--active   .ds-row__pip { background: var(--state-active); }
+.ds-row--overdue  .ds-row__pip { background: var(--state-overdue); }
+
+/* The title is the only visible copy of the record's name, so it wraps to
+   a second line rather than ellipsising -- "Never truncate the only
+   visible copy of a title" (audit P1-03). Secondary description still
+   clamps, because the row links to the record that holds all of it. */
+.ds-row__title {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere;
+  font-size: 14px; line-height: 20px; font-weight: 500;
+}
+.ds-row__desc {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere;
+  font-size: 13px; line-height: 18px; color: var(--color-text-secondary);
+}
+/* A row is at least one 44px line and grows to fit two-line content. */
+.ds-row { padding-block: 6px; }
+.ds-row__when { font-family: var(--font-mono); font-size: 13px; color: var(--color-text-secondary); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ds-row--overdue .ds-row__when { color: var(--state-overdue); font-weight: 600; }
+.ds-row__docs { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary); text-decoration: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-row__docs .ph { font-size: 14px; }
+a.ds-row__docs { color: var(--color-link); }
+a.ds-row__docs:hover { text-decoration: underline; }
+.ds-row__act { justify-self: end; display: flex; align-items: center; gap: var(--space-2); }
+/* A second disclosure on the same row (the import batch's Provenance)
+   shares the action column rather than adding an eighth track. */
+.ds-row > .ds-review--wide { grid-column: 7; justify-self: end; }
+.ds-row__empty { color: var(--color-text-disabled); font-family: var(--font-mono); font-size: 12px; }
+
+/* ── Deciding on a record: read first, then review ─────────────────────
+   Audit P1-04. Every task, checklist item, budget line, document, buddy
+   log, contribution and feedback row used to carry a select, a free-text
+   reason and a Save button inline. On desktop those collided with the
+   status chip; on a phone they were positioned off-canvas and appeared as
+   fragments on the left edge (P0-02).
+
+   The row is now read-first: state, then one verb. `Review` opens a panel
+   holding the identical form -- same action, same method, same field
+   names, same CSRF and version inputs, same server validation. It is a
+   native <details>, so it opens, closes and takes focus with no
+   JavaScript, which the no-JS contract requires. */
+
+.ds-review { position: static; }
+.ds-review__trigger {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  height: 26px; padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-chip);
+  background: var(--color-surface-1); color: var(--color-text-secondary);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .04em; cursor: pointer; white-space: nowrap;
+  list-style: none;
+}
+.ds-review__trigger::-webkit-details-marker { display: none; }
+.ds-review__trigger::marker { content: ""; }
+.ds-review__trigger:hover { border-color: var(--color-text); color: var(--color-text); }
+.ds-review__trigger:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-review[open] > .ds-review__trigger { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.ds-review__trigger::after { content: "\203a"; font-size: 15px; line-height: 1; rotate: 90deg; }
+.ds-review[open] > .ds-review__trigger::after { rotate: -90deg; }
+
+/* Anchored to the row rather than stretching it, so opening one review
+   does not shove every row below it down the screen. */
+.ds-review__panel {
+  position: absolute; z-index: var(--z-popover);
+  top: calc(100% - 2px); right: 0;
+  width: min(440px, calc(100vw - 2 * var(--screen-pad)));
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-panel);
+  background: var(--color-surface-1); box-shadow: var(--shadow-tile-raised);
+  text-align: left; white-space: normal;
+}
+.ds-review__title {
+  margin: 0 0 var(--space-3); font-family: var(--font-display);
+  font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+/* Inside the panel the form is a normal stacked form again: visible
+   labels, full-size controls, hints beside the field they qualify. */
+.ds-review__panel .aurora-inline-decision { display: grid; gap: var(--space-3); margin: 0; }
+.ds-review__panel .aurora-inline-field { display: grid; gap: var(--space-1); min-width: 0; }
+.ds-review__panel .aurora-inline-label {
+  position: static; width: auto; height: auto; margin: 0; padding: 0;
+  overflow: visible; clip-path: none; white-space: normal;
+  color: var(--color-text-tertiary);
+}
+.ds-review__panel .aurora-inline-decision button { justify-self: start; }
+.ds-review__hint { margin: 0; color: var(--color-text-tertiary); font-size: 12px; line-height: 16px; }
+
+.ds-empty {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4); color: var(--color-text-tertiary);
+  font-size: 12px; line-height: 16px; font-weight: 500;
+}
+/* A screen-level empty state. Compact on purpose: the old one centred a
+   small card in a very large blank page and told the reader nothing about
+   what to do next (audit P1-11). One explanation, one permitted action,
+   and the container follows the content instead of stretching. */
+.ds-empty--block {
+  align-items: flex-start; gap: var(--space-4); flex-wrap: wrap;
+  max-width: 640px; margin: var(--space-6) 0 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-surface-1);
+}
+.ds-empty--block > i.ph { font-size: 22px; color: var(--color-text-disabled); flex: none; }
+.ds-empty--block > div { flex: 1 1 260px; min-width: 0; }
+.ds-empty__title { margin: 0; font-family: var(--font-display); font-size: 17px; line-height: 22px; font-weight: 600; color: var(--color-text); }
+.ds-empty__body { margin: var(--space-1) 0 0; font-size: 13px; line-height: 19px; font-weight: 400; color: var(--color-text-secondary); }
+
+/* ── Search, as one control ────────────────────────────────────────────
+   Audit: a full-width field and a distant Search button read as two
+   unrelated things. One bordered group, Enter submits, and Clear appears
+   only when there is something to clear. */
+.ds-search {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 30px; padding: 0 var(--space-2); min-width: 0; flex: 1 1 200px; max-width: 420px;
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-control);
+  background: var(--color-surface-1);
+}
+.ds-search:focus-within { border-color: var(--color-focus); }
+.ds-search > .ph { font-size: 15px; color: var(--color-text-tertiary); flex: none; }
+/* Four classes deep because components.css sizes every bare `input` at
+   (0,3,1); a shorter selector loses and the 38px bordered control comes
+   back inside a 30px group. */
+.ds-filter .ds-search .ds-search__input, .ds-search input.ds-search__input {
+  flex: 1 1 auto; min-width: 0; height: 26px; min-height: 0;
+  padding: 0; border: 0; background: transparent; font-size: 13px;
+}
+.ds-search__go, .ds-search__clear {
+  flex: none; height: 22px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-chip);
+  background: var(--color-surface-2); color: var(--color-text-secondary);
+  font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-decoration: none; display: inline-flex; align-items: center; cursor: pointer;
+}
+.ds-search__go:hover, .ds-search__clear:hover { background: var(--color-surface-3); color: var(--color-text); }
+.ds-filter { flex-wrap: wrap; }
+
+/* A chip that names its own dimension needs a box to hang the mobile label
+   on, because that label cannot live inside an inline-flex chip. */
+.ds-row__state { display: inline-flex; align-items: center; min-width: 0; }
+/* Reused in the screen header, where it is a flex item with no basis: it was
+   sized to 27px while the chip inside it stayed 99px, so the chip ran under
+   the "blocking closure" button. Nothing in the tools strip shrinks; the
+   title beside it is the element that gives way, and it already ellipsises. */
+.ds-screen__tools > * { flex: none; }
+/* One element, two audiences: hidden from sight beside a column head that
+   already names it, and the card's visible label once the head is gone. */
+.ds-chip__dimension {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* A list's footer holds the secondary "add" forms. They are a disclosure
+   because they are not items: the list above them is never collapsed. */
+.ds-rows__foot { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); background: var(--color-surface-1); }
+.ds-rows__foot--inline { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* A row of filters is one scrolling line, never a wrapped block. Eleven
+   decision kinds wrapped to five rows on a phone and pushed the list they
+   filter off the first viewport. */
+.ds-chipbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+.ds-chipbar > * { flex: none; }
+.ds-rows__foot .aurora-disclosure__trigger { font-size: 12px; }
+
+.ds-evidence { margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-panel); }
+.ds-evidence__legend { padding: 0 var(--space-2); font-family: var(--font-display); font-size: 13px; font-weight: 600; }
+.ds-evidence__list { margin: 0 0 var(--space-2); padding-left: var(--space-5); font-size: 13px; }
+.ds-evidence__list li { margin-bottom: var(--space-1); }
+.ds-evidence__legacy { margin: 0 0 var(--space-2); color: var(--color-text-tertiary); font-size: 12px; }
+.ds-evidence .aurora-inline-decision { margin-top: var(--space-2); }
+
+/* Reference facts, not items: a key/value strip that wraps into as many
+   columns as the width allows and never becomes a row list. */
+.ds-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 var(--space-5); margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-surface-1);
+}
+/* The value wraps. Every one of these is the only visible copy of a fact
+   -- operating unit, venue, audience, the date range -- and clipping them
+   is exactly audit finding P1-03: "Never truncate the only visible copy of
+   a title or required instruction." The row grows instead. */
+.ds-facts__row { display: flex; align-items: baseline; gap: var(--space-2); padding: 4px 0; border-bottom: 1px solid var(--color-border-subtle); }
+.ds-facts dt { flex: none; font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.ds-facts dd { margin: 0 0 0 auto; min-width: 0; font-size: 13px; line-height: 18px; text-align: right; overflow-wrap: anywhere; }
+
+.ds-more { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.ds-more__item {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--color-border); border-radius: var(--radius-control);
+  background: var(--color-surface-1); color: var(--color-text); text-decoration: none;
+  font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: .04em;
+}
+.ds-more__item:hover { background: var(--color-surface-2); }
+.ds-more__item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ── Buttons sized for a row ───────────────────────────────────────────── */
+
+.ds-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-control);
+  background: var(--color-surface-1); color: var(--color-text); cursor: pointer; text-decoration: none;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; white-space: nowrap;
+}
+.ds-btn:hover { background: var(--color-surface-2); }
+.ds-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-btn .ph { font-size: 15px; }
+.ds-btn--primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.ds-btn--primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.ds-btn--quiet { border-color: transparent; background: transparent; color: var(--color-text-secondary); }
+.ds-btn--quiet:hover { background: var(--color-surface-2); color: var(--color-text); }
+.ds-btn--sm { height: 26px; padding: 0 var(--space-2); }
+.ds-btn[disabled], .ds-btn[aria-disabled="true"] { color: var(--color-text-disabled); border-color: var(--color-border); background: var(--color-surface-1); cursor: default; }
+
+/* ── Analytics ─────────────────────────────────────────────────────────── */
+
+.ds-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); }
+.ds-kpi {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface-1);
+  color: inherit; text-decoration: none; display: block;
+}
+a.ds-kpi:hover { background: var(--color-surface-2); }
+a.ds-kpi:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-kpi__label { display: block; font-family: var(--font-display); font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.ds-kpi__value { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: 34px; line-height: 36px; font-weight: 600; letter-spacing: -.02em; }
+.ds-kpi__value--overdue { color: var(--state-overdue); }
+.ds-kpi__foot { display: block; margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+.ds-kpi__foot b { font-weight: 600; color: var(--color-text-secondary); }
+
+.ds-panel {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-surface-1); min-height: 0; display: flex; flex-direction: column;
+}
+/* `wrap`, because the head is a title beside an action group that does not
+   shrink: on a phone "Import itinerary" needed 349px in a 301px head, so the
+   title was squeezed to nothing and the button was still cut off by the
+   panel's edge. The action now takes its own line when it cannot share one.
+   Inert wherever the two already fit, which is every desktop width. */
+.ds-panel__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.ds-panel__title { margin: 0; font-family: var(--font-display); font-size: 17px; line-height: 20px; font-weight: 600; }
+.ds-panel__note { font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+.ds-panel__plot { min-height: 0; flex: 1; }
+.ds-panel__plot svg { display: block; width: 100%; height: auto; }
+
+.ds-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); font-size: 12px; line-height: 16px; color: var(--color-text-secondary); }
+.ds-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ds-legend i { width: 10px; height: 10px; border-radius: 2px; }
+
+/* Chart marks. Recessive axis, ink for text -- text never wears the series
+   colour. The four series are the reserved status palette, and each is
+   named in the legend beside its swatch. */
+.ds-chart__axis { fill: var(--color-border); }
+.ds-chart__label { font-family: var(--font-sans); font-size: 12px; fill: var(--color-text-secondary); }
+.ds-chart__value { font-family: var(--font-mono); font-size: 12px; font-weight: 600; fill: var(--color-text-secondary); }
+.ds-chart__seg--complete { fill: var(--state-complete); }
+.ds-chart__seg--active   { fill: var(--state-active); }
+.ds-chart__seg--upcoming { fill: var(--state-upcoming); }
+.ds-chart__seg--overdue  { fill: var(--state-overdue); }
+.ds-chart__key { width: 10px; height: 10px; border-radius: 2px; }
+.ds-chart__key--complete { background: var(--state-complete); }
+.ds-chart__key--active   { background: var(--state-active); }
+.ds-chart__key--upcoming { background: var(--state-upcoming); }
+.ds-chart__key--overdue  { background: var(--state-overdue); }
+
+/* A floating aside: first-run guidance that must not change the screen's
+   height budget. It is dismissed for good, not collapsed. */
+.ds-aside {
+  position: fixed; right: var(--space-5); bottom: var(--space-5); z-index: var(--z-sticky);
+  width: 300px; padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border); border-radius: var(--radius-panel);
+  background: var(--color-surface-1); box-shadow: var(--shadow-tile-raised);
+}
+.ds-aside__head { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: var(--space-3); }
+.ds-aside__title { margin: 0; font-family: var(--font-display); font-size: 17px; line-height: 20px; font-weight: 600; }
+.ds-aside__count { margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+.ds-aside .onb-task__label { color: inherit; }
+.ds-aside a.onb-task__label { color: var(--color-link); }
+
+/* ── Motion ────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-tile, .ds-event, .ds-tile__go .ph, .ds-rail__item, .ds-rail__label { transition: none; }
+  .ds-tile[href]:hover, .ds-event:hover { translate: none; }
+}
+
+/* ── Short viewports ───────────────────────────────────────────────────── */
+
+@media (max-height: 900px) {
+  .ds-row, .ds-rows__head { padding: 0 var(--space-3); }
+  .ds-row { min-height: var(--row-height-dense); }
+  /* Only the auto-shaped grid shrinks here. --quad and --pair declare
+     their own rows and are already height-bound; letting this rule win
+     over them (equal specificity, later in the file) was what pinned four
+     campus tiles to 180px in the top half of an 800px screen. */
+  .ds-tilegrid:not(.ds-tilegrid--quad):not(.ds-tilegrid--pair) { grid-auto-rows: 180px; }
+  .ds-tilegrid--pair { grid-auto-rows: minmax(180px, 300px); }
+  .ds-tile { padding: var(--space-5); }
+  .ds-screen__title { font-size: 26px; line-height: 28px; }
+}
+
+/* ── When the header cannot hold one row ───────────────────────────────
+   Measured, not guessed: a project header carries a four-level breadcrumb
+   (572px for "Campuses / Central / International Christite Community /
+   ICC-2026-CEN-001") beside 512px of lifecycle chip and actions. At 1024px
+   the head has 952px for 1,100px of content, and whichever of the two is
+   made to yield, it is mangled -- the crumb shrank to "CAM… / CE… /
+   INTERNATIONAL CHR…", or "Report" was cut off the right edge.
+
+   The two-row header below 860px was written for exactly this ("the record's
+   identity, which wraps, and its actions, which scroll"). It simply started
+   too late. It now starts where one row provably stops fitting. Only the
+   header changes here; rows stay rows and the rail stays a rail until 860px,
+   and `.ds-screen`'s head row becomes `auto`, so the extra line is real
+   space rather than something to overflow into. */
+@media (max-width: 1100px) {
+  .ds-screen { grid-template-rows: auto minmax(0, 1fr); }
+  .ds-screen__head {
+    display: grid; grid-template-columns: minmax(0, 1fr);
+    align-items: start; gap: var(--space-2);
+    padding: var(--space-3) var(--screen-pad);
+  }
+  .ds-screen__tools {
+    margin-left: 0; width: 100%;
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .ds-screen__tools::-webkit-scrollbar { display: none; }
+  .ds-crumb { flex-wrap: wrap; overflow: visible; }
+  .ds-crumb > * { overflow: visible; text-overflow: clip; }
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  /* The bottom bar reserves its own height plus the home-indicator inset,
+     and everything fixed above it is offset from --mobile-nav-clearance
+     rather than from a hard-coded 56px. Audit P0-05 and P1-14: the demo
+     banner, the flash stack and the first-run aside each carried their own
+     offset, and the banner sat over the last row of every table. */
+  :root { --mobile-nav: 56px; --mobile-nav-clearance: calc(56px + env(safe-area-inset-bottom)); }
+  .ds-app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) var(--mobile-nav-clearance);
+    grid-template-areas: "banner" "screen" "rail";
+  }
+  .ds-rail {
+    flex-direction: row; justify-content: space-around;
+    padding: 0 var(--space-2) env(safe-area-inset-bottom); gap: 0;
+  }
+  .ds-rail__brand, .ds-rail__label, .ds-rail__item--desk { display: none; }
+  .ds-rail__nav { flex-direction: row; justify-content: space-around; }
+  .ds-rail__spacer { margin-top: 0; }
+  .ds-rail__item { width: 48px; height: 48px; }
+  .ds-rail__item.is-active::before { left: 10px; right: 10px; top: -8px; bottom: auto; width: auto; height: 3px; }
+  /* ── An explicit mobile record header ───────────────────────────────
+     Audit P0-02: the head was one flex line, so a long title ellipsised
+     to "Coffee Meet…" while the lifecycle chip and the Edit/Report
+     buttons ran off the right edge. It becomes two stacked rows: the
+     record's identity, which wraps, and its actions, which scroll. */
+  .ds-screen { grid-template-rows: auto minmax(0, 1fr); }
+  .ds-screen__head {
+    display: grid; grid-template-columns: minmax(0, 1fr);
+    align-items: start; gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+  /* Four stacked campus tiles are 652px of content in a 588px body, and the
+     body clips. On a phone the one-screen rule has already yielded -- the
+     header stacks, rows become cards, a panel body scrolls -- so the body
+     scrolls here too rather than hiding the last tile. `auto` is inert on
+     any screen whose content already fits. */
+  .ds-screen__body { padding: var(--space-4); overflow-y: auto; overscroll-behavior: contain; }
+  .ds-screen__title {
+    /* Two lines, then clamp. A record you cannot name is a record you
+       cannot safely act on. */
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+    white-space: normal; overflow: hidden; overflow-wrap: anywhere;
+    font-size: 22px; line-height: 26px;
+  }
+  .ds-screen__tools {
+    margin-left: 0; width: 100%;
+    overflow-x: auto; overflow-y: hidden;
+    /* The row scrolls; it never clips. A button half off the viewport is
+       the "actions extend past the right edge" finding. */
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .ds-screen__tools::-webkit-scrollbar { display: none; }
+  .ds-screen__tools > * { flex: none; }
+  /* Below 860px the head is an `auto` row, so the crumb is free to wrap --
+     and must not stay clipped to the one line the fixed desktop head needs. */
+  .ds-crumb { flex-wrap: wrap; overflow: visible; }
+  .ds-crumb > * { overflow: visible; text-overflow: clip; }
+  /* A labelled cell on a card puts its label on its own line, including
+     the one that wraps a chip. The chip's dimension becomes that label
+     rather than a second ::before, so it is announced once. */
+  .ds-row__state { display: block; }
+  .ds-chip__dimension {
+    position: static; width: auto; height: auto; margin: 0 0 1px; padding: 0;
+    overflow: visible; clip-path: none; display: block;
+    font: 600 11px/15px var(--font-display); letter-spacing: .09em; text-transform: uppercase;
+    color: var(--color-text-tertiary);
+  }
+
+  /* ── A row becomes a labelled record card ───────────────────────────
+     Audit P0-02. The seven-column grid needed ~750px; inside 390px the
+     action cell was positioned off-canvas and Save/Resolve appeared as a
+     fragment on the left edge. Below 860px the row stacks, every cell
+     announces which column it is, and the actions sit inside the card. */
+  .ds-rows__head { display: none; }
+  .ds-row {
+    grid-template-columns: 8px minmax(0, 1fr);
+    align-items: start; row-gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+  }
+  .ds-row > * { grid-column: 2; min-width: 0; justify-self: start; }
+  .ds-row__pip { grid-column: 1; grid-row: 1; margin-top: 7px; }
+  .ds-row__title { -webkit-line-clamp: none; line-clamp: none; display: block; font-size: 15px; line-height: 21px; }
+  .ds-row__desc, .ds-row__docs { display: block; }
+  .ds-row__desc { -webkit-line-clamp: 3; line-clamp: 3; display: -webkit-box; }
+  /* The column name, carried by the cell itself. A card that drops its
+     labels is the "unexplained dashes" finding on the phone People tab. */
+  .ds-row > [data-label]::before {
+    content: attr(data-label);
+    display: block; margin-bottom: 1px;
+    font: 600 11px/15px var(--font-display); letter-spacing: .09em; text-transform: uppercase;
+    color: var(--color-text-tertiary);
+  }
+  .ds-row__act { justify-self: stretch; flex-wrap: wrap; }
+  .ds-row__act form, .ds-row__act .ds-review { width: 100%; }
+  .ds-row__act .ds-btn, .ds-review__trigger { justify-content: center; }
+  /* Static and full width: an anchored popover inside a 390px card has
+     nowhere to anchor to. */
+  .ds-review__panel {
+    position: static; width: 100%; margin-top: var(--space-2);
+    box-shadow: none; background: var(--color-surface-2);
+  }
+
+  .ds-tabs { overflow-x: auto; gap: var(--space-1); }
+  .ds-tab { padding: 0 var(--space-3); }
+  /* A tools button keeps its number and loses its sentence: the head is one
+     line and the title has first claim on it. */
+  .ds-btn__wide { display: none; }
+  .ds-flash { right: var(--space-3); left: var(--space-3); bottom: calc(var(--mobile-nav-clearance) + var(--space-3)); width: auto; }
+  .ds-aside { left: var(--space-3); right: var(--space-3); width: auto; bottom: calc(var(--mobile-nav-clearance) + var(--space-3)); }
+}
+
+/* ── The phone Menu drawer ─────────────────────────────────────────────
+   Audit P0-05. The bar carried seven icons and a sign-out; the contract is
+   four destinations plus Menu. Everything displaced lives here, labelled,
+   with the role and scope that explains what the screens behind it show
+   (P1-10). A native <details>, so it needs no JavaScript. */
+
+.ds-menu { display: none; }
+.ds-menu__trigger { position: relative; list-style: none; cursor: pointer; }
+.ds-menu__trigger::-webkit-details-marker { display: none; }
+.ds-menu__trigger::marker { content: ""; }
+
+.ds-menu__drawer {
+  position: fixed; z-index: var(--z-overlay);
+  left: 0; right: 0; bottom: var(--mobile-nav-clearance, 56px);
+  max-height: 70dvh; overflow-y: auto;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  background: var(--color-surface-1);
+  border-top: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-tile-raised);
+  text-align: left;
+}
+.ds-menu__title {
+  margin: 0 0 var(--space-3); font-family: var(--font-display);
+  font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+.ds-menu__scope { margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.ds-menu__role { display: grid; gap: 1px; margin: 0 0 var(--space-2); font-size: 13px; line-height: 18px; }
+.ds-menu__role b { font-weight: 600; color: var(--color-text); }
+.ds-menu__role span { color: var(--color-text-tertiary); font-size: 12px; }
+.ds-menu__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ds-menu__link {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-control);
+  color: var(--color-text); text-decoration: none; font-size: 15px;
+}
+.ds-menu__link:hover, .ds-menu__link.is-active { background: var(--color-surface-2); }
+.ds-menu__link .ph { font-size: 18px; color: var(--color-text-tertiary); flex: none; }
+.ds-menu__count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--color-primary); }
+
+/* ── Role and scope in the desktop rail ────────────────────────────────
+   Same fact, same words, in the place a desktop reader looks for identity. */
+.ds-rail__scope {
+  width: 100%; padding: var(--space-2) 6px; margin-bottom: var(--space-1);
+  border-top: 1px solid rgb(255 255 255 / 14%);
+  color: rgb(255 255 255 / 76%);
+  font-family: var(--font-display); font-size: 10px; line-height: 13px;
+  letter-spacing: .06em; text-transform: uppercase; text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* ── Error pages ───────────────────────────────────────────────────────
+   Audit P0-01: a 429 threw away the shell and every route out of it. */
+.ds-error { max-width: 60ch; padding-top: var(--space-4); }
+.ds-error__code {
+  margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: .04em; color: var(--color-text-tertiary);
+}
+.ds-error__title { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: 30px; line-height: 34px; font-weight: 700; }
+.ds-error__lede { margin: 0 0 var(--space-3); font-size: 15px; line-height: 23px; color: var(--color-text-secondary); }
+.ds-error__retry {
+  margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-warning); background: var(--color-warning-bg);
+  color: var(--color-warning); font-size: 14px; font-weight: 600;
+}
+.ds-error__hint { margin: 0 0 var(--space-4); font-size: 13px; line-height: 19px; color: var(--color-text-tertiary); }
+.ds-error__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-6); }
+.ds-error__details { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.ds-error__details > summary { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; }
+.ds-error__details .ds-facts { margin-top: var(--space-3); }
+.ds-facts__wrap { white-space: normal; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 12px; }
+
+@media (max-width: 860px) {
+  .ds-menu { display: block; }
+  .ds-error__title { font-size: 24px; line-height: 28px; }
+}
+
+/* ── Conditional fields ────────────────────────────────────────────────
+   Audit P1-12. Two fields were permanently on screen while their own copy
+   said they applied in one case only: the "If Other, specify" input beside
+   every controlled-vocabulary select, and the reason beside a decision
+   that needs one only when sending back.
+
+   Both are revealed by :has() on the live selection. There is deliberately
+   no JavaScript in it, because the no-JS contract covers every form on the
+   workspace. The rule *hides*, so a browser without :has() drops the whole
+   selector and both fields stay visible -- the behaviour before this
+   change, never a field the reader cannot reach. The inputs keep their
+   name, their label and the server's validation either way; a hidden
+   field submits empty, exactly as an untouched one always did. */
+
+.ds-cond:has(select option:checked:not([value="Other"])) + .ds-cond__other { display: none; }
+.aurora-inline-decision:has(select option:checked[data-no-reason]) .aurora-inline-field--reason { display: none; }
+/* The same rule for a full-width form: the lifecycle transition and the
+   publication decision each take a reason in one branch only. */
+form:has(.ds-cond select option:checked[data-no-reason]) > .aurora-inline-field--reason { display: none; }
+
+/* ── The paged section workspace ───────────────────────────────────────
+   Added 17 September 2026.
+
+   The event workspace put every list a tab owned into one `.ds-scroll`.
+   Logistics stacked the fact strip, the tasks, every checklist and the
+   schedule; People stacked five lists. The screen scrolled to hold it --
+   which the one-screen rule forbids -- and the reader met forty rows when
+   the decision in front of them concerned one.
+
+   A tab is now a strip of section tiles above one open section, paged on
+   the server to `paging.PAGE_SIZE` rows. `--work-strip` and `--pager-height`
+   are tokens here because the fit is arithmetic, not luck: the panel body
+   is the viewport minus the rail's head, the tab strip, this strip, the
+   panel head, the column head and the pager. Change PAGE_SIZE and the row
+   track and these must be recomputed together. */
+
+:root {
+  /* A tile that carries an "N open" pip is three rows -- label 16, figure 23,
+     pip 17, two 2px gaps, 8px padding either side and its border: 78px. The
+     strip was 72, so `.ds-section`'s grid had to take 8px out of a row, and
+     it took them out of the *first* one: every section label rendered in an
+     8px box against a 16px line and was cut clean through the middle of the
+     letters. The strip is now measured from the tallest tile, not guessed. */
+  --work-strip: 84px;
+  --panel-head: 48px;
+  --pager-height: 40px;
+}
+
+.ds-work {
+  display: grid;
+  grid-template-rows: var(--work-strip) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── The section strip ─────────────────────────────────────────────────
+   Tinted while closed, filled while open. Closed tiles stay quiet so the
+   open one is unmistakable, and the accent still says at a glance that
+   these are peers -- which a row of grey chips never did.
+
+   The strip scrolls sideways when a record has more checklists than fit.
+   That is the one axis allowed to move: the *screen* does not scroll, and a
+   horizontal strip that overflows its own width is a control, not a page. */
+.ds-sections {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.ds-section {
+  flex: 0 0 auto;
+  display: grid;
+  align-content: center;
+  /* Rows size to their content and are never squeezed. Without this a strip
+     one pixel shorter than its tallest tile silently slices the label rather
+     than overflowing, which is far harder to notice. */
+  grid-auto-rows: min-content;
+  gap: 2px;
+  min-width: 132px; max-width: 260px;
+  /* A grid item's default `min-width: auto` is min-content, so a checklist
+     called "Summer School Exchange Programme" pushed its own label straight
+     out through the tile's max-width instead of ellipsising inside it. */
+  overflow: hidden;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-tile);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: translate var(--motion-fast), box-shadow var(--motion-fast);
+}
+.ds-section:hover { box-shadow: var(--shadow-tile); translate: 0 -1px; }
+.ds-section:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.ds-section__label {
+  min-width: 0;
+  font-family: var(--font-display); font-size: 13px; line-height: 16px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ds-section__figure { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.ds-section__figure > * { min-width: 0; }
+.ds-section__n { font-family: var(--font-mono); font-size: 19px; line-height: 23px; font-weight: 600; }
+.ds-section__note {
+  font-size: 12px; line-height: 16px; color: var(--color-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* "Open" is the one thing on the tile that carries state, so it takes a
+   reserved state colour and prints its own word. Colour is never alone. */
+.ds-section__open {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--state-overdue);
+}
+.ds-section__open .ph { font-size: 8px; }
+
+.ds-section--pine,   .ds-fact--pine   { background: var(--tile-pine-tint);   border-color: rgb(31 95 78 / 22%); }
+.ds-section--indigo, .ds-fact--indigo { background: var(--tile-indigo-tint); border-color: rgb(44 69 93 / 22%); }
+.ds-section--brass,  .ds-fact--brass  { background: var(--tile-brass-tint);  border-color: rgb(122 90 36 / 22%); }
+
+/* The open section is filled. Every foreground on the three dark grounds is
+   named explicitly: `base.css` sets `h1..h6 { color: var(--color-text) }` at
+   (0,0,1), which beats an inherited white however specific this selector is
+   -- that is audit P1-06, and the same trap applies to any child that has a
+   colour rule of its own. */
+.ds-section.is-active { box-shadow: var(--shadow-tile); }
+.ds-section--pine.is-active   { background: var(--tile-pine);   border-color: var(--tile-pine); }
+.ds-section--indigo.is-active { background: var(--tile-indigo); border-color: var(--tile-indigo); }
+.ds-section--brass.is-active  { background: var(--tile-brass);  border-color: var(--tile-brass); }
+.ds-section.is-active .ds-section__label,
+.ds-section.is-active .ds-section__n { color: var(--on-accent); }
+.ds-section.is-active .ds-section__note { color: var(--on-accent-muted); }
+/* On a filled ground the overdue red drops below 4.5:1, so the open count
+   switches to the accent foreground and keeps its word. */
+.ds-section.is-active .ds-section__open { color: var(--on-accent); }
+.ds-section.is-active:focus-visible { outline-color: var(--color-text); }
+
+/* ── The open section ──────────────────────────────────────────────────
+   Three fixed tracks. The body is `minmax(0, 1fr)` and `overflow: hidden`:
+   the page it holds is sized to fit, so nothing is clipped and nothing
+   scrolls. The pager is pinned to the bottom of the panel rather than
+   floating after the last row, so it is in the same place whether a page
+   holds eight rows or one. */
+.ds-panel {
+  display: grid;
+  /* `minmax`, for the same reason `.ds-work`'s strip is measured rather than
+     fixed: a 48px track cannot hold a head that has wrapped its action onto
+     a second line, and the overflow lands on top of the first row. Resolves
+     to exactly --panel-head wherever the head is one line, which is every
+     screen wide enough to sit the title and the action side by side. */
+  grid-template-rows: minmax(var(--panel-head), auto) minmax(0, 1fr) auto;
+  min-height: 0;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.ds-panel__head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-1);
+  min-width: 0;
+}
+.ds-panel__title {
+  margin: 0; min-width: 0;
+  font-family: var(--font-display); font-size: 19px; line-height: 22px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ds-panel__n {
+  margin: 0; flex: none;
+  font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+.ds-panel__open { color: var(--state-overdue); font-weight: 600; }
+.ds-panel__act { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; flex: none; max-width: 100%; }
+
+/* `auto`, not `hidden`. Paging is still what keeps a section to one screen,
+   but PAGE_SIZE is a constant and the space a page needs is not: four buddy
+   pairings print their interaction logs underneath them, which is twelve
+   rows, and on a 768px-tall screen three of them fitted and the fourth was
+   cut off inside a `hidden` box -- a record the pager had already counted
+   ("1-4 of 6") and no scrollbar to reach. `auto` paints nothing while the
+   page fits, so a roomy screen looks exactly as it did. */
+.ds-panel__body { min-height: 0; min-width: 0; overflow: hidden auto; overscroll-behavior: contain; }
+/* The rows inside a panel are the panel's own children: the `.ds-rows` card
+   that used to wrap them would be a second border around the same edge. */
+.ds-panel__body > .ds-row:last-child { border-bottom: 0; }
+
+/* ── The pager ─────────────────────────────────────────────────────────
+   Plain links, resolved on the server, so it works with JavaScript off and
+   a page can be bookmarked. A single page keeps its count and loses the
+   steps: "1-6 of 6" is what tells the reader nothing is hidden. */
+.ds-pager {
+  display: flex; align-items: center; gap: var(--space-3);
+  height: var(--pager-height); padding: 0 var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+.ds-pager__count { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary); }
+.ds-pager__range { color: var(--color-text); font-weight: 600; }
+.ds-pager__steps { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.ds-pager__n, .ds-pager__step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 26px; padding: 0 6px;
+  border: 1px solid transparent; border-radius: var(--radius-chip);
+  color: var(--color-text-secondary); text-decoration: none;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+}
+.ds-pager__n:hover, .ds-pager__step:hover { background: var(--color-surface-1); border-color: var(--color-border-strong); color: var(--color-text); }
+.ds-pager__n:focus-visible, .ds-pager__step:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.ds-pager__gap { padding: 0 2px; color: var(--color-text-disabled); font-family: var(--font-mono); font-size: 12px; }
+.ds-pager__n.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.ds-pager__step.is-off { color: var(--color-text-disabled); }
+.ds-pager__step.is-off:hover { background: transparent; border-color: transparent; }
+
+/* ── Fact cards ────────────────────────────────────────────────────────
+   The record's attributes, which were a ten-row definition list pinned
+   above the work. They are reference, not items: as cards they are legible
+   at a glance and they carry the family tints, which is most of what the
+   screen was missing. The value still wraps rather than clipping -- every
+   one of these is the only visible copy of the fact (audit P1-03). */
+.ds-factgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+}
+.ds-fact {
+  display: grid; align-content: start; gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-1);
+}
+.ds-fact__label {
+  font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--color-text-tertiary);
+}
+.ds-fact__value { margin: 0; font-size: 14px; line-height: 19px; overflow-wrap: anywhere; }
+/* A fact card takes the same three tints as a closed section tile, declared
+   once with them: ink on a tint, never white, because these are the light
+   grounds. */
+
+/* A panel of decisions rather than a list -- Public disclosure. It has no
+   pager, so it may use the whole body; it is the one section allowed its
+   own scroll, because a closure summary plus a transition plus a
+   publication verdict is three forms and they are all blocking. */
+.ds-forms { padding: var(--space-4); min-height: 0; max-height: 100%; overflow-y: auto; }
+
+/* ── :target dialogs ───────────────────────────────────────────────────
+   Sixteen "add", "import" and "attach" forms used to sit at the foot of the
+   lists they belonged to, each three to six fields tall. They were most of
+   the reason a tab could not fit one viewport.
+
+   The mechanism is the URL fragment and nothing else: the trigger is a link
+   to the dialog's id, `:target` shows it, and both the scrim and the close
+   control are links back to `#`. No JavaScript, so it survives the no-JS
+   contract, and no inline handler, which the CSP would kill and the
+   contract test forbids outright. */
+.ds-modal { display: none; }
+.ds-modal:target {
+  display: grid;
+  place-items: center;
+  position: fixed; inset: 0; z-index: var(--z-dialog);
+  padding: var(--space-6);
+}
+.ds-modal__scrim { position: absolute; inset: 0; background: rgb(29 31 32 / 42%); }
+.ds-modal__panel {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(680px, calc(100dvh - 2 * var(--space-6)));
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-tile-raised);
+  animation: rise .18s ease both;
+}
+.ds-modal__head { display: flex; align-items: flex-start; gap: var(--space-4); }
+.ds-modal__title { margin: 0; flex: 1 1 auto; font-family: var(--font-display); font-size: 22px; line-height: 26px; font-weight: 600; }
+.ds-modal__close {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; margin: -4px -8px 0 0;
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary); text-decoration: none;
+}
+.ds-modal__close:hover { background: var(--color-surface-2); color: var(--color-text); }
+.ds-modal__close:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ds-modal__close .ph { font-size: 18px; }
+.ds-modal__hint { margin: var(--space-2) 0 0; font-size: 13px; line-height: 19px; color: var(--color-text-secondary); }
+/* The dialog is the floating surface, so this is the one place a scroll is
+   correct: it belongs to the dialog, not to the screen behind it. */
+.ds-modal__body { min-height: 0; overflow-y: auto; margin-top: var(--space-4); padding-right: var(--space-1); }
+.ds-modal__rule { margin: var(--space-5) 0; border: 0; border-top: 1px solid var(--color-border); }
+@media (prefers-reduced-motion: reduce) {
+  .ds-modal__panel { animation: none; }
+  .ds-section { transition: none; }
+  .ds-section:hover { translate: none; }
+}
+
+/* ── When one viewport genuinely cannot hold a page ────────────────────
+   Below 860px a row becomes a labelled record card several lines tall, and
+   on a short screen the fixed tracks alone use most of the height. Eight
+   cards do not fit either, and clipping them would hide records rather than
+   page them. This used to be two breakpoints; `.ds-panel__body` now carries
+   `overflow: hidden auto` at every size, which covers those two cases and
+   every other one, without a threshold that has to be guessed right. It is
+   still the only thing on the screen that scrolls, and only when it must --
+   the strip above it stays put. */
+@media (max-width: 860px) {
+  .ds-work { grid-template-rows: auto minmax(0, 1fr); }
+  .ds-section { min-width: 116px; padding: var(--space-2) var(--space-3); }
+  .ds-panel__head { padding: 0 var(--space-3); }
+  .ds-panel__title { font-size: 17px; }
+  /* The count line is restated by the open section's own tile; the head
+     keeps the title and the actions, which is what a 375px line holds. */
+  .ds-panel__n { display: none; }
+  .ds-pager { padding: 0 var(--space-3); }
+  .ds-modal:target { padding: var(--space-3); place-items: end stretch; }
+  .ds-modal__panel { max-height: calc(100dvh - 2 * var(--space-3)); padding: var(--space-4); }
+  .ds-factgrid { grid-template-columns: minmax(0, 1fr); padding: var(--space-3); }
+}

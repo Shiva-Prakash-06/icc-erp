@@ -49,8 +49,11 @@ from app.services.itinerary import (
     create_igp_project_from_itinerary,
     stage_itinerary_import,
 )
+from app.services.paging import PAGE_SIZE, page_of, paginate
 from app.services.project_quickcreate import create_minimal_project, creatable_program_types
 from app.services.scope import visible_projects
+from app.services.analytics import division_dashboard, division_dashboards, event_dashboard, row_state
+from app.services.hierarchy import DIVISIONS, FILTER_SEGMENTS, STATE_LABELS, campus_tiles, division_tiles, event_cards, event_state, filter_counts, matches_filter
 from app.services.timeutil import to_utc
 from app.services.buddy_import import BuddyImportError, commit_buddy_batch, stage_buddy_import
 from app.models.erp import ReimbursementEntry
@@ -114,23 +117,97 @@ def campuses():
 
 @erp_bp.get("/campuses/<string:public_id>")
 def campus_detail(public_id):
+    """Level two of the drill-down: the campus's two divisions.
+
+    404 on a campus outside the roster's open set rather than 403 -- a
+    campus that is not open yet is not a permission failure, and answering
+    403 would confirm it exists as a record when it does not. A campus that
+    IS open but happens to hold nothing still renders: the campus is live,
+    it is simply empty, and the division tiles say so.
+    """
     campus = Campus.query.filter_by(public_id=public_id).first_or_404()
-    projects = [project for project in visible_projects(g.user) if project.campus_id == campus.id]
-    if not projects:
+    tile = _open_campus_tile(public_id)
+    if tile is None:
         abort(404)
-    return render_template("erp/campus_detail.html", campus=campus, projects=projects)
+    return render_template(
+        "erp/campus_detail.html",
+        campus=campus,
+        campus_label=tile["name"],
+        divisions=division_tiles(g.user, campus),
+    )
+
+
+def _open_campus_tile(public_id):
+    for tile in campus_tiles(g.user):
+        if tile["open"] and tile["public_id"] == public_id:
+            return tile
+    return None
+
+
+@erp_bp.get("/campuses/<string:public_id>/<string:division>")
+def division(public_id, division):
+    """Level three: every event in one division of one campus, filterable.
+
+    The four segment counts describe the whole division and are computed
+    before the filter is applied, so a segment reading "Upcoming 5" is true
+    before you click it. Filtering is this same route with a query argument,
+    which keeps counts and cards drawn from one query.
+    """
+    slug = (division or "").lower()
+    if slug not in DIVISIONS:
+        abort(404)
+    campus = Campus.query.filter_by(public_id=public_id).first_or_404()
+    tile = _open_campus_tile(public_id)
+    if tile is None:
+        abort(404)
+    entry = DIVISIONS[slug]
+    segment = (request.args.get("state") or "all").lower()
+    if segment not in FILTER_SEGMENTS:
+        segment = "all"
+    cards, counts = event_cards(g.user, campus, entry, segment)
+    return render_template(
+        "erp/division.html",
+        campus=campus,
+        campus_label=tile["name"],
+        division=entry,
+        cards=cards,
+        counts=counts,
+        segment=segment,
+        segments=[(key, key.title() if key != "all" else "All") for key in FILTER_SEGMENTS],
+        can_create=has_any_permission(g.user, "manage_projects"),
+    )
+
+
+@erp_bp.get("/analytics")
+def analytics():
+    """Two dashboard tiles and nothing else."""
+    return render_template("erp/analytics.html", dashboards=division_dashboards(g.user))
+
+
+@erp_bp.get("/analytics/<string:division>")
+def analytics_division(division):
+    slug = (division or "").lower()
+    if slug not in DIVISIONS:
+        abort(404)
+    entry = DIVISIONS[slug]
+    return render_template(
+        "erp/analytics_division.html",
+        division=entry,
+        dashboard=division_dashboard(g.user, entry),
+    )
 
 
 @erp_bp.get("/oversight")
 def oversight():
-    # Merged into the home page's decision queue -- see dashboard.index /
-    # app/services/home.py. The 403 gate is kept here (not just on the
-    # queue section of "/") because e2e/auth-and-rbac and
-    # tests/production_completion_test assert this exact route still 403s
-    # for non-approvers.
+    # Merged into the decision queue -- see dashboard.queue /
+    # app/services/home.py. (It pointed at "/" until the Tile System made
+    # the home screen the campus tiles and gave the queue its own route.)
+    # The 403 gate is kept here, not just on the queue screen, because
+    # e2e/auth-and-rbac and tests/production_completion_test assert this
+    # exact route still 403s for non-approvers.
     if not has_any_permission(g.user, "approve"):
         abort(403)
-    return redirect(url_for("dashboard.index", queue="all"))
+    return redirect(url_for("dashboard.queue"))
 
 
 @erp_bp.route("/projects", methods=["GET", "POST"])
@@ -266,6 +343,9 @@ def quick_create_with_documents():
 
 def _render_projects(*, show_create=False):
     visible = [project for project in Project.query.order_by(Project.start_date.desc(), Project.id.desc()).all() if can_view_project(g.user, project)]
+    # Counted before any filter is applied: a facet reading "Upcoming 5"
+    # has to be true before you click it, not after.
+    visible_unfiltered = list(visible)
     search_query = (request.args.get("q") or "").strip()
     if search_query:
         needle = search_query.lower()
@@ -274,12 +354,31 @@ def _render_projects(*, show_create=False):
             if needle in (project.title or "").lower() or needle in (project.code or "").lower()
         ]
     # Free-text search alone meant finding the one project you own required
-    # reading every card. The status filter is a query param on the existing
+    # reading every card. Both filters are query params on the existing
     # route, so the frozen URL map is untouched.
+    #
+    # Two filters, because there are two questions. `status` matches the
+    # stored column exactly and is what a facet chip sets. `state` matches
+    # the four reserved Tile System states through `matches_filter`, which
+    # is what every KPI and counter is actually counting.
+    #
+    # Audit finding P0-03: the analytics tile "Active programmes 1 of 1"
+    # linked to `?status=Active` and landed on "0 in scope". The programme
+    # was `Closing`, which `event_state` reports as active (it is still in
+    # flight) while `status == "Active"` excludes it. A counted record must
+    # appear in the list its own counter opens, so a counter now links to
+    # `state` and never to `status`.
     status_filter = (request.args.get("status") or "").strip()
+    state_filter = (request.args.get("state") or "").strip().lower()
     if status_filter and status_filter != "All":
         visible = [project for project in visible if project.status == status_filter]
+    if state_filter and state_filter != "all":
+        visible = [project for project in visible if matches_filter(event_state(project), state_filter)]
     status_facets = ["All", "Draft", "Planned", "Active", "Closing", "Completed"]
+    state_facets = [
+        {"key": key, "label": "All" if key == "all" else STATE_LABELS[key]}
+        for key in FILTER_SEGMENTS
+    ]
 
     campuses = Campus.query.order_by(Campus.name).all()
     programs = ProgramType.query.order_by(ProgramType.name).all()
@@ -320,6 +419,9 @@ def _render_projects(*, show_create=False):
         search_query=search_query,
         status_filter=status_filter or "All",
         status_facets=status_facets,
+        state_filter=state_filter or "all",
+        state_facets=state_facets,
+        state_counts=filter_counts(visible_unfiltered),
         project_category_options=vocabulary_options("project_category"),
         project_type_options=vocabulary_options("project_type"),
     )
@@ -339,12 +441,153 @@ def _project(public_id):
 # in-the-operation-checklists-crystalline-dongarra.md Step 8.
 SETTLED_WORK_STATUSES = frozenset({"Approved", "Rejected", "Waived", "Completed", "Cancelled"})
 
-_PROJECT_TABS = {"overview", "people", "delivery", "contributions", "finance", "insights", "resources"}
-# "operations" used to be the single tab holding tasks, checklists,
-# contributions, requests and budget behind one mega-disclosure; it is kept
-# as a permanent read-only alias for old bookmarks/emailed links, resolving
-# to "delivery" -- see in-the-operation-checklists-crystalline-dongarra.md Step 8.
-_PROJECT_TAB_ALIASES = {"operations": "delivery"}
+# Four work tabs and Analytics -- the Tile System's ceiling. There is no
+# Overview: it restated facts that live one tab away, and the questions it
+# was really there to answer (how much is committed, what is late, who is
+# unassigned) need aggregation, which is what Analytics does.
+_PROJECT_TABS = ("logistics", "finance", "documents", "people", "analytics")
+_DEFAULT_PROJECT_TAB = "logistics"
+
+# Every tab name this workspace has ever had resolves to one of the five, so
+# bookmarks, emailed links and the notification rows written before the
+# migration all still land somewhere real. "operations" predates even the
+# seven-tab set -- see in-the-operation-checklists-crystalline-dongarra.md
+# Step 8. Query arguments are not part of the frozen URL map, so re-pointing
+# them is presentation, not a route change.
+_PROJECT_TAB_ALIASES = {
+    "operations": "logistics",
+    "delivery": "logistics",
+    "overview": "logistics",
+    "contributions": "people",
+    "resources": "documents",
+    "insights": "analytics",
+}
+
+PROJECT_TAB_LABELS = {
+    "logistics": "Logistics",
+    "finance": "Finance",
+    "documents": "Documents",
+    "people": "People",
+    "analytics": "Analytics",
+}
+
+
+# ── Sections inside a tab ───────────────────────────────────────────────
+#
+# A tab used to render every one of its lists at once: Logistics stacked the
+# fact strip, the tasks, every checklist and the schedule into a single
+# scrolling column, and People stacked five more. That is the information
+# overload, and the scrolling it needed is what broke the one-screen rule.
+#
+# A tab is now a strip of section tiles and exactly one open section. The
+# tile carries the section's name, its total and how many items in it still
+# need somebody -- so the counts that used to justify scrolling the whole tab
+# are visible without opening anything, and the reader chooses what to look
+# at instead of being handed all of it.
+#
+# `section` and `page` are query arguments. The URL map is frozen; query
+# arguments are not part of it, so this is presentation, exactly as the `tab`
+# argument already was.
+
+#: Section tiles rotate through the three family accents so a strip reads as
+#: a set rather than as a wall of one colour. Position, not meaning: the four
+#: reserved state colours still carry state, on the tile's own pip.
+_SECTION_ACCENTS = ("pine", "indigo", "brass")
+
+
+def _section(key, label, items=None, *, open_count=None, count=None, note=None, form_only=False, per_page=PAGE_SIZE, anchor=None):
+    """One entry in a tab's section strip.
+
+    ``count`` is the number on the tile and ``open_count`` the number still
+    wanting a decision; a section with neither (Details, Public disclosure)
+    is ``form_only`` and shows a note instead of a count, because a tile that
+    printed "0" for a panel of facts would read as "nothing here".
+    """
+    return {
+        "key": key,
+        "label": label,
+        "items": list(items or []),
+        "count": len(items) if (count is None and items is not None) else count,
+        "open": open_count,
+        "note": note,
+        "form_only": form_only,
+        # Buddy pairings print their interaction logs underneath the pairing,
+        # so one "row" there is several lines and fewer of them fit.
+        "per_page": per_page,
+        # A form-only section holds no records, so `focus` cannot find it by
+        # public_id. The decision queue's publication row points at the
+        # literal anchor "publication"; this is how that link still lands.
+        "anchor": anchor,
+    }
+
+
+def _project_sections(tab, project, *, is_igp, open_tasks, settled_tasks, open_budget_lines,
+                      settled_budget_lines, open_requests, settled_requests, open_contributions,
+                      settled_contributions, report_snapshots, recruitment_applications,
+                      approved_feedback_count):
+    """The ordered sections of one tab, each carrying the list it pages."""
+    if tab == "logistics":
+        sections = [
+            _section("details", "Details", note="Campus, dates, venue, reach", form_only=True),
+            _section("tasks", "Tasks", open_tasks + settled_tasks, open_count=len(open_tasks)),
+        ]
+        for checklist in project.checklists:
+            items = sorted(checklist.item_statuses, key=lambda row: row.template_item.sequence)
+            sections.append(_section(
+                f"checklist-{checklist.public_id}", checklist.name, items,
+                open_count=sum(1 for item in items if item.status not in SETTLED_WORK_STATUSES),
+            ))
+        sections.append(_section("schedule", "Schedule", sorted(project.sessions, key=lambda s: s.starts_at)))
+        return sections
+
+    if tab == "finance":
+        sections = [
+            _section("budget", "Budget", open_budget_lines + settled_budget_lines, open_count=len(open_budget_lines)),
+            _section("requests", "Operational requests", open_requests + settled_requests, open_count=len(open_requests)),
+        ]
+        if is_igp:
+            entries = sorted(project.reimbursement_entries, key=lambda e: e.date)
+            sections.append(_section(
+                "reimbursements", "Reimbursements", entries,
+                open_count=sum(1 for e in entries if e.status not in {"Approved", "Paid"}),
+            ))
+        return sections
+
+    if tab == "documents":
+        return [
+            _section("index", "Document index", list(project.document_records),
+                     open_count=sum(1 for d in project.document_records if d.status == "Submitted")),
+            _section("reports", "Reports", report_snapshots,
+                     open_count=sum(1 for s in report_snapshots if s.approval_status == "Draft")),
+            _section("disclosure", "Public disclosure", note=project.publication_status, form_only=True, anchor="publication"),
+        ]
+
+    if tab == "people":
+        sections = [_section("team", "Team", list(project.team_assignments),
+                             open_count=sum(1 for a in project.team_assignments if a.status != "Active"))]
+        if recruitment_applications:
+            sections.append(_section(
+                "recruitment", "Recruitment", recruitment_applications,
+                # `decision`, not `status`, and "Submitted"/"Interview Scheduled" are the
+                # two values the row itself still offers a Review control for.
+                open_count=sum(1 for a in recruitment_applications if a.decision in {"Submitted", "Interview Scheduled"}),
+            ))
+        sections.append(_section("contributions", "Contributions", open_contributions + settled_contributions,
+                                 open_count=len(open_contributions)))
+        if is_igp:
+            sections.append(_section("buddies", "Buddy pairings", list(project.buddy_assignments), per_page=4))
+        responses = [
+            {"form": form, "response": response}
+            for form in project.feedback_forms for response in form.responses
+        ]
+        sections.append(_section(
+            "feedback", "Feedback", responses,
+            open_count=sum(1 for row in responses if row["response"].moderation_status == "Pending"),
+            note=f"{approved_feedback_count} approved",
+        ))
+        return sections
+
+    return []
 
 
 @erp_bp.get("/projects/<string:public_id>")
@@ -352,7 +595,7 @@ def project_detail(public_id):
     project = _project(public_id)
     blockers = closure_blockers(project)
     requested_tab = _PROJECT_TAB_ALIASES.get(request.args.get("tab"), request.args.get("tab"))
-    active_tab = requested_tab if requested_tab in _PROJECT_TABS else "overview"
+    active_tab = requested_tab if requested_tab in _PROJECT_TABS else _DEFAULT_PROJECT_TAB
     people_query = (request.args.get("people_q") or "").strip()
     people_matches = []
     if active_tab == "people" and len(people_query) >= 2:
@@ -386,10 +629,75 @@ def project_detail(public_id):
             continue
         if rating in feedback_distribution:
             feedback_distribution[rating] += 1
+    state = event_state(project)
+    open_tasks = [task for task in project.work_tasks if task.status not in SETTLED_WORK_STATUSES]
+    settled_tasks = [task for task in project.work_tasks if task.status in SETTLED_WORK_STATUSES]
+    open_contributions = [c for c in project.contribution_records if c.approval_status == "Pending"]
+    settled_contributions = [c for c in project.contribution_records if c.approval_status != "Pending"]
+    # Approved requests still need completion; rejected requests can be
+    # revised/resubmitted. Keep their actions reachable until terminal.
+    open_requests = [r for r in project.operational_requests if r.status not in {"Completed", "Cancelled"}]
+    settled_requests = [r for r in project.operational_requests if r.status in {"Completed", "Cancelled"}]
+    open_budget_lines = [b for b in project.budget_lines if b.status not in {"Approved", "Rejected"}]
+    settled_budget_lines = [b for b in project.budget_lines if b.status in {"Approved", "Rejected"}]
+    report_snapshots = ReportSnapshot.query.filter_by(project_id=project.id).order_by(ReportSnapshot.created_at.desc()).all()
+    recruitment_applications = RecruitmentApplication.query.filter_by(project_id=project.id).order_by(RecruitmentApplication.created_at.desc()).all()
+    is_igp = project.program_type.name == "IGP"
+
+    sections = _project_sections(
+        active_tab, project, is_igp=is_igp,
+        open_tasks=open_tasks, settled_tasks=settled_tasks,
+        open_budget_lines=open_budget_lines, settled_budget_lines=settled_budget_lines,
+        open_requests=open_requests, settled_requests=settled_requests,
+        open_contributions=open_contributions, settled_contributions=settled_contributions,
+        report_snapshots=report_snapshots, recruitment_applications=recruitment_applications,
+        approved_feedback_count=sum(feedback_distribution.values()),
+    )
+    section_keys = [section["key"] for section in sections]
+    # `focus` names a record: a deep link from the decision queue, a
+    # notification or a blocker's Resolve button. It wins over `section` and
+    # `page`, because landing on page 1 of a list that does not contain the
+    # row you were sent to is the same as not arriving at all.
+    focus = (request.args.get("focus") or "").strip()
+    requested_section = request.args.get("section")
+    active_section = requested_section if requested_section in section_keys else (section_keys[0] if section_keys else None)
+    requested_page = request.args.get("page")
+    if focus:
+        for section in sections:
+            if section["anchor"] == focus:
+                active_section, requested_page = section["key"], 1
+                break
+            found = page_of(section["items"], focus, section["per_page"])
+            if found:
+                active_section, requested_page = section["key"], found
+                break
+    active = next((section for section in sections if section["key"] == active_section), None)
+    page = paginate(active["items"], requested_page, active["per_page"]) if active else paginate([], 1)
+    # The checklist behind a `checklist-<public_id>` section, so the panel can
+    # title itself and the evidence modal knows which requirements to list.
+    active_checklist = None
+    if active_section and active_section.startswith("checklist-"):
+        wanted = active_section[len("checklist-"):]
+        active_checklist = next((c for c in project.checklists if c.public_id == wanted), None)
+    open_feedback_form = next((form for form in project.feedback_forms if form.is_open), None)
+
+    tab_strip = [
+        ("logistics", "Logistics", len(project.work_tasks) + sum(len(c.item_statuses) for c in project.checklists)),
+        ("finance", "Finance", len(project.budget_lines) + len(project.operational_requests)),
+        ("documents", "Documents", len(project.document_records)),
+        ("people", "People", len(project.team_assignments)),
+        ("analytics", "Analytics", None),
+    ]
     return render_template(
         "erp/project_detail.html",
         project=project,
         blockers=blockers,
+        event_state=state,
+        event_state_label=STATE_LABELS[state],
+        tab_strip=tab_strip,
+        item_state=row_state,
+        task_statuses=("Not Started", "In Progress", "Blocked", "Submitted", "Approved", "Rejected", "Waived", "Completed"),
+        dashboard=event_dashboard(project, blockers=blockers) if active_tab == "analytics" else None,
         transitions=sorted(TRANSITIONS.get(project.status, set())),
         can_manage=has_permission(g.user, "manage_projects", project),
         can_contribute=has_permission(g.user, "contribute", project),
@@ -401,13 +709,24 @@ def project_detail(public_id):
         can_waive=has_permission(g.user, "waive", project),
         can_view_sensitive=has_permission(g.user, "sensitive_links", project, sensitive=True),
         active_tab=active_tab,
-        is_igp=project.program_type.name == "IGP",
+        is_igp=is_igp,
         checklist_templates=ChecklistTemplate.query.filter_by(is_active=True).order_by(ChecklistTemplate.name).all(),
         contribution_statuses=("Approved", "Rejected"),
         feedback_distribution=feedback_distribution,
         approved_feedback_count=sum(feedback_distribution.values()),
-        recruitment_applications=RecruitmentApplication.query.filter_by(project_id=project.id).order_by(RecruitmentApplication.created_at.desc()).all(),
-        report_snapshots=ReportSnapshot.query.filter_by(project_id=project.id).order_by(ReportSnapshot.created_at.desc()).all(),
+        recruitment_applications=recruitment_applications,
+        report_snapshots=report_snapshots,
+        sections=sections,
+        active_section=active_section,
+        checklist=active_checklist,
+        checklist_items=(active["items"] if active_checklist else []),
+        open_form=open_feedback_form,
+        section=active,
+        page=page,
+        # Every form inside a panel posts this back as `next`, so a verdict
+        # returns to the section and page it was taken on rather than to
+        # page 1 of the tab's first section.
+        return_to=request.full_path.rstrip("?"),
         people_query=people_query,
         people_matches=people_matches,
         eligible_participants=[assignment.person for assignment in project.team_assignments if assignment.status == "Active"],
@@ -418,16 +737,6 @@ def project_detail(public_id):
         document_category_options=vocabulary_options("document_category"),
         compute_availability=compute_availability,
         settled_statuses=SETTLED_WORK_STATUSES,
-        open_tasks=[task for task in project.work_tasks if task.status not in SETTLED_WORK_STATUSES],
-        settled_tasks=[task for task in project.work_tasks if task.status in SETTLED_WORK_STATUSES],
-        open_contributions=[c for c in project.contribution_records if c.approval_status == "Pending"],
-        settled_contributions=[c for c in project.contribution_records if c.approval_status != "Pending"],
-        # Approved requests still need completion; rejected requests can be
-        # revised/resubmitted. Keep their actions reachable until terminal.
-        open_requests=[r for r in project.operational_requests if r.status not in {"Completed", "Cancelled"}],
-        settled_requests=[r for r in project.operational_requests if r.status in {"Completed", "Cancelled"}],
-        open_budget_lines=[b for b in project.budget_lines if b.status not in {"Approved", "Rejected"}],
-        settled_budget_lines=[b for b in project.budget_lines if b.status in {"Approved", "Rejected"}],
     )
 
 
@@ -444,7 +753,11 @@ def _redirect_to_tab(project, tab, anchor=None):
         parsed = urlparse(target)
         if not parsed.scheme and not parsed.netloc:
             return redirect(target)
-    return redirect(url_for("erp.project_detail", public_id=project.public_id, tab=tab) + (f"#{anchor}" if anchor else ""))
+    # `focus` resolves to the section and page that actually hold the record,
+    # which a bare fragment cannot do now that a section is paged.
+    target = url_for("erp.project_detail", public_id=project.public_id, tab=tab, focus=anchor) if anchor \
+        else url_for("erp.project_detail", public_id=project.public_id, tab=tab)
+    return redirect(target + (f"#{anchor}" if anchor else ""))
 
 
 @erp_bp.post("/projects/<string:public_id>/applications/<string:application_public_id>/decision")
@@ -477,7 +790,7 @@ def approve_report_route(public_id, snapshot_public_id):
         record_audit("report.approve", snapshot, after={"approval_status": "Approved"}, actor=g.user)
         db.session.commit()
     flash("Report approved.", "success")
-    return _redirect_to_tab(project, "insights", snapshot.public_id)
+    return _redirect_to_tab(project, "documents", snapshot.public_id)
 
 
 WIZARD_STEPS = ["basics", "sessions", "team", "checklist", "documents", "budget"]
@@ -593,7 +906,7 @@ def add_session(public_id):
     title = (request.form.get("title") or "").strip()
     if not title:
         flash("Session title is required.", "danger")
-        return _redirect_after_action(project, "overview")
+        return _redirect_after_action(project, "logistics")
     try:
         # The browser sends campus-local wall-clock time with no offset;
         # storage is UTC throughout (audit B09).
@@ -601,15 +914,15 @@ def add_session(public_id):
         ends_at = to_utc(datetime.strptime(request.form["ends_at"], "%Y-%m-%dT%H:%M"))
     except (KeyError, ValueError):
         flash("Provide valid start and end times.", "danger")
-        return _redirect_after_action(project, "overview")
+        return _redirect_after_action(project, "logistics")
     if ends_at < starts_at:
         flash("Session end time cannot precede its start time.", "danger")
-        return _redirect_after_action(project, "overview")
+        return _redirect_after_action(project, "logistics")
     try:
         session_type = resolve_vocabulary_value(request.form.get("session_type") or "Session", request.form.get("session_type_other"), domain="session_type")
     except ValueError as error:
         flash(str(error), "danger")
-        return _redirect_after_action(project, "overview")
+        return _redirect_after_action(project, "logistics")
     existing_count = ProjectSession.query.filter_by(project_id=project.id).count()
     session_item = ProjectSession(
         project_id=project.id, code=request.form.get("code") or f"S{existing_count + 1}",
@@ -620,7 +933,7 @@ def add_session(public_id):
     record_audit("session.create", session_item, after={"project": project.public_id, "title": title}, actor=g.user)
     db.session.commit()
     flash("Session added.", "success")
-    return _redirect_after_action(project, "overview")
+    return _redirect_after_action(project, "logistics")
 
 
 @erp_bp.post("/projects/<string:public_id>/checklists")
@@ -634,7 +947,7 @@ def instantiate_project_checklist(public_id):
     else:
         instantiate_checklist(project, template, actor=g.user)
         flash(f"{template.name} checklist added to this project.", "success")
-    return _redirect_after_action(project, "overview")
+    return _redirect_after_action(project, "logistics")
 
 
 @erp_bp.post("/projects/<string:public_id>/team")
@@ -811,7 +1124,7 @@ def log_contribution(public_id):
         abort(403)
     if not g.user.person_id:
         flash("Your account has no linked person record; contact an administrator.", "danger")
-        return _redirect_to_tab(project, "contributions")
+        return _redirect_to_tab(project, "people")
     try:
         activity_type = resolve_vocabulary_value(
             request.form.get("activity_type") or "Event support",
@@ -820,7 +1133,7 @@ def log_contribution(public_id):
         )
     except ValueError as error:
         flash(str(error), "danger")
-        return _redirect_to_tab(project, "contributions")
+        return _redirect_to_tab(project, "people")
     contribution = ContributionRecord(
         project_id=project.id, person_id=g.user.person_id,
         activity_type=activity_type,
@@ -831,7 +1144,7 @@ def log_contribution(public_id):
     record_audit("contribution.log", contribution, after={"project": project.public_id}, actor=g.user)
     db.session.commit()
     flash("Contribution logged for approval.", "success")
-    return _redirect_to_tab(project, "contributions")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/contributions/<string:contribution_public_id>/decision")
@@ -845,7 +1158,7 @@ def decide_contribution_route(public_id, contribution_public_id):
         flash("Contribution decision recorded.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "contributions")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/buddy-assignments/<string:assignment_public_id>/logs")
@@ -864,7 +1177,7 @@ def log_buddy_interaction(public_id, assignment_public_id):
     record_audit("buddy_log.create", log, after={"assignment": assignment.public_id}, actor=g.user)
     db.session.commit()
     flash("Buddy interaction logged for approval.", "success")
-    return _redirect_to_tab(project, "contributions")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/buddy-logs/<string:log_public_id>/decision")
@@ -878,7 +1191,7 @@ def decide_buddy_log_route(public_id, log_public_id):
         flash("Buddy log decision recorded.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "contributions")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/operational-requests")
@@ -966,18 +1279,18 @@ def add_feedback_form(public_id):
         abort(403)
     if FeedbackForm.query.filter_by(project_id=project.id, is_open=True).first():
         flash("An open feedback form already exists for this project.", "warning")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     raw_questions = (request.form.get("questions") or "").splitlines()
     labels = [line.strip() for line in raw_questions]
     if any(not label for label in labels):
         flash("Remove blank question lines; each question must contain text.", "danger")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     if len(labels) > 20:
         flash("A feedback form may contain at most 20 additional questions.", "danger")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     if any(len(label) > 200 for label in labels):
         flash("Each feedback question must be 200 characters or fewer.", "danger")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     questions = [{"key": "rating", "type": "scale", "min": 1, "max": 5, "label": "Overall rating"}]
     questions.extend({"key": f"q_{index}", "type": "text", "label": label} for index, label in enumerate(labels, 1))
     form = FeedbackForm(project_id=project.id, title=(request.form.get("title") or "Project Feedback").strip(), questions_json=questions, is_open=True)
@@ -985,7 +1298,7 @@ def add_feedback_form(public_id):
     record_audit("feedback_form.create", form, after={"project": project.public_id}, actor=g.user)
     db.session.commit()
     flash("Feedback form opened.", "success")
-    return _redirect_to_tab(project, "insights")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/feedback-responses")
@@ -994,14 +1307,14 @@ def submit_feedback_response(public_id):
     form = FeedbackForm.query.filter_by(project_id=project.id, is_open=True).order_by(FeedbackForm.id.desc()).first()
     if not form:
         flash("There is no open feedback form for this project.", "danger")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     try:
         rating = int(request.form.get("rating", ""))
     except ValueError:
         rating = 0
     if rating not in range(1, 6):
         flash("Choose an overall rating from 1 to 5.", "danger")
-        return _redirect_to_tab(project, "insights")
+        return _redirect_to_tab(project, "people")
     answers = {"rating": rating}
     for question in form.questions_json or []:
         if question.get("type") == "text":
@@ -1011,7 +1324,7 @@ def submit_feedback_response(public_id):
     record_audit("feedback_response.submit", response, after={"form": form.public_id}, actor=g.user)
     db.session.commit()
     flash("Thank you — your feedback has been recorded.", "success")
-    return _redirect_to_tab(project, "insights")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/feedback-responses/<string:response_public_id>/moderate")
@@ -1025,7 +1338,7 @@ def moderate_feedback_route(public_id, response_public_id):
         flash("Feedback moderation updated.", "success")
     except ValueError as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "insights")
+    return _redirect_to_tab(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/documents")
@@ -1036,7 +1349,7 @@ def add_document(public_id):
     title = (request.form.get("title") or "").strip()
     if not title:
         flash("Document title is required.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "documents")
     classification = request.form.get("permission_classification") or "Internal"
     try:
         category = resolve_vocabulary_value(
@@ -1046,7 +1359,7 @@ def add_document(public_id):
         )
     except ValueError as error:
         flash(str(error), "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "documents")
     drive_url = (request.form.get("drive_url") or "").strip() or None
     document = DocumentRecord(
         project_id=project.id, title=title, category=category,
@@ -1063,7 +1376,7 @@ def add_document(public_id):
     record_audit("document.create", document, after={"project": project.public_id, "title": title}, actor=g.user)
     db.session.commit()
     flash("Document added.", "success")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "documents")
 
 
 @erp_bp.post("/projects/<string:public_id>/documents/<string:document_public_id>/decision")
@@ -1081,7 +1394,7 @@ def decide_document_route(public_id, document_public_id):
         flash("Document decision recorded.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "resources")
+    return _redirect_to_tab(project, "documents")
 
 
 @erp_bp.post("/projects/<string:public_id>/closure-summary")
@@ -1179,7 +1492,7 @@ def add_task(public_id):
         record_audit("task.create", task, after={"title": title, "project": project.public_id})
         db.session.commit()
         flash("Task added.", "success")
-    return _redirect_to_tab(project, "delivery")
+    return _redirect_to_tab(project, "logistics")
 
 
 @erp_bp.post("/projects/<string:public_id>/tasks/<string:task_public_id>/status")
@@ -1200,7 +1513,7 @@ def update_task(public_id, task_public_id):
         flash("Task status updated.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "delivery", task.public_id)
+    return _redirect_to_tab(project, "logistics", task.public_id)
 
 
 def _checklist_item(project, item_public_id):
@@ -1233,7 +1546,7 @@ def update_checklist_item(public_id, item_public_id):
         flash("Checklist requirement updated.", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "delivery", item.public_id)
+    return _redirect_to_tab(project, "logistics", item.public_id)
 
 
 @erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents")
@@ -1251,7 +1564,7 @@ def attach_checklist_document(public_id, item_public_id):
     document_public_id = (request.form.get("document_public_id") or "").strip()
     if not document_public_id:
         flash("Choose a document to attach.", "danger")
-        return _redirect_to_tab(project, "delivery", item.public_id)
+        return _redirect_to_tab(project, "logistics", item.public_id)
     document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id).first_or_404()
     # Restricted documents are masked with 404, not 403 -- a 403 would let a
     # caller confirm a restricted document's public_id exists.
@@ -1259,16 +1572,16 @@ def attach_checklist_document(public_id, item_public_id):
         abort(404)
     if document.checklist_status_id == item.id:
         flash("That document is already linked to this requirement.", "info")
-        return _redirect_to_tab(project, "delivery", item.public_id)
+        return _redirect_to_tab(project, "logistics", item.public_id)
     if document.checklist_status_id is not None and not has_permission(g.user, "manage_projects", project):
         flash("That document is linked to another requirement. Ask a coordinator to move it.", "danger")
-        return _redirect_to_tab(project, "delivery", item.public_id)
+        return _redirect_to_tab(project, "logistics", item.public_id)
     before = {"checklist_status_id": document.checklist_status_id}
     document.checklist_status_id = item.id
     record_audit("document.link_checklist", document, before=before, after={"checklist_status": item.public_id, "project": project.public_id}, actor=g.user)
     db.session.commit()
     flash("Document linked to the requirement.", "success")
-    return _redirect_to_tab(project, "delivery", item.public_id)
+    return _redirect_to_tab(project, "logistics", item.public_id)
 
 
 @erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents/upload")
@@ -1284,20 +1597,20 @@ def upload_checklist_document(public_id, item_public_id):
     uploaded = request.files.get("source_file")
     if not uploaded or not uploaded.filename:
         flash("Choose a file to upload.", "danger")
-        return _redirect_to_tab(project, "delivery", item.public_id)
+        return _redirect_to_tab(project, "logistics", item.public_id)
     category = None
     if request.form.get("category"):
         try:
             category = resolve_vocabulary_value(request.form.get("category"), request.form.get("category_other"), domain="document_category")
         except ValueError as error:
             flash(str(error), "danger")
-            return _redirect_to_tab(project, "delivery", item.public_id)
+            return _redirect_to_tab(project, "logistics", item.public_id)
     classification = request.form.get("permission_classification") or None
     try:
         document = upload_file_single_shot(project, uploaded.filename, uploaded.read(), g.user, category=category, classification=classification)
     except (UploadSessionError, ValueError) as error:
         flash(str(error), "danger")
-        return _redirect_to_tab(project, "delivery", item.public_id)
+        return _redirect_to_tab(project, "logistics", item.public_id)
     if document.checklist_status_id in (None, item.id) or has_permission(g.user, "manage_projects", project):
         document.checklist_status_id = item.id
         record_audit("document.link_checklist", document, after={"checklist_status": item.public_id, "project": project.public_id, "via": "upload"}, actor=g.user)
@@ -1305,7 +1618,7 @@ def upload_checklist_document(public_id, item_public_id):
         flash("Document uploaded and linked to the requirement.", "success")
     else:
         flash("Document uploaded, but it is already linked to another requirement.", "warning")
-    return _redirect_to_tab(project, "delivery", item.public_id)
+    return _redirect_to_tab(project, "logistics", item.public_id)
 
 
 @erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents/<string:document_public_id>/detach")
@@ -1322,7 +1635,7 @@ def detach_checklist_document(public_id, item_public_id, document_public_id):
     record_audit("document.unlink_checklist", document, before={"checklist_status": item.public_id}, after={"checklist_status": None}, actor=g.user)
     db.session.commit()
     flash("Document unlinked.", "success")
-    return _redirect_to_tab(project, "delivery", item.public_id)
+    return _redirect_to_tab(project, "logistics", item.public_id)
 
 
 @erp_bp.post("/projects/<string:public_id>/itinerary/upload")
@@ -1333,7 +1646,7 @@ def upload_itinerary(public_id):
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
         flash("Choose an itinerary file to upload.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "logistics")
     try:
         batch = stage_itinerary_import(project, uploaded_file, g.user.public_id)
         commit_itinerary_batch(batch, g.user)
@@ -1344,7 +1657,7 @@ def upload_itinerary(public_id):
         )
     except (ItineraryParseError, ValueError) as error:
         flash(f"Itinerary import failed: {error}", "danger")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "logistics")
 
 
 @erp_bp.post("/projects/<string:public_id>/buddies/upload")
@@ -1380,11 +1693,11 @@ def add_reimbursement(public_id):
         entry_date = datetime.strptime(request.form.get("date"), "%Y-%m-%d").date()
     except (InvalidOperation, ValueError, TypeError):
         flash("A valid date and non-negative amount are required.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "finance")
     party_name = (request.form.get("party_name") or "").strip()
     if not party_name:
         flash("Party name is required.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "finance")
     entry = ReimbursementEntry(
         project_id=project.id, date=entry_date, party_name=party_name,
         bill_number=(request.form.get("bill_number") or "").strip() or None,
@@ -1396,7 +1709,7 @@ def add_reimbursement(public_id):
     db.session.commit()
     record_audit("reimbursement.create", entry, after={"project": project.public_id}, actor=g.user)
     flash("Reimbursement entry added.", "success")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "finance")
 
 
 @erp_bp.post("/projects/<string:public_id>/reimbursements/<string:entry_public_id>/status")
@@ -1408,12 +1721,12 @@ def update_reimbursement_status(public_id, entry_public_id):
     status = (request.form.get("status") or "").strip()
     if not status:
         flash("Status cannot be blank.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "finance")
     entry.status = status
     db.session.commit()
     record_audit("reimbursement.status", entry, after={"status": status}, actor=g.user)
     flash("Reimbursement status updated.", "success")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "finance")
 
 
 @erp_bp.post("/projects/<string:public_id>/reimbursements/upload")
@@ -1424,14 +1737,14 @@ def upload_reimbursements(public_id):
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
         flash("Choose a reimbursements file to upload.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "finance")
     try:
         batch = stage_reimbursement_import(project, uploaded_file, g.user.public_id)
         commit_reimbursement_batch(batch, g.user)
         flash(f"Reimbursements imported: {batch.committed_count} of {batch.staged_count} rows committed.", "success")
     except (ReimbursementImportError, ValueError) as error:
         flash(f"Reimbursement import failed: {error}", "danger")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "finance")
 
 
 @erp_bp.get("/projects/<string:public_id>/reimbursements/export.<string:output_format>")
@@ -1472,7 +1785,7 @@ def upload_icc_event_folder(public_id):
     uploaded_files = [f for f in request.files.getlist("source_files") if f and f.filename]
     if not uploaded_files:
         flash("Choose one or more event-folder files to upload.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "documents")
     try:
         results = stage_icc_event_folder_import(project, uploaded_files, g.user)
         attached = sum(1 for r in results if r["status"] == "attached")
@@ -1481,7 +1794,7 @@ def upload_icc_event_folder(public_id):
         flash(f"Event folder import: {attached} attached, {duplicates} duplicate, {rejected} rejected.", "success")
     except ValueError as error:
         flash(f"Event folder import failed: {error}", "danger")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "documents")
 
 
 @erp_bp.get("/imports")
@@ -1509,7 +1822,7 @@ def upload_documents(public_id):
     uploaded_files = [f for f in request.files.getlist("source_files") if f and f.filename]
     if not uploaded_files:
         flash("Choose one or more files to upload.", "danger")
-        return _redirect_after_action(project, "resources")
+        return _redirect_after_action(project, "documents")
     attached, failed = 0, []
     for uploaded_file in uploaded_files:
         try:
@@ -1522,7 +1835,7 @@ def upload_documents(public_id):
         flash(f"{attached} document(s) uploaded to Drive and indexed.", "success")
     for message in failed:
         flash(message, "danger")
-    return _redirect_after_action(project, "resources")
+    return _redirect_after_action(project, "documents")
 
 
 @erp_bp.post("/imports/upload")

@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 from datetime import date, datetime, timezone
 
@@ -23,6 +24,7 @@ from app.models.erp import (
     Wing,
     WorkTask,
 )
+from app.models.production import RecruitmentApplication
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.project import BuddyAssignment
 from app.models.user import User
@@ -131,7 +133,9 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         self.icc_project.status = "Closing"
         db.session.commit()
         path = f"/erp/projects/{self.icc_project.public_id}"
-        self.assertIn(b"Save closure summary", self.client.get(path).data)
+        # Closure moved to the Documents tab with the rest of the paperwork
+        # when the Tile System deleted Overview.
+        self.assertIn(b"Save closure summary", self.client.get(path + "?tab=documents&section=disclosure").data)
         response = self.client.post(path + "/closure-summary", data={
             "version": self.icc_project.version, "closure_summary": "Synthetic delivery completed.",
         }, follow_redirects=True)
@@ -220,18 +224,58 @@ class ERPProductionShapeTestCase(unittest.TestCase):
             response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab={tab}")
             self.assertEqual(response.status_code, 200, tab)
 
-    def test_operations_tab_alias_renders_delivery_panel(self):
-        self.login()
-        response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab=operations")
-        self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertIn('id="panel-delivery"', html)
-        self.assertIn('class="aurora-tab active"', html)
+    def test_people_tab_renders_for_a_project_with_recruitment(self):
+        """The Recruitment section only exists when there are applications.
 
-    def test_saving_task_or_checklist_status_returns_to_delivery_not_overview(self):
+        `test_every_new_project_tab_renders` uses a project that has none, so
+        the branch that builds the Recruitment section tile was never
+        executed by the suite and shipped reading `application.status` -- a
+        field `RecruitmentApplication` does not have. Every People tab on
+        every project with an applicant answered 500.
+        """
+        person = Person(first_name="Applicant", primary_email="applicant@example.com", person_type="Participant")
+        db.session.add(person)
+        db.session.flush()
+        db.session.add(RecruitmentApplication(
+            person_id=person.id, project_id=self.icc_project.id,
+            desired_role="Volunteer", decision="Submitted", version=1,
+        ))
+        db.session.commit()
+
+        self.login()
+        response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab=people")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Recruitment", response.get_data(as_text=True))
+
+    def test_legacy_tab_names_still_resolve(self):
+        """Every tab name this workspace has ever had lands somewhere real.
+
+        `operations` predates the seven-tab set; `delivery`, `overview`,
+        `contributions`, `resources` and `insights` are the seven-tab names
+        the Tile System replaced with five. Bookmarks, emailed links and
+        notification rows written before either change must not silently
+        drop the reader on the default tab.
+        """
+        self.login()
+        for legacy, panel in [
+            ("operations", "logistics"), ("delivery", "logistics"), ("overview", "logistics"),
+            ("contributions", "people"), ("resources", "documents"), ("insights", "analytics"),
+        ]:
+            with self.subTest(tab=legacy):
+                response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab={legacy}")
+                self.assertEqual(response.status_code, 200)
+                html = response.get_data(as_text=True)
+                self.assertIn(f'id="panel-{panel}"', html)
+                # Exactly one tab is marked active, and it is the resolved one.
+                active = re.findall(r'href="([^"]*)"[^>]*class="ds-tab[^"]*is-active', html)
+                self.assertEqual(len(active), 1, f"{legacy}: {len(active)} active tabs")
+                self.assertIn(f"tab={panel}", active[0])
+
+    def test_saving_task_or_checklist_status_returns_to_logistics(self):
         # Pre-existing bug: these three handlers used to redirect to the
         # bare project URL with no `tab`, throwing the user back to
-        # Overview after every save.
+        # Overview after every save. The tab they return to is now
+        # Logistics, which is where tasks and checklists live.
         task = WorkTask(project_id=self.icc_project.id, title="Book venue", status="Not Started", version=1)
         db.session.add(task)
         db.session.commit()
@@ -241,7 +285,7 @@ class ERPProductionShapeTestCase(unittest.TestCase):
             data={"version": 1, "status": "In Progress"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertIn("tab=delivery", response.headers["Location"])
+        self.assertIn("tab=logistics", response.headers["Location"])
 
 
 class SuppliedImportTestCase(unittest.TestCase):

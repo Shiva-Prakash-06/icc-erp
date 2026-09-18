@@ -1,0 +1,342 @@
+{#- ──────────────────────────────────────────────────────────────────────
+    Every "add", "import", "attach" and "open a form" of the event
+    workspace, moved out of the record and into a dialog.
+
+    Why they moved. Each of these used to sit at the foot of the list it
+    belonged to, inside an `aurora-disclosure`: three to six fields tall when
+    open, and still a row of trigger buttons when closed. Across the four
+    tabs that was sixteen of them. They were most of the reason a tab could
+    not fit one viewport, and on Logistics they pushed the tasks the reader
+    came for below the fold.
+
+    A dialog costs nothing when it is closed and covers the record only while
+    it is open. It is a `:target` dialog -- the trigger is an ordinary link
+    to the dialog's id and the close control is a link back to `#` -- so it
+    needs no JavaScript and no inline handler. The contract test forbids the
+    second; the no-JS contract forbids depending on the first.
+
+    Nothing about any form below changed: same action, same method, same
+    field names, same CSRF and version inputs, same server validation. The
+    one addition is `next`, which `_redirect_to_tab` already honours, so
+    saving returns to the section and page the reader was on.
+
+    Each dialog is rendered only when its own trigger is, so a reader without
+    the permission never has a hidden dialog in their document at all. -#}
+
+{% from "_tiles.html" import modal, file_picker %}
+
+{% if active_section == 'tasks' and can_manage %}
+{% call modal('m-task-add', 'Add a task') %}
+<form method="POST" action="{{ url_for('erp.add_task', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6"><label class="aurora-label" for="taskTitle">Task title</label><input id="taskTitle" class="aurora-input" name="title" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="taskPriority">Priority</label><select id="taskPriority" class="aurora-select" name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div>
+  <div class="col-12 aurora-choice"><input class="aurora-choice__input" type="checkbox" name="mandatory_for_closure" id="mandatory"><label class="aurora-choice__label" for="mandatory">Required for closure</label></div>
+  <div class="col-12"><button class="aurora-button--primary">Add task</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if checklist %}
+{% call modal('m-evidence', 'Evidence', 'Evidence is per requirement and needs a document’s full title, an open link and an unlink control — more than a 44px row can carry. The row shows the count; this is where the linking is done. These are the requirements on the page behind.') %}
+{% for item in checklist_items %}
+{% set may_edit = can_manage or (can_contribute and current_person_id == item.owner_person_id) %}
+<fieldset class="ds-evidence">
+  <legend class="ds-evidence__legend">{{ item.template_item.title }}</legend>
+  {% if item.evidence_documents %}
+  <ul class="ds-evidence__list">
+    {% for document in item.evidence_documents %}
+    <li>
+      {% if document.permission_classification == 'Restricted' and not can_view_sensitive %}
+      <span class="text-muted">Restricted</span>
+      {% elif document.drive_url %}
+      <a href="{{ url_for('erp.open_document', public_id=document.public_id) }}" target="_blank" rel="noopener noreferrer">{{ document.title }}</a>
+      {% else %}
+      {{ document.title }} <span class="text-muted">(indexed metadata only)</span>
+      {% endif %}
+      {% if may_edit %}
+      <form method="POST" action="{{ url_for('erp.detach_checklist_document', public_id=project.public_id, item_public_id=item.public_id, document_public_id=document.public_id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ return_to }}">
+        <button class="ds-btn ds-btn--sm ds-btn--quiet">Unlink</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if item.evidence_reference %}<p class="ds-evidence__legacy">Legacy reference: {{ item.evidence_reference }}</p>{% endif %}
+  {% if may_edit %}
+  {% if project.document_records %}
+  <form method="POST" action="{{ url_for('erp.attach_checklist_document', public_id=project.public_id, item_public_id=item.public_id) }}" class="aurora-inline-decision">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ return_to }}">
+    <span class="aurora-inline-field aurora-inline-field--reason">
+      <label class="aurora-inline-label" for="evidence-doc-{{ item.public_id }}">Attach a document <span class="visually-hidden">to {{ item.template_item.title }}</span></label>
+      <select id="evidence-doc-{{ item.public_id }}" class="aurora-select aurora-select--small" name="document_public_id">
+        <option value="">Select an indexed document…</option>
+        {% for document in project.document_records if not (document.permission_classification == 'Restricted' and not can_view_sensitive) and document.checklist_status_id in (none, item.id) %}
+        <option value="{{ document.public_id }}">{{ document.title }}</option>
+        {% endfor %}
+      </select>
+    </span>
+    <button class="aurora-button--small aurora-button--outline-primary">Attach</button>
+  </form>
+  {% else %}
+  <p class="ds-evidence__legacy">Index a document under Documents before attaching evidence.</p>
+  {% endif %}
+  <form method="POST" action="{{ url_for('erp.upload_checklist_document', public_id=project.public_id, item_public_id=item.public_id) }}" enctype="multipart/form-data" class="aurora-inline-decision">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ return_to }}">
+    <span class="aurora-inline-field aurora-inline-field--reason aurora-file-field">
+      <label class="aurora-inline-label" for="evidence-file-{{ item.public_id }}">Upload evidence <span class="visually-hidden">for {{ item.template_item.title }}</span></label>
+      <span class="aurora-file-field__control"><i class="ph ph-file-arrow-up" aria-hidden="true"></i><input id="evidence-file-{{ item.public_id }}" type="file" name="source_file" required></span>
+    </span>
+    <button class="aurora-button--small aurora-button--outline-primary">Upload</button>
+  </form>
+  {% endif %}
+</fieldset>
+{% endfor %}
+{% endcall %}
+{% endif %}
+
+{% if active_section and (checklist or active_section == 'schedule') and can_manage and checklist_templates %}
+{% call modal('m-checklist-add', 'Add a checklist') %}
+<form method="POST" action="{{ url_for('erp.instantiate_project_checklist', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-12"><label class="aurora-label" for="checklist_template">Checklist template</label>
+    <select id="checklist_template" class="aurora-select" name="template_public_id">
+      {% for template in checklist_templates %}<option value="{{ template.public_id }}">{{ template.name }} ({{ template.project_type }})</option>{% endfor %}
+    </select></div>
+  <div class="col-12"><button class="aurora-button--primary">Add checklist</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'schedule' and can_manage and is_igp %}
+{% call modal('m-itinerary', 'Import itinerary') %}
+<form method="POST" action="{{ url_for('erp.upload_itinerary', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('itinerary_file', 'source_file', 'Itinerary file', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--primary">Import itinerary</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'budget' and can_manage %}
+{% call modal('m-budget-add', 'Add a budget line') %}
+<form method="POST" action="{{ url_for('erp.add_budget_line', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6 ds-cond"><label class="aurora-label" for="budget_category">Category</label><select id="budget_category" class="aurora-select" name="category">{% for option in budget_category_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+  <div class="col-md-6 ds-cond__other"><label class="aurora-label" for="budget_category_other">If “Other,” specify</label><input id="budget_category_other" class="aurora-input" name="category_other"></div>
+  <div class="col-md-8"><label class="aurora-label" for="budget_description">Description</label><input id="budget_description" class="aurora-input" name="description" required></div>
+  <div class="col-md-4"><label class="aurora-label" for="budget_amount">Estimated amount</label><input id="budget_amount" class="aurora-input" type="number" step="0.01" min="0" name="estimated_amount" required></div>
+  <div class="col-12"><button class="aurora-button--primary">Add budget line</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'requests' and can_manage %}
+{% call modal('m-request-add', 'Create a request') %}
+<form method="POST" action="{{ url_for('erp.add_operational_request', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6 ds-cond"><label class="aurora-label" for="request_type">Request type</label><select id="request_type" class="aurora-select" name="request_type">{% for option in operational_request_type_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+  <div class="col-md-6 ds-cond__other"><label class="aurora-label" for="request_type_other">If “Other,” specify</label><input id="request_type_other" class="aurora-input" name="request_type_other"></div>
+  <div class="col-md-6"><label class="aurora-label" for="request_title">Title</label><input id="request_title" class="aurora-input" name="title" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="request_details">Details</label><input id="request_details" class="aurora-input" name="details"></div>
+  <div class="col-md-6"><label class="aurora-label" for="request_amount">Amount</label><input id="request_amount" class="aurora-input" type="number" min="0" step="0.01" name="amount"></div>
+  <div class="col-12"><button class="aurora-button--primary">Create draft</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'reimbursements' and can_manage %}
+{% call modal('m-reimbursement-add', 'Add or import reimbursements') %}
+<form method="POST" action="{{ url_for('erp.add_reimbursement', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6"><label class="aurora-label" for="reimb_date">Date</label><input id="reimb_date" type="date" class="aurora-input" name="date" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="reimb_party">Party name</label><input id="reimb_party" class="aurora-input" name="party_name" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="reimb_bill">Bill number</label><input id="reimb_bill" class="aurora-input" name="bill_number"></div>
+  <div class="col-md-6"><label class="aurora-label" for="reimb_amount">Amount (INR)</label><input id="reimb_amount" type="number" step="0.01" min="0" class="aurora-input" name="amount" required></div>
+  <div class="col-12"><label class="aurora-label" for="reimb_particular">Particular</label><input id="reimb_particular" class="aurora-input" name="particular"></div>
+  <div class="col-12"><button class="aurora-button--primary">Add reimbursement</button></div>
+</form>
+<hr class="ds-modal__rule">
+<form method="POST" action="{{ url_for('erp.upload_reimbursements', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('reimbursement_file', 'source_file', 'Bulk reimbursements file', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--secondary">Import reimbursements</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'index' and can_manage %}
+{% call modal('m-document-add', 'Upload or index a document') %}
+<form method="POST" action="{{ url_for('erp.upload_documents', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('document_files', 'source_files', 'Documents (classified and stored in Drive automatically)', 'Choose one or more files.', multiple=true, wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--secondary">Upload</button></div>
+</form>
+<hr class="ds-modal__rule">
+<form method="POST" action="{{ url_for('erp.add_document', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6"><label class="aurora-label" for="document_title">Document title</label><input id="document_title" class="aurora-input" name="title" required></div>
+  <div class="col-md-6 ds-cond"><label class="aurora-label" for="document_category">Category</label><select id="document_category" class="aurora-select" name="category">{% for option in document_category_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+  <div class="col-md-6 ds-cond__other"><label class="aurora-label" for="document_category_other">If “Other,” specify</label><input id="document_category_other" class="aurora-input" name="category_other"></div>
+  <div class="col-md-6"><label class="aurora-label" for="document_classification">Classification</label><select id="document_classification" class="aurora-select" name="permission_classification"><option>Internal</option><option>Restricted</option><option>Public</option></select></div>
+  <div class="col-12"><label class="aurora-label" for="document_drive_url">Google Drive link</label><input id="document_drive_url" class="aurora-input" type="url" name="drive_url" aria-describedby="document_drive_url_hint"><p id="document_drive_url_hint" class="small text-muted mb-0">Paste a Google Drive share link.</p></div>
+  <div class="col-12"><button class="aurora-button--primary">Add document</button></div>
+</form>
+{% if not is_igp %}
+<hr class="ds-modal__rule">
+<form method="POST" action="{{ url_for('erp.upload_icc_event_folder', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('event_folder_files', 'source_files', 'Event folder files', 'Poster, backdrop, programme, photos, report. Choose one or more.', multiple=true, wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--secondary">Upload &amp; classify</button></div>
+</form>
+{% endif %}
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'team' and can_manage %}
+{% call modal('m-people-find', 'Find and enrol a participant') %}
+{#- The search is a GET form, so it carries the tab and the section it was
+    run from: a search must not drop the reader back onto another list. -#}
+<form method="GET" class="row g-2">
+  <input type="hidden" name="tab" value="people">
+  <input type="hidden" name="section" value="team">
+  <div class="col-12"><label class="aurora-label" for="people_q">Search people by name, email, or registration number</label><input id="people_q" class="aurora-input" name="people_q" value="{{ people_query }}" placeholder="Start typing at least 2 characters…"></div>
+  <div class="col-12"><button class="aurora-button--secondary">Search</button></div>
+</form>
+{% for match in people_matches %}
+<form method="POST" action="{{ url_for('erp.add_team_member', public_id=project.public_id) }}" class="aurora-inline-decision mt-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <input type="hidden" name="person_public_id" value="{{ match.public_id }}">
+  <span class="aurora-inline-field"><span class="aurora-inline-label">{{ match.display_name }} {{ match.registration_number or '' }}</span></span>
+  <span class="aurora-inline-field"><label class="aurora-inline-label" for="assignment-type-{{ match.public_id }}">Assignment type <span class="visually-hidden">for {{ match.display_name }}</span></label>
+    <select id="assignment-type-{{ match.public_id }}" class="aurora-select aurora-select--small" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></span>
+  <button class="aurora-button--small aurora-button--outline-primary" {% if match.is_member %}disabled{% endif %}>{{ 'Already enrolled' if match.is_member else 'Enrol' }}</button>
+</form>
+{% else %}
+{% if people_query %}<p class="ds-empty">Nobody matches “{{ people_query }}”.</p>{% endif %}
+{% endfor %}
+{% endcall %}
+
+{% call modal('m-people-new', 'Create a new participant') %}
+<form method="POST" action="{{ url_for('erp.create_and_enroll_team_member', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6"><label class="aurora-label" for="new_first_name">First name</label><input id="new_first_name" class="aurora-input" name="first_name" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="new_last_name">Last name</label><input id="new_last_name" class="aurora-input" name="last_name"></div>
+  <div class="col-md-6"><label class="aurora-label" for="new_email">Email</label><input id="new_email" type="email" class="aurora-input" name="email"></div>
+  <div class="col-md-6"><label class="aurora-label" for="new_registration_number">Registration number</label><input id="new_registration_number" class="aurora-input" name="registration_number"></div>
+  <div class="col-md-6"><label class="aurora-label" for="new_assignment_type">Assignment type</label><select id="new_assignment_type" class="aurora-select" name="assignment_type"><option>Project Team</option><option>Governance</option>{% if is_igp %}<option>IGP Program Team</option>{% endif %}</select></div>
+  <div class="col-md-6 ds-cond"><label class="aurora-label" for="new_role_label">Role</label><select id="new_role_label" class="aurora-select" name="role_label"><option value="">Not specified</option>{% for option in assignment_role_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+  <div class="col-md-6 ds-cond__other"><label class="aurora-label" for="new_role_label_other">If "Other", specify</label><input id="new_role_label_other" class="aurora-input" name="role_label_other"></div>
+  <div class="col-12"><button class="aurora-button--primary">Create &amp; enrol</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'contributions' and can_contribute %}
+{% call modal('m-contribution-add', 'Log a contribution') %}
+<form method="POST" action="{{ url_for('erp.log_contribution', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6 ds-cond"><label class="aurora-label" for="contribution_activity_type">Activity type</label><select id="contribution_activity_type" class="aurora-select" name="activity_type">{% for option in contribution_activity_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}</select></div>
+  <div class="col-md-6 ds-cond__other"><label class="aurora-label" for="contribution_activity_other">If “Other,” specify</label><input id="contribution_activity_other" class="aurora-input" name="activity_type_other"></div>
+  <div class="col-md-8"><label class="aurora-label" for="contribution_description">Contribution</label><input id="contribution_description" class="aurora-input" name="description" required></div>
+  <div class="col-md-4"><label class="aurora-label" for="contribution_hours">Hours</label><input id="contribution_hours" class="aurora-input" type="number" step="0.5" min="0.5" name="duration_hours" value="1" required></div>
+  <div class="col-12"><button class="aurora-button--primary">Log contribution</button></div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if active_section == 'buddies' %}
+{% if can_manage %}
+{% call modal('m-buddy-add', 'Pair a buddy, or import an allocation') %}
+<form method="POST" action="{{ url_for('erp.add_buddy_assignment', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-md-6"><label class="aurora-label" for="buddy_person_public_id">Buddy</label><select id="buddy_person_public_id" class="aurora-select" name="buddy_person_public_id" required><option value="">Select a project participant…</option>{% for person in eligible_participants %}<option value="{{ person.public_id }}">{{ person.display_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><label class="aurora-label" for="exchange_student_person_public_id">Exchange student</label><select id="exchange_student_person_public_id" class="aurora-select" name="exchange_student_person_public_id" required><option value="">Select a project participant…</option>{% for person in eligible_participants %}<option value="{{ person.public_id }}">{{ person.display_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><label class="aurora-label" for="start_date">Start date</label><input id="start_date" type="date" class="aurora-input" name="start_date" required></div>
+  <div class="col-md-6"><label class="aurora-label" for="end_date">End date</label><input id="end_date" type="date" class="aurora-input" name="end_date" required></div>
+  <div class="col-12"><button class="aurora-button--primary">Create pairing</button></div>
+</form>
+<hr class="ds-modal__rule">
+<form method="POST" action="{{ url_for('erp.upload_buddy_allocation', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('buddy_allocation_file', 'source_file', 'Bulk buddy allocation file', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--secondary">Import allocation</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% if can_contribute and project.buddy_assignments %}
+{% call modal('m-buddy-log', 'Log an interaction') %}
+{#- One form per pairing: the assignment is a URL parameter, not a field, so
+    a single form with a pairing picker would need a script to rewrite its
+    action -- and an inline handler is dead under this app's CSP. -#}
+{% for assignment in project.buddy_assignments %}
+<form method="POST" action="{{ url_for('erp.log_buddy_interaction', public_id=project.public_id, assignment_public_id=assignment.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-12"><span class="ds-evidence__legend">{{ assignment.buddy_person.display_name if assignment.buddy_person else (assignment.buddy.username if assignment.buddy else 'Buddy') }} &amp; {{ assignment.exchange_student_person.display_name if assignment.exchange_student_person else (assignment.exchange_student.username if assignment.exchange_student else 'Exchange student') }}</span></div>
+  <div class="col-md-4"><label class="aurora-label" for="buddy_log_date_{{ assignment.public_id }}">Interaction date</label><input id="buddy_log_date_{{ assignment.public_id }}" class="aurora-input" type="date" name="activity_date" required></div>
+  <div class="col-md-3"><label class="aurora-label" for="buddy_log_hours_{{ assignment.public_id }}">Hours</label><input id="buddy_log_hours_{{ assignment.public_id }}" class="aurora-input" type="number" step="0.5" min="0.5" name="duration_hours" value="1" required></div>
+  <div class="col-md-5"><label class="aurora-label" for="buddy_log_description_{{ assignment.public_id }}">Interaction summary</label><input id="buddy_log_description_{{ assignment.public_id }}" class="aurora-input" name="description" required></div>
+  <div class="col-12"><button class="aurora-button--primary">Log</button></div>
+</form>
+{% if not loop.last %}<hr class="ds-modal__rule">{% endif %}
+{% endfor %}
+{% endcall %}
+{% endif %}
+{% endif %}
+
+{% if active_section == 'feedback' %}
+{% if open_form %}
+{% call modal('m-feedback-respond', 'Respond to “' ~ open_form.title ~ '”') %}
+<form method="POST" action="{{ url_for('erp.submit_feedback_response', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {% for question in open_form.questions_json %}
+    {% if question.type == 'scale' %}<div class="col-md-6"><label class="aurora-label" for="feedback-{{ question.key }}">{{ question.label }} <span aria-hidden="true">*</span></label><select id="feedback-{{ question.key }}" class="aurora-select" name="{{ question.key }}" required>{% for value in [5,4,3,2,1] %}<option value="{{ value }}">{{ value }} out of 5</option>{% endfor %}</select></div>
+    {% else %}<div class="col-12"><label class="aurora-label" for="feedback-{{ question.key }}">{{ question.label }}</label><textarea id="feedback-{{ question.key }}" class="aurora-input" name="{{ question.key }}" rows="2"></textarea></div>{% endif %}
+  {% endfor %}
+  <div class="col-12"><button class="aurora-button--primary">Submit feedback</button></div>
+</form>
+{% endcall %}
+{% elif can_manage %}
+{% call modal('m-feedback-open', 'Open a feedback form') %}
+<form method="POST" action="{{ url_for('erp.add_feedback_form', public_id=project.public_id) }}" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  <div class="col-12"><label class="aurora-label" for="feedback-title">Form title</label><input id="feedback-title" class="aurora-input" name="title" value="Project Feedback" required maxlength="180"></div>
+  <div class="col-12"><label class="aurora-label" for="feedback-questions">Additional text questions</label><textarea id="feedback-questions" class="aurora-input" name="questions" rows="4" aria-describedby="feedback-question-help"></textarea><div id="feedback-question-help" class="small text-muted">Optional. One question per line, up to 20 questions and 200 characters each. Overall rating (1–5) is always first.</div></div>
+  <div class="col-12"><button class="aurora-button--primary">Open feedback form</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% if can_manage and not is_igp %}
+{% call modal('m-icc-attendance', 'Import volunteer attendance') %}
+<form method="POST" action="{{ url_for('erp.upload_icc_attendance', public_id=project.public_id) }}" enctype="multipart/form-data" class="row g-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ return_to }}">
+  {{ file_picker('icc_attendance_file', 'source_file', 'Volunteer attendance file', 'Accepted format: .xlsx.', '.xlsx', wrapper='col-12') }}
+  <div class="col-12"><button class="aurora-button--secondary">Import attendance</button></div>
+</form>
+{% endcall %}
+{% endif %}
+{% endif %}

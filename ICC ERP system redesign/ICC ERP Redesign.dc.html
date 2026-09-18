@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="_ds/industry-f6eab4bb-7960-45d9-b208-daed6a92cfa4/styles.css">
+<script src="_ds/industry-f6eab4bb-7960-45d9-b208-daed6a92cfa4/_ds_bundle.js"></script>
+<style>
+body { margin: 0; background: #f2f2f3; color: #1d1f20; font-family: "Barlow", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: #416180; text-underline-offset: 3px; }
+a:hover { color: #2c455d; }
+button { font: inherit; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</helmet>
+
+<div style="min-height:100vh; display:flex; flex-direction:column">
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Sign in" style="flex:1 1 auto; display:grid; place-items:center; padding:48px 24px; background:#f2f2f3">
+  <div style="width:100%; max-width:380px; animation:rise .4s ease both">
+    <div style="display:flex; align-items:center; gap:11px; margin-bottom:38px">
+      <span style="width:34px; height:34px; display:grid; place-items:center; background:#5980a6; color:#f2f2f3; font:700 15px/1 'Barlow Condensed'; letter-spacing:.02em">ICC</span>
+      <span style="font:600 17px/1.1 'Barlow Condensed'; letter-spacing:.01em">Christ University<small style="display:block; margin-top:2px; font:400 12px/1 Barlow; color:#7a7a7d">International Christite Community</small></span>
+    </div>
+    <h1 style="margin:0 0 26px; font:600 34px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Sign in</h1>
+    <label style="display:block; margin-bottom:16px">
+      <span style="display:block; margin-bottom:5px; font:500 12px/1 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#5d5d60">Email</span>
+      <input type="text" value="r.thomas@christuniversity.in" onChange="{{ noop }}" style="width:100%; padding:10px 12px; border:1px solid rgba(29,31,32,.22); border-radius:0; background:#fff; color:#1d1f20; font:400 14px/1.3 Barlow; box-sizing:border-box">
+    </label>
+    <label style="display:block; margin-bottom:22px">
+      <span style="display:block; margin-bottom:5px; font:500 12px/1 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#5d5d60">Password</span>
+      <input type="password" value="············" onChange="{{ noop }}" style="width:100%; padding:10px 12px; border:1px solid rgba(29,31,32,.22); border-radius:0; background:#fff; color:#1d1f20; font:400 14px/1.3 Barlow; box-sizing:border-box">
+    </label>
+    <button type="button" onClick="{{ signIn }}" class="blueprint" style="width:100%; padding:12px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 15px/1 'Barlow Condensed'; letter-spacing:.04em; text-transform:uppercase; cursor:pointer">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Sign in</button>
+    <div style="display:flex; justify-content:space-between; margin-top:16px; font-size:13px"><a href="#" onClick="{{ noop }}">Forgot password</a><a href="#" onClick="{{ noop }}">Request access</a></div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ══════════════ APP SHELL ══════════════ -->
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1 1 auto; display:flex; flex-direction:column">
+
+  <!-- top nav -->
+  <header style="position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:20px; flex-wrap:wrap; padding:12px 28px; border-bottom:1px solid rgba(29,31,32,.16); background:#f2f2f3">
+    <button type="button" onClick="{{ goHome }}" style="display:flex; align-items:center; gap:9px; padding:0; border:0; background:none; cursor:pointer; text-align:left">
+      <span style="width:28px; height:28px; display:grid; place-items:center; background:#5980a6; color:#f2f2f3; font:700 12px/1 'Barlow Condensed'">ICC</span>
+      <span style="font:600 15px/1 'Barlow Condensed'; letter-spacing:.01em; color:#1d1f20">ICC / OIA</span>
+    </button>
+    <nav style="display:flex; gap:2px; flex-wrap:wrap">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+        <button type="button" onClick="{{ n.go }}" style="{{ n.style }}">{{ n.label }}</button>
+      </sc-for>
+    </nav>
+    <div style="flex:1 1 auto"></div>
+    <button type="button" onClick="{{ openPalette }}" style="display:flex; align-items:center; gap:8px; min-width:190px; padding:7px 10px; border:1px solid rgba(29,31,32,.2); background:#fff; color:#7a7a7d; font:400 13px/1 Barlow; cursor:pointer; text-align:left">
+      <span style="width:14px;height:14px;flex:0 0 14px;background:currentColor;-webkit-mask:url(assets/icons/search.svg) center/contain no-repeat;mask:url(assets/icons/search.svg) center/contain no-repeat"></span>
+      <span style="flex:1 1 auto">Search or jump to…</span>
+      <kbd style="padding:1px 5px; border:1px solid rgba(29,31,32,.18); font:400 11px/1.5 Barlow; color:#7a7a7d">⌘K</kbd>
+    </button>
+    <button type="button" onClick="{{ goAlerts }}" style="position:relative; width:32px; height:32px; display:grid; place-items:center; border:1px solid rgba(29,31,32,.16); background:none; color:#5d5d60; cursor:pointer">
+      <span style="width:15px;height:15px;background:currentColor;-webkit-mask:url(assets/icons/bell.svg) center/contain no-repeat;mask:url(assets/icons/bell.svg) center/contain no-repeat"></span>
+      <span style="position:absolute; top:-5px; right:-5px; min-width:15px; height:15px; display:grid; place-items:center; padding:0 3px; background:#5980a6; color:#f2f2f3; font:600 10px/1 Barlow; box-sizing:border-box">3</span>
+    </button>
+    <button type="button" onClick="{{ cycleRole }}" title="Switch role" style="display:flex; align-items:center; gap:8px; padding:4px 9px 4px 4px; border:1px solid rgba(29,31,32,.16); background:#fff; cursor:pointer">
+      <span style="width:24px; height:24px; display:grid; place-items:center; background:#1d2d3d; color:#f2f2f3; font:600 11px/1 'Barlow Condensed'">{{ userInitials }}</span>
+      <span style="display:grid; text-align:left"><strong style="font:500 12px/1.2 Barlow; color:#1d1f20">{{ userName }}</strong><small style="font:400 11px/1.2 Barlow; color:#7a7a7d">{{ roleLabel }}</small></span>
+    </button>
+  </header>
+
+  <!-- toast -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; z-index:80; bottom:24px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:11px 16px; background:#1d2d3d; color:#f2f2f3; font:400 13px/1.3 Barlow; box-shadow:0 12px 32px rgba(43,43,45,.22); animation:rise .2s ease both">
+      <span style="width:14px;height:14px;background:currentColor;-webkit-mask:url(assets/icons/check.svg) center/contain no-repeat;mask:url(assets/icons/check.svg) center/contain no-repeat"></span>{{ toast }}</div>
+  </sc-if>
+
+  <!-- command palette -->
+  <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePalette }}" style="position:fixed; z-index:70; inset:0; display:grid; align-items:start; justify-items:center; padding:12vh 16px 16px; background:rgba(29,31,32,.34); animation:fade .15s ease both">
+      <div style="width:min(100%,560px); background:#f2f2f3; border:1px solid rgba(29,31,32,.3); box-shadow:0 12px 32px rgba(43,43,45,.22); animation:rise .18s ease both">
+        <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid rgba(29,31,32,.16)">
+          <span style="width:16px;height:16px;color:#5980a6;background:currentColor;-webkit-mask:url(assets/icons/search.svg) center/contain no-repeat;mask:url(assets/icons/search.svg) center/contain no-repeat"></span>
+          <span style="flex:1 1 auto; font:400 15px/1 Barlow; color:#1d1f20">{{ paletteQuery }}<span style="color:#5980a6">|</span></span>
+          <kbd style="padding:1px 5px; border:1px solid rgba(29,31,32,.18); font:400 11px/1.5 Barlow; color:#7a7a7d">esc</kbd>
+        </div>
+        <div style="max-height:52vh; overflow:auto; padding:8px">
+          <sc-for list="{{ paletteResults }}" as="r" hint-placeholder-count="5">
+            <button type="button" onClick="{{ r.go }}" style="{{ r.style }}">
+              <span style="display:grid; text-align:left"><strong style="font:500 14px/1.3 Barlow">{{ r.title }}</strong><small style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ r.meta }}</small></span>
+              <span style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#7a7a7d">{{ r.kind }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- first-run tour -->
+  <sc-if value="{{ tourStep }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; z-index:60; inset:0; background:rgba(29,31,32,.42); animation:fade .2s ease both">
+      <div class="blueprint" style="position:absolute; {{ tourPos }} width:340px; padding:20px; background:#f2f2f3; border:1px solid #1d2d3d; box-shadow:0 12px 32px rgba(43,43,45,.3); animation:rise .22s ease both">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.11em; text-transform:uppercase; color:#5980a6">Step {{ tourStep }} of 4</div>
+        <h3 style="margin:8px 0 6px; font:600 22px/1.1 'Barlow Condensed'">{{ tourTitle }}</h3>
+        <p style="margin:0 0 16px; font:400 14px/1.5 Barlow; color:#424244">{{ tourBody }}</p>
+        <div style="display:flex; gap:8px">
+          <button type="button" onClick="{{ tourNext }}" style="padding:8px 14px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">{{ tourCta }}</button>
+          <button type="button" onClick="{{ tourSkip }}" style="padding:8px 14px; border:1px solid rgba(29,31,32,.2); background:none; color:#5d5d60; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Skip</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <main style="flex:1 1 auto; width:100%; max-width:1440px; margin:0 auto; padding:32px 28px 72px; box-sizing:border-box">
+
+  <!-- ═══ HOME ═══ -->
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <div data-screen-label="Home">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:26px">
+      <div>
+        <h1 style="margin:0; font:600 40px/1.05 'Barlow Condensed'; letter-spacing:-.015em">{{ greeting }}</h1>
+        <p style="margin:6px 0 0; font:400 15px/1.5 Barlow; color:#424244">{{ homeLede }}</p>
+      </div>
+      <button type="button" onClick="{{ homeCtaGo }}" class="blueprint" style="padding:11px 18px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>{{ homeCta }}</button>
+    </div>
+
+    <!-- counters: every one is a filtered link -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:34px">
+      <sc-for list="{{ counters }}" as="c" hint-placeholder-count="4">
+        <button type="button" onClick="{{ c.go }}" class="blueprint" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px; border:1px solid rgba(29,31,32,.16); background:none; cursor:pointer; text-align:left">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <span style="display:grid; gap:4px">
+            <span style="font:400 32px/1 Barlow; color:{{ c.tone }}; font-variant-numeric:tabular-nums">{{ c.value }}</span>
+            <span style="font:500 12px/1.3 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#5d5d60">{{ c.label }}</span>
+          </span>
+          <span style="width:16px;height:16px;flex:0 0 16px;color:#94bce3;background:currentColor;-webkit-mask:url(assets/icons/arrow-up-right.svg) center/contain no-repeat;mask:url(assets/icons/arrow-up-right.svg) center/contain no-repeat"></span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr); gap:28px; align-items:start">
+      <!-- the one big list -->
+      <section>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+          <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">{{ queueTitle }}</h2>
+          <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ queueCount }}</span>
+        </div>
+        <sc-for list="{{ queue }}" as="q" hint-placeholder-count="5">
+          <div style="{{ q.rowStyle }}">
+            <div style="min-width:0; flex:1 1 auto">
+              <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap">
+                <span style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#5980a6">{{ q.kind }}</span>
+                <span style="font:400 12px/1 Barlow; color:#7a7a7d">{{ q.code }}</span>
+              </div>
+              <div style="margin-top:4px; font:500 15px/1.35 Barlow; color:{{ q.titleTone }}">{{ q.title }}</div>
+              <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ q.meta }}</div>
+            </div>
+            <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px">
+              <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex; align-items:center; gap:6px; font:500 13px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:#597ea3">
+                  <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/check.svg) center/contain no-repeat;mask:url(assets/icons/check.svg) center/contain no-repeat"></span>{{ q.settledLabel }}</span>
+              </sc-if>
+              <sc-if value="{{ q.open }}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{ q.approve }}" style="padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">{{ q.approveLabel }}</button>
+                <button type="button" onClick="{{ q.reject }}" style="padding:7px 13px; border:1px solid rgba(29,31,32,.22); background:none; color:#5d5d60; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">{{ q.rejectLabel }}</button>
+                <button type="button" onClick="{{ q.openItem }}" title="Open record" style="width:30px; height:30px; display:grid; place-items:center; border:1px solid rgba(29,31,32,.16); background:none; color:#7a7a7d; cursor:pointer">
+                  <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/arrow-right.svg) center/contain no-repeat;mask:url(assets/icons/arrow-right.svg) center/contain no-repeat"></span></button>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:40px 20px; text-align:center; border-bottom:1px solid rgba(29,31,32,.1)">
+            <div style="font:600 20px/1.2 'Barlow Condensed'; color:#1d1f20">Nothing waiting on you.</div>
+            <p style="margin:6px 0 14px; font:400 14px/1.5 Barlow; color:#7a7a7d">When a volunteer logs hours or a checklist item needs a decision, it lands here.</p>
+            <button type="button" onClick="{{ goProjects }}" style="padding:9px 15px; border:1px solid rgba(29,31,32,.22); background:none; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Browse projects</button>
+          </div>
+        </sc-if>
+      </section>
+
+      <!-- today -->
+      <aside style="display:grid; gap:24px">
+        <section>
+          <div style="padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)"><h2 style="margin:0; font:600 20px/1.1 'Barlow Condensed'">Today</h2></div>
+          <sc-for list="{{ today }}" as="t" hint-placeholder-count="2">
+            <div style="padding:13px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+              <div style="font:400 12px/1 Barlow; color:#5980a6; font-variant-numeric:tabular-nums">{{ t.time }}</div>
+              <div style="margin-top:3px; font:500 14px/1.35 Barlow">{{ t.title }}</div>
+              <div style="margin-top:2px; font:400 12px/1.4 Barlow; color:#7a7a7d">{{ t.meta }}</div>
+              <sc-if value="{{ t.action }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ t.go }}" style="margin-top:9px; padding:7px 12px; border:1px solid #5980a6; background:none; color:#416180; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">{{ t.action }}</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+        <section class="blueprint" style="padding:16px; border:1px solid rgba(29,31,32,.16)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.11em; text-transform:uppercase; color:#5980a6">Where you left off</div>
+          <button type="button" onClick="{{ goProject }}" style="display:block; margin-top:9px; padding:0; border:0; background:none; text-align:left; cursor:pointer">
+            <div style="font:500 15px/1.3 Barlow; color:#1d1f20">{{ resumeTitle }}</div>
+            <div style="margin-top:2px; font:400 12px/1.4 Barlow; color:#7a7a7d">{{ resumeMeta }}</div>
+          </button>
+        </section>
+      </aside>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ═══ PROJECTS ═══ -->
+  <sc-if value="{{ isProjects }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Projects">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:22px">
+      <div>
+        <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Projects</h1>
+        <p style="margin:6px 0 0; font:400 15px/1.5 Barlow; color:#424244">{{ projectsLede }}</p>
+      </div>
+      <button type="button" onClick="{{ goNew }}" class="blueprint" style="padding:11px 18px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>New project</button>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+        <button type="button" onClick="{{ f.go }}" style="{{ f.style }}">{{ f.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:grid; grid-template-columns:minmax(0,1fr) 200px 190px 130px; gap:16px; padding:14px 0 8px; border-bottom:1px solid rgba(29,31,32,.28); font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">
+      <span>Project</span><span>Programme</span><span>Progress</span><span style="text-align:right">Status</span>
+    </div>
+    <sc-for list="{{ projectRows }}" as="p" hint-placeholder-count="6">
+      <button type="button" onClick="{{ p.go }}" style="{{ p.style }}">
+        <span style="min-width:0; display:grid; gap:3px; text-align:left">
+          <span style="font:400 11px/1 Barlow; letter-spacing:.06em; color:#5980a6">{{ p.code }}</span>
+          <span style="font:500 16px/1.3 Barlow; color:#1d1f20">{{ p.title }}</span>
+          <span style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ p.dates }}</span>
+        </span>
+        <span style="display:grid; gap:3px; text-align:left; font:400 13px/1.35 Barlow; color:#424244">{{ p.programme }}<small style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ p.campus }}</small></span>
+        <span style="display:grid; gap:6px; align-content:center">
+          <span style="display:block; height:4px; background:rgba(29,31,32,.14)"><span style="display:block; height:4px; width:{{ p.pct }}; background:#5980a6"></span></span>
+          <small style="font:400 12px/1 Barlow; color:#7a7a7d">{{ p.progressLabel }}</small>
+        </span>
+        <span style="justify-self:end; align-self:center; display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border:1px solid {{ p.statusBorder }}; color:{{ p.statusColor }}; font:500 11px/1.4 'Barlow Condensed'; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap">{{ p.status }}</span>
+      </button>
+    </sc-for>
+    <p style="margin:16px 0 0; font:400 13px/1.5 Barlow; color:#7a7a7d">{{ projectsFooter }}</p>
+  </div>
+  </sc-if>
+
+  <!-- ═══ PROJECT DETAIL ═══ -->
+  <sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Project detail">
+    <button type="button" onClick="{{ goProjects }}" style="display:inline-flex; align-items:center; gap:7px; margin-bottom:14px; padding:0; border:0; background:none; color:#7a7a7d; font:400 13px/1 Barlow; cursor:pointer">
+      <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/arrow-left.svg) center/contain no-repeat;mask:url(assets/icons/arrow-left.svg) center/contain no-repeat"></span>All projects</button>
+
+    <!-- sticky action bar -->
+    <div style="position:sticky; top:57px; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; padding:14px 0; margin-bottom:0; border-bottom:1px solid rgba(29,31,32,.28); background:#f2f2f3">
+      <div style="min-width:0">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <span style="font:400 12px/1 Barlow; letter-spacing:.07em; color:#5980a6">IGP-2026-014</span>
+          <span style="display:inline-flex; padding:3px 8px; border:1px solid #94bce3; color:#416180; font:500 11px/1.4 'Barlow Condensed'; letter-spacing:.08em; text-transform:uppercase">Active</span>
+        </div>
+        <h1 style="margin:4px 0 0; font:600 30px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Summer School 2026</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <button type="button" onClick="{{ noop }}" style="padding:9px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Edit</button>
+        <button type="button" onClick="{{ toastReport }}" style="padding:9px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">PDF report</button>
+        <button type="button" onClick="{{ closeProject }}" class="blueprint" style="padding:9px 16px; border:1px solid {{ closeBtnBorder }}; background:{{ closeBtnBg }}; color:{{ closeBtnColor }}; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:{{ closeBtnCursor }}">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>{{ closeBtnLabel }}</button>
+      </div>
+    </div>
+
+    <!-- section switch: 3 visible + more -->
+    <div style="display:flex; align-items:center; gap:2px; flex-wrap:wrap; padding:10px 0 0; margin-bottom:26px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <button type="button" onClick="{{ t.go }}" style="{{ t.style }}">{{ t.label }}<sc-if value="{{ t.count }}" hint-placeholder-val="{{ false }}"><span style="margin-left:7px; font:400 12px/1 Barlow; color:#7a7a7d">{{ t.count }}</span></sc-if></button>
+      </sc-for>
+      <sc-if value="{{ moreOpen }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ moreTabs }}" as="t" hint-placeholder-count="4">
+          <button type="button" onClick="{{ t.go }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </sc-if>
+      <button type="button" onClick="{{ toggleMore }}" style="padding:8px 12px; border:1px solid transparent; background:none; color:#7a7a7d; font:600 13px/1 'Barlow Condensed'; letter-spacing:.04em; text-transform:uppercase; cursor:pointer">{{ moreLabel }}</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <sc-if value="{{ tabOverview }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:32px; align-items:start">
+      <div style="display:grid; gap:32px">
+        <!-- blockers first, uncollapsed, actionable -->
+        <section>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+            <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'; color:{{ blockersTone }}">{{ blockersTitle }}</h2>
+            <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ blockersHint }}</span>
+          </div>
+          <sc-for list="{{ blockers }}" as="b" hint-placeholder-count="4">
+            <div style="{{ b.rowStyle }}">
+              <div style="min-width:0; flex:1 1 auto">
+                <div style="font:500 15px/1.35 Barlow; color:{{ b.titleTone }}">{{ b.title }}</div>
+                <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ b.meta }}</div>
+              </div>
+              <sc-if value="{{ b.open }}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{ b.resolve }}" style="flex:0 0 auto; padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">{{ b.action }}</button>
+              </sc-if>
+              <sc-if value="{{ b.settled }}" hint-placeholder-val="{{ false }}">
+                <span style="flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; font:500 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:#597ea3">
+                  <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/check.svg) center/contain no-repeat;mask:url(assets/icons/check.svg) center/contain no-repeat"></span>Cleared</span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+        <!-- schedule -->
+        <section>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+            <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Schedule</h2>
+            <button type="button" onClick="{{ goRollcall }}" style="padding:0; border:0; background:none; color:#416180; font:500 13px/1 Barlow; cursor:pointer">Next session · roll call →</button>
+          </div>
+          <sc-for list="{{ schedule }}" as="s" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:112px minmax(0,1fr) auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+              <span style="font:400 13px/1.3 Barlow; color:#5980a6; font-variant-numeric:tabular-nums">{{ s.when }}</span>
+              <span style="display:grid; gap:2px"><span style="font:500 15px/1.3 Barlow">{{ s.title }}</span><span style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ s.venue }}</span></span>
+              <span style="font:500 11px/1.4 'Barlow Condensed'; letter-spacing:.08em; text-transform:uppercase; color:#7a7a7d">{{ s.state }}</span>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+      <!-- facts: compact, one block, no forms -->
+      <aside style="display:grid; gap:24px">
+        <section class="blueprint" style="padding:18px; border:1px solid rgba(29,31,32,.16)">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <h3 style="margin:0 0 12px; font:600 13px/1 'Barlow Condensed'; letter-spacing:.11em; text-transform:uppercase; color:#5d5d60">Record</h3>
+          <sc-for list="{{ facts }}" as="f" hint-placeholder-count="6">
+            <div style="display:flex; justify-content:space-between; gap:14px; padding:7px 0; border-bottom:1px solid rgba(29,31,32,.08); font:400 13px/1.4 Barlow">
+              <span style="color:#7a7a7d">{{ f.k }}</span><span style="text-align:right; color:#1d1f20">{{ f.v }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:12px">
+            <button type="button" onClick="{{ toggleFacts }}" style="padding:0; border:0; background:none; color:#416180; font:500 13px/1 Barlow; cursor:pointer">{{ factsToggle }}</button>
+            <button type="button" onClick="{{ goAudit }}" style="padding:0; border:0; background:none; color:#416180; font:500 13px/1 Barlow; cursor:pointer">Change history</button>
+          </div>
+        </section>
+        <section>
+          <h3 style="margin:0 0 10px; font:600 13px/1 'Barlow Condensed'; letter-spacing:.11em; text-transform:uppercase; color:#5d5d60">Public site</h3>
+          <p style="margin:0 0 12px; font:400 13px/1.5 Barlow; color:#7a7a7d">Not published. Publishing needs closure cleared first.</p>
+          <button type="button" onClick="{{ publish }}" style="padding:8px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Request publication</button>
+        </section>
+      </aside>
+    </div>
+    </sc-if>
+
+    <!-- DELIVERY -->
+    <sc-if value="{{ tabDelivery }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:960px">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+        <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Needs action</h2>
+        <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ deliveryCount }}</span>
+      </div>
+      <sc-for list="{{ delivery }}" as="d" hint-placeholder-count="6">
+        <div style="{{ d.rowStyle }}">
+          <div style="min-width:0; flex:1 1 auto">
+            <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap">
+              <span style="font:400 11px/1 Barlow; letter-spacing:.06em; color:#5980a6">{{ d.code }}</span>
+              <span style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#7a7a7d">{{ d.kind }}</span>
+            </div>
+            <div style="margin-top:4px; font:500 15px/1.35 Barlow; color:{{ d.titleTone }}">{{ d.title }}</div>
+            <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ d.meta }}</div>
+          </div>
+          <sc-if value="{{ d.open }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:0 0 auto; display:flex; gap:8px">
+              <button type="button" onClick="{{ d.approve }}" style="padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Approve</button>
+              <button type="button" onClick="{{ d.reject }}" style="padding:7px 13px; border:1px solid rgba(29,31,32,.22); background:none; color:#5d5d60; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Send back</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ d.settled }}" hint-placeholder-val="{{ false }}">
+            <span style="flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; font:500 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:#597ea3">
+              <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/check.svg) center/contain no-repeat;mask:url(assets/icons/check.svg) center/contain no-repeat"></span>{{ d.settledLabel }}</span>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap">
+        <button type="button" onClick="{{ toggleSettled }}" style="padding:9px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">{{ settledToggle }}</button>
+        <button type="button" onClick="{{ noop }}" style="padding:9px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Add item</button>
+      </div>
+      <sc-if value="{{ settledOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:22px">
+          <sc-for list="{{ settledRows }}" as="s" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(29,31,32,.08)">
+              <span style="font:400 14px/1.35 Barlow; color:#7a7a7d">{{ s.title }}</span>
+              <span style="font:500 11px/1.4 'Barlow Condensed'; letter-spacing:.08em; text-transform:uppercase; color:#7a7a7d">{{ s.status }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- PEOPLE -->
+    <sc-if value="{{ tabPeople }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:1000px">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+        <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Team &amp; pairings</h2>
+        <div style="display:flex; gap:8px">
+          <button type="button" onClick="{{ noop }}" style="padding:8px 13px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Import allocation</button>
+          <button type="button" onClick="{{ noop }}" style="padding:8px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Add person</button>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 200px 150px 120px; gap:16px; padding:14px 0 8px; border-bottom:1px solid rgba(29,31,32,.2); font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">
+        <span>Person</span><span>Paired with</span><span>Role</span><span style="text-align:right">Hours</span>
+      </div>
+      <sc-for list="{{ people }}" as="p" hint-placeholder-count="6">
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) 200px 150px 120px; gap:16px; align-items:center; padding:12px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+          <span style="display:grid; gap:2px"><span style="font:500 15px/1.3 Barlow">{{ p.name }}</span><span style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ p.reg }}</span></span>
+          <span style="font:400 14px/1.35 Barlow; color:#424244">{{ p.pair }}</span>
+          <span style="font:400 13px/1.35 Barlow; color:#7a7a7d">{{ p.role }}</span>
+          <span style="text-align:right; font:400 14px/1 Barlow; font-variant-numeric:tabular-nums">{{ p.hours }}</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- BUDGET -->
+    <sc-if value="{{ tabBudget }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:960px; display:grid; gap:32px">
+      <section>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+          <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Reimbursements</h2>
+          <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ reimbCount }}</span>
+        </div>
+        <sc-for list="{{ reimbursements }}" as="r" hint-placeholder-count="4">
+          <div style="{{ r.rowStyle }}">
+            <div style="min-width:0; flex:1 1 auto">
+              <div style="font:500 15px/1.35 Barlow; color:{{ r.titleTone }}">{{ r.title }}</div>
+              <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ r.meta }}</div>
+            </div>
+            <span style="flex:0 0 auto; font:400 16px/1 Barlow; font-variant-numeric:tabular-nums">{{ r.amount }}</span>
+            <sc-if value="{{ r.open }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:0 0 auto; display:flex; gap:8px">
+                <button type="button" onClick="{{ r.approve }}" style="padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Approve</button>
+                <button type="button" onClick="{{ r.reject }}" style="padding:7px 13px; border:1px solid rgba(29,31,32,.22); background:none; color:#5d5d60; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Query</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.settled }}" hint-placeholder-val="{{ false }}">
+              <span style="flex:0 0 auto; font:500 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:#597ea3">{{ r.settledLabel }}</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </section>
+      <section>
+        <div style="padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)"><h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Budget lines</h2></div>
+        <sc-for list="{{ budgetLines }}" as="b" hint-placeholder-count="4">
+          <div style="display:grid; grid-template-columns:minmax(0,1fr) 120px 120px 130px; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid rgba(29,31,32,.1); font:400 14px/1.35 Barlow">
+            <span>{{ b.line }}</span>
+            <span style="text-align:right; color:#7a7a7d; font-variant-numeric:tabular-nums">{{ b.planned }}</span>
+            <span style="text-align:right; font-variant-numeric:tabular-nums">{{ b.spent }}</span>
+            <span style="display:block; height:4px; align-self:center; background:rgba(29,31,32,.14)"><span style="display:block; height:4px; width:{{ b.pct }}; background:#5980a6"></span></span>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- RESOURCES / INSIGHTS / CONTRIBUTIONS (light) -->
+    <sc-if value="{{ tabSimple }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:900px">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.16)">
+        <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">{{ simpleTitle }}</h2>
+        <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ simpleMeta }}</span>
+      </div>
+      <sc-for list="{{ simpleRows }}" as="s" hint-placeholder-count="5">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+          <span style="display:grid; gap:2px"><span style="font:500 15px/1.3 Barlow">{{ s.title }}</span><span style="font:400 12px/1.35 Barlow; color:#7a7a7d">{{ s.meta }}</span></span>
+          <span style="font:400 14px/1 Barlow; color:#424244; font-variant-numeric:tabular-nums">{{ s.value }}</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- ═══ NEW PROJECT ═══ -->
+  <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="New project" style="max-width:760px">
+    <button type="button" onClick="{{ goProjects }}" style="display:inline-flex; align-items:center; gap:7px; margin-bottom:14px; padding:0; border:0; background:none; color:#7a7a7d; font:400 13px/1 Barlow; cursor:pointer">
+      <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/arrow-left.svg) center/contain no-repeat;mask:url(assets/icons/arrow-left.svg) center/contain no-repeat"></span>All projects</button>
+    <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">New project</h1>
+    <p style="margin:6px 0 26px; font:400 15px/1.5 Barlow; color:#424244">Start from what you already have. Everything else is filled in for you.</p>
+    <div style="display:grid; gap:10px; margin-bottom:28px">
+      <sc-for list="{{ createRoutes }}" as="r" hint-placeholder-count="3">
+        <button type="button" onClick="{{ r.go }}" style="{{ r.style }}">
+          <span style="display:grid; gap:3px; text-align:left">
+            <span style="font:600 18px/1.15 'Barlow Condensed'; color:#1d1f20">{{ r.title }}</span>
+            <span style="font:400 13px/1.45 Barlow; color:#7a7a7d">{{ r.body }}</span>
+          </span>
+          <span style="width:16px;height:16px;flex:0 0 16px;color:{{ r.arrowTone }};background:currentColor;-webkit-mask:url(assets/icons/arrow-right.svg) center/contain no-repeat;mask:url(assets/icons/arrow-right.svg) center/contain no-repeat"></span>
+        </button>
+      </sc-for>
+    </div>
+    <sc-if value="{{ createFormOpen }}" hint-placeholder-val="{{ true }}">
+    <section class="blueprint" style="padding:24px; border:1px solid rgba(29,31,32,.2); animation:rise .25s ease both">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <h2 style="margin:0 0 4px; font:600 22px/1.1 'Barlow Condensed'">{{ createFormTitle }}</h2>
+      <p style="margin:0 0 20px; font:400 13px/1.5 Barlow; color:#7a7a7d">{{ createFormHint }}</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px">
+        <label style="display:block; grid-column:1 / -1"><span style="display:block; margin-bottom:5px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#5d5d60">Title</span>
+          <input type="text" value="{{ formTitle }}" onChange="{{ setFormTitle }}" placeholder="e.g. Summer School 2027" style="width:100%; padding:9px 11px; border:1px solid rgba(29,31,32,.22); border-radius:0; background:#fff; font:400 14px/1.3 Barlow; box-sizing:border-box"></label>
+        <label style="display:block"><span style="display:block; margin-bottom:5px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#5d5d60">Starts</span>
+          <input type="date" value="2027-06-01" onChange="{{ noop }}" style="width:100%; padding:9px 11px; border:1px solid rgba(29,31,32,.22); border-radius:0; background:#fff; font:400 14px/1.3 Barlow; box-sizing:border-box"></label>
+        <label style="display:block"><span style="display:block; margin-bottom:5px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#5d5d60">Ends</span>
+          <input type="date" value="2027-06-28" onChange="{{ noop }}" style="width:100%; padding:9px 11px; border:1px solid rgba(29,31,32,.22); border-radius:0; background:#fff; font:400 14px/1.3 Barlow; box-sizing:border-box"></label>
+      </div>
+      <p style="margin:16px 0 0; font:400 13px/1.5 Barlow; color:#7a7a7d">Campus, academic year, owner, code and status are inferred — <button type="button" onClick="{{ noop }}" style="padding:0; border:0; background:none; color:#416180; font:500 13px/1.5 Barlow; cursor:pointer; text-decoration:underline">override them</button>.</p>
+      <div style="display:flex; gap:10px; margin-top:22px">
+        <button type="button" onClick="{{ createProject }}" style="padding:11px 18px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Create project</button>
+        <button type="button" onClick="{{ goProjects }}" style="padding:11px 18px; border:1px solid rgba(29,31,32,.22); background:none; color:#5d5d60; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Cancel</button>
+      </div>
+    </section>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- ═══ ROLL CALL ═══ -->
+  <sc-if value="{{ isRollcall }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Roll call" style="max-width:860px">
+    <button type="button" onClick="{{ goProject }}" style="display:inline-flex; align-items:center; gap:7px; margin-bottom:14px; padding:0; border:0; background:none; color:#7a7a7d; font:400 13px/1 Barlow; cursor:pointer">
+      <span style="width:13px;height:13px;background:currentColor;-webkit-mask:url(assets/icons/arrow-left.svg) center/contain no-repeat;mask:url(assets/icons/arrow-left.svg) center/contain no-repeat"></span>Summer School 2026</button>
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid rgba(29,31,32,.28)">
+      <div>
+        <div style="font:400 12px/1 Barlow; letter-spacing:.07em; color:#5980a6">14 Sep · 09:30–11:00</div>
+        <h1 style="margin:5px 0 0; font:600 34px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Campus orientation walk</h1>
+      </div>
+      <div style="text-align:right">
+        <div style="font:400 26px/1 Barlow; font-variant-numeric:tabular-nums">{{ rollPresent }}<span style="color:#7a7a7d">/{{ rollTotal }}</span></div>
+        <div style="font:500 11px/1.6 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">Marked present</div>
+      </div>
+    </div>
+    <sc-for list="{{ roster }}" as="r" hint-placeholder-count="8">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+        <span style="min-width:0; display:grid; gap:2px">
+          <span style="font:500 15px/1.3 Barlow">{{ r.name }}</span>
+          <span style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ r.reg }}</span>
+        </span>
+        <span style="flex:0 0 auto; display:flex; gap:0">
+          <sc-for list="{{ r.options }}" as="o" hint-placeholder-count="3">
+            <button type="button" onClick="{{ o.set }}" style="{{ o.style }}">{{ o.label }}</button>
+          </sc-for>
+        </span>
+      </div>
+    </sc-for>
+    <div style="position:sticky; bottom:0; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:20px; padding:16px 0; border-top:1px solid rgba(29,31,32,.28); background:#f2f2f3">
+      <span style="font:400 13px/1.5 Barlow; color:#7a7a7d">{{ rollSummary }}</span>
+      <div style="display:flex; gap:10px">
+        <button type="button" onClick="{{ markAllPresent }}" style="padding:10px 16px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">All present</button>
+        <button type="button" onClick="{{ saveRoll }}" class="blueprint" style="padding:10px 18px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Save roll call</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ═══ IMPORTS ═══ -->
+  <sc-if value="{{ isImports }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Imports" style="max-width:900px">
+    <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Imports</h1>
+    <p style="margin:6px 0 26px; font:400 15px/1.5 Barlow; color:#424244">Nothing is written until you commit it. Re-uploading the same file is always safe.</p>
+    <div class="blueprint" style="display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; padding:22px; margin-bottom:32px; border:1px dashed #94bce3">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display:flex; align-items:center; gap:14px">
+        <span style="width:22px;height:22px;flex:0 0 22px;color:#5980a6;background:currentColor;-webkit-mask:url(assets/icons/file-up.svg) center/contain no-repeat;mask:url(assets/icons/file-up.svg) center/contain no-repeat"></span>
+        <span style="display:grid; gap:2px"><span style="font:600 17px/1.15 'Barlow Condensed'">Drop a spreadsheet</span><span style="font:400 13px/1.4 Barlow; color:#7a7a7d">.xlsx or .csv · columns are matched automatically</span></span>
+      </div>
+      <button type="button" onClick="{{ noop }}" style="padding:9px 15px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Choose file</button>
+    </div>
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.2)">
+      <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Batches</h2>
+      <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ importsMeta }}</span>
+    </div>
+    <sc-for list="{{ batches }}" as="b" hint-placeholder-count="4">
+      <div style="{{ b.rowStyle }}">
+        <div style="min-width:0; flex:1 1 auto">
+          <div style="font:500 15px/1.35 Barlow">{{ b.title }}</div>
+          <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ b.meta }}</div>
+        </div>
+        <sc-if value="{{ b.open }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ b.commit }}" style="flex:0 0 auto; padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Commit {{ b.count }}</button>
+        </sc-if>
+        <sc-if value="{{ b.settled }}" hint-placeholder-val="{{ false }}">
+          <span style="flex:0 0 auto; font:500 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:{{ b.tone }}">{{ b.settledLabel }}</span>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ═══ ALERTS ═══ -->
+  <sc-if value="{{ isAlerts }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Alerts" style="max-width:760px">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap">
+      <div>
+        <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Alerts</h1>
+        <p style="margin:6px 0 0; font:400 15px/1.5 Barlow; color:#424244">Only what needs you. Everything else is in the audit trail.</p>
+      </div>
+      <button type="button" onClick="{{ readAll }}" style="padding:9px 14px; border:1px solid rgba(29,31,32,.22); background:none; color:#424244; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Mark all read</button>
+    </div>
+    <div style="margin-top:24px; border-top:1px solid rgba(29,31,32,.2)">
+      <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="5">
+        <button type="button" onClick="{{ a.go }}" style="{{ a.rowStyle }}">
+          <span style="width:6px; height:6px; flex:0 0 6px; margin-top:7px; background:{{ a.dot }}"></span>
+          <span style="min-width:0; display:grid; gap:2px; text-align:left">
+            <span style="font:500 15px/1.35 Barlow; color:{{ a.tone }}">{{ a.title }}</span>
+            <span style="font:400 13px/1.45 Barlow; color:#7a7a7d">{{ a.body }}</span>
+          </span>
+          <span style="flex:0 0 auto; font:400 12px/1.4 Barlow; color:#98989b">{{ a.when }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ═══ AUDIT ═══ -->
+  <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Audit" style="max-width:1000px">
+    <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">Audit trail</h1>
+    <p style="margin:6px 0 26px; font:400 15px/1.5 Barlow; color:#424244">Append-only. Raw ids are one click away, not on the page.</p>
+    <div style="display:grid; grid-template-columns:150px minmax(0,1fr) 170px; gap:16px; padding-bottom:8px; border-bottom:1px solid rgba(29,31,32,.28); font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">
+      <span>When</span><span>What happened</span><span>Who</span>
+    </div>
+    <sc-for list="{{ auditRows }}" as="a" hint-placeholder-count="8">
+      <div style="display:grid; grid-template-columns:150px minmax(0,1fr) 170px; gap:16px; padding:12px 0; border-bottom:1px solid rgba(29,31,32,.1); font:400 14px/1.4 Barlow">
+        <span style="color:#7a7a7d; font-variant-numeric:tabular-nums">{{ a.when }}</span>
+        <span>{{ a.what }}<small style="display:block; margin-top:2px; font:400 12px/1.4 Barlow; color:#98989b">{{ a.entity }}</small></span>
+        <span style="color:#424244">{{ a.who }}</span>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ═══ ADMIN ═══ -->
+  <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Admin" style="max-width:900px">
+    <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">People &amp; access</h1>
+    <p style="margin:6px 0 26px; font:400 15px/1.5 Barlow; color:#424244">Approving someone needs one decision: what they do. Scope follows from their campus.</p>
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.2)">
+      <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Waiting for approval</h2>
+      <span style="font:400 13px/1 Barlow; color:#7a7a7d">{{ pendingCount }}</span>
+    </div>
+    <sc-for list="{{ pending }}" as="u" hint-placeholder-count="3">
+      <div style="{{ u.rowStyle }}">
+        <div style="min-width:0; flex:1 1 auto">
+          <div style="font:500 15px/1.35 Barlow; color:{{ u.tone }}">{{ u.name }}</div>
+          <div style="margin-top:2px; font:400 13px/1.4 Barlow; color:#7a7a7d">{{ u.meta }}</div>
+        </div>
+        <sc-if value="{{ u.open }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end">
+            <span style="font:400 13px/1 Barlow; color:#7a7a7d">as</span>
+            <span style="flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; padding:6px 10px; border:1px solid rgba(29,31,32,.2); background:#fff; font:400 13px/1.2 Barlow">{{ u.requested }} ⌄</span>
+            <button type="button" onClick="{{ u.approve }}" style="padding:7px 13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Approve</button>
+            <button type="button" onClick="{{ u.reject }}" style="padding:7px 13px; border:1px solid rgba(29,31,32,.22); background:none; color:#5d5d60; font:600 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; cursor:pointer">Decline</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ u.settled }}" hint-placeholder-val="{{ false }}">
+          <span style="flex:0 0 auto; font:500 12px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; color:#597ea3">{{ u.settledLabel }}</span>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-top:38px; padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.2)">
+      <h2 style="margin:0; font:600 22px/1.1 'Barlow Condensed'">Directory</h2>
+      <span style="font:400 13px/1 Barlow; color:#7a7a7d">48 people</span>
+    </div>
+    <sc-for list="{{ directory }}" as="d" hint-placeholder-count="4">
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 190px 170px; gap:16px; align-items:center; padding:12px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+        <span style="display:grid; gap:2px"><span style="font:500 15px/1.3 Barlow">{{ d.name }}</span><span style="font:400 12px/1.3 Barlow; color:#7a7a7d">{{ d.email }}</span></span>
+        <span style="font:400 13px/1.35 Barlow; color:#424244">{{ d.role }}</span>
+        <span style="font:400 13px/1.35 Barlow; color:#7a7a7d">{{ d.campus }}</span>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ═══ PUBLIC SITE ═══ -->
+  <sc-if value="{{ isPublic }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Public site">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:22px; padding:9px 13px; border:1px solid #94bce3; background:#eef6ff; font:400 13px/1.4 Barlow; color:#416180">
+      <span style="width:14px;height:14px;flex:0 0 14px;background:currentColor;-webkit-mask:url(assets/icons/earth.svg) center/contain no-repeat;mask:url(assets/icons/earth.svg) center/contain no-repeat"></span>
+      Preview of what the public sees. Only Published projects appear here.</div>
+    <div style="max-width:900px">
+      <h1 style="margin:0; font:600 46px/1.02 'Barlow Condensed'; letter-spacing:-.02em">International Christite Community</h1>
+      <p style="margin:10px 0 34px; max-width:56ch; font:400 16px/1.55 Barlow; color:#424244">Exchange programmes, cultural events and student partnerships at Christ University.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:38px">
+        <sc-for list="{{ publicStats }}" as="s" hint-placeholder-count="3">
+          <div class="blueprint" style="padding:18px; border:1px solid rgba(29,31,32,.16)">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <div style="font:400 34px/1 Barlow; font-variant-numeric:tabular-nums">{{ s.value }}</div>
+            <div style="margin-top:5px; font:500 12px/1.3 'Barlow Condensed'; letter-spacing:.09em; text-transform:uppercase; color:#5d5d60">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding-bottom:10px; border-bottom:1px solid rgba(29,31,32,.2)"><h2 style="margin:0; font:600 24px/1.1 'Barlow Condensed'">Published events</h2></div>
+      <sc-for list="{{ publicEvents }}" as="e" hint-placeholder-count="4">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+          <span style="display:grid; gap:3px"><span style="font:500 16px/1.3 Barlow">{{ e.title }}</span><span style="font:400 13px/1.35 Barlow; color:#7a7a7d">{{ e.meta }}</span></span>
+          <span style="font:400 13px/1 Barlow; color:#5980a6; white-space:nowrap">{{ e.when }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ═══ MOBILE ═══ -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Mobile">
+    <h1 style="margin:0; font:600 38px/1.05 'Barlow Condensed'; letter-spacing:-.015em">On a phone</h1>
+    <p style="margin:6px 0 30px; max-width:60ch; font:400 15px/1.5 Barlow; color:#424244">Event days happen away from a desk. Three screens carry that: what's next, roll call, and logging hours.</p>
+    <div style="display:flex; gap:28px; flex-wrap:wrap">
+
+      <!-- phone 1: home -->
+      <div style="width:320px; padding:10px; border:1px solid rgba(29,31,32,.28); background:#e9e9ea">
+        <div style="height:600px; overflow:hidden; background:#f2f2f3; border:1px solid rgba(29,31,32,.14)">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid rgba(29,31,32,.14); font:400 11px/1 Barlow; color:#7a7a7d"><span>9:41</span><span>ICC / OIA</span></div>
+          <div style="padding:16px 14px">
+            <h2 style="margin:0; font:600 24px/1.1 'Barlow Condensed'">Today</h2>
+            <p style="margin:4px 0 16px; font:400 13px/1.45 Barlow; color:#7a7a7d">Orientation walk starts in 40 min.</p>
+            <button type="button" onClick="{{ goRollcall }}" style="width:100%; padding:13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer">Start roll call</button>
+            <div style="margin-top:22px; padding-bottom:8px; border-bottom:1px solid rgba(29,31,32,.16); font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">Waiting on you · 3</div>
+            <sc-for list="{{ mobileQueue }}" as="m" hint-placeholder-count="3">
+              <div style="padding:12px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+                <div style="font:500 14px/1.3 Barlow">{{ m.title }}</div>
+                <div style="margin-top:2px; font:400 12px/1.35 Barlow; color:#7a7a7d">{{ m.meta }}</div>
+                <div style="display:flex; gap:7px; margin-top:9px">
+                  <span style="flex:1 1 0; padding:9px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 11px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; text-align:center">Approve</span>
+                  <span style="flex:1 1 0; padding:9px; border:1px solid rgba(29,31,32,.22); color:#5d5d60; font:600 11px/1 'Barlow Condensed'; letter-spacing:.06em; text-transform:uppercase; text-align:center">Send back</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="padding:8px 2px 2px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">Home</div>
+      </div>
+
+      <!-- phone 2: roll call -->
+      <div style="width:320px; padding:10px; border:1px solid rgba(29,31,32,.28); background:#e9e9ea">
+        <div style="height:600px; overflow:hidden; background:#f2f2f3; border:1px solid rgba(29,31,32,.14); display:flex; flex-direction:column">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid rgba(29,31,32,.14); font:400 11px/1 Barlow; color:#7a7a7d"><span>9:41</span><span>Roll call</span></div>
+          <div style="padding:14px; border-bottom:1px solid rgba(29,31,32,.16)">
+            <div style="font:400 11px/1 Barlow; letter-spacing:.07em; color:#5980a6">09:30–11:00</div>
+            <h2 style="margin:4px 0 0; font:600 21px/1.1 'Barlow Condensed'">Orientation walk</h2>
+            <div style="margin-top:6px; font:400 13px/1 Barlow; color:#7a7a7d">28 of 36 marked</div>
+          </div>
+          <div style="flex:1 1 auto; overflow:hidden; padding:0 14px">
+            <sc-for list="{{ mobileRoster }}" as="m" hint-placeholder-count="6">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; border-bottom:1px solid rgba(29,31,32,.1)">
+                <span style="font:500 14px/1.3 Barlow">{{ m.name }}</span>
+                <span style="display:flex">
+                  <span style="{{ m.pStyle }}">P</span><span style="{{ m.aStyle }}">A</span><span style="{{ m.eStyle }}">E</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:12px 14px; border-top:1px solid rgba(29,31,32,.16)">
+            <span style="display:block; padding:13px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; text-align:center">Save</span>
+          </div>
+        </div>
+        <div style="padding:8px 2px 2px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">Roll call · 44px targets</div>
+      </div>
+
+      <!-- phone 3: log hours -->
+      <div style="width:320px; padding:10px; border:1px solid rgba(29,31,32,.28); background:#e9e9ea">
+        <div style="height:600px; overflow:hidden; background:#f2f2f3; border:1px solid rgba(29,31,32,.14)">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid rgba(29,31,32,.14); font:400 11px/1 Barlow; color:#7a7a7d"><span>9:41</span><span>Log hours</span></div>
+          <div style="padding:16px 14px">
+            <h2 style="margin:0; font:600 24px/1.1 'Barlow Condensed'">Log hours</h2>
+            <p style="margin:4px 0 18px; font:400 13px/1.45 Barlow; color:#7a7a7d">Summer School 2026 · today</p>
+            <div style="font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#5d5d60">What did you do</div>
+            <div style="display:flex; gap:7px; flex-wrap:wrap; margin-top:9px">
+              <span style="padding:9px 12px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:500 13px/1 Barlow">Airport pickup</span>
+              <span style="padding:9px 12px; border:1px solid rgba(29,31,32,.2); font:500 13px/1 Barlow; color:#424244">Buddy meet</span>
+              <span style="padding:9px 12px; border:1px solid rgba(29,31,32,.2); font:500 13px/1 Barlow; color:#424244">Session support</span>
+              <span style="padding:9px 12px; border:1px solid rgba(29,31,32,.2); font:500 13px/1 Barlow; color:#424244">Other</span>
+            </div>
+            <div style="margin-top:22px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#5d5d60">Hours</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:9px">
+              <span style="width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(29,31,32,.2); font:400 20px/1 Barlow; color:#424244">−</span>
+              <span style="font:400 30px/1 Barlow; font-variant-numeric:tabular-nums">8.0</span>
+              <span style="width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(29,31,32,.2); font:400 20px/1 Barlow; color:#424244">+</span>
+            </div>
+            <span style="display:block; margin-top:26px; padding:14px; border:1px solid #5980a6; background:#5980a6; color:#f2f2f3; font:600 14px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; text-align:center">Submit for approval</span>
+            <p style="margin:14px 0 0; font:400 12px/1.5 Barlow; color:#98989b">Goes to Dr. Thomas. You'll get one alert when it's decided.</p>
+          </div>
+        </div>
+        <div style="padding:8px 2px 2px; font:500 11px/1 'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; color:#7a7a7d">Log hours · volunteer</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  </main>
+</div>
+</sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440}}">
+const ROLES = {
+  coordinator: { name: "Dr. R. Thomas", initials: "RT", label: "Faculty coordinator" },
+  volunteer:   { name: "Ananya R",      initials: "AR", label: "ICC volunteer" },
+  office:      { name: "P. Iyer",        initials: "PI", label: "OIA office" }
+};
+const ORDER = ["coordinator", "volunteer", "office"];
+
+const QUEUES = {
+  coordinator: [
+    { id: "q1", kind: "Hours", code: "IGP-2026-014", title: "Ananya R · Airport pickup, 8.0 h", meta: "Logged yesterday · buddy for Lena Fischer", a: "Approve", r: "Send back", done: "Approved", undone: "Sent back" },
+    { id: "q2", kind: "Reimbursement", code: "IGP-2026-014", title: "Transport for Summer School week 2", meta: "₹14,200 · receipts attached", a: "Approve", r: "Query", done: "Approved", undone: "Queried" },
+    { id: "q3", kind: "Checklist", code: "ICC-2026-031", title: "SS-04 · Visa & C-Form verification", meta: "Blocks closure · owner: OIA front desk", a: "Verify", r: "Send back", done: "Verified", undone: "Sent back" },
+    { id: "q4", kind: "Hours", code: "ICC-2026-031", title: "K. D'Souza · Registration desk, 5.5 h", meta: "Logged 2 days ago", a: "Approve", r: "Send back", done: "Approved", undone: "Sent back" },
+    { id: "q5", kind: "Publication", code: "ICC-2026-009", title: "Coffee Meet & Greet · publish to public site", meta: "Report and photos attached", a: "Publish", r: "Hold", done: "Published", undone: "Held" }
+  ],
+  volunteer: [
+    { id: "v1", kind: "Task", code: "IGP-2026-014", title: "Collect welcome kits from the OIA store", meta: "Due today · with M. George", a: "Done", r: "Blocked", done: "Done", undone: "Blocked" },
+    { id: "v2", kind: "Task", code: "IGP-2026-014", title: "Confirm airport pickup slot with Lena", meta: "Due tomorrow", a: "Done", r: "Blocked", done: "Done", undone: "Blocked" },
+    { id: "v3", kind: "Hours", code: "IGP-2026-014", title: "Log yesterday's 8.0 h pickup shift", meta: "Draft saved · not submitted", a: "Submit", r: "Discard", done: "Submitted", undone: "Discarded" },
+    { id: "v4", kind: "Task", code: "ICC-2026-031", title: "Photograph the inaugural for the report", meta: "Due 18 Sep", a: "Done", r: "Blocked", done: "Done", undone: "Blocked" }
+  ],
+  office: [
+    { id: "o1", kind: "Import", code: "—", title: "Summer School checklist · 62 rows validated", meta: "No errors · awaiting commit", a: "Commit", r: "Discard", done: "Committed", undone: "Discarded" },
+    { id: "o2", kind: "Publication", code: "IGP-2026-014", title: "Summer School 2026 · publication request", meta: "4 closure blockers still open", a: "Review", r: "Hold", done: "Reviewed", undone: "Held" },
+    { id: "o3", kind: "Access", code: "—", title: "3 registrations waiting for approval", meta: "a.mehra, s.nair, k.dsouza", a: "Open", r: "Later", done: "Opened", undone: "Deferred" },
+    { id: "o4", kind: "Closure", code: "ICC-2026-022", title: "Lamppost Cultural Evening · report overdue", meta: "Event ended 11 days ago", a: "Chase", r: "Waive", done: "Chased", undone: "Waived" }
+  ]
+};
+
+const BLOCKERS = [
+  { id: "b1", title: "Closure report not written", meta: "Required before this project can complete", action: "Write it" },
+  { id: "b2", title: "SS-04 · Visa & C-Form verification", meta: "12 of 42 students unverified", action: "Verify" },
+  { id: "b3", title: "6 volunteer hour claims undecided", meta: "Oldest waiting 9 days", action: "Decide" },
+  { id: "b4", title: "Transport reimbursement unsettled", meta: "₹14,200 · receipts attached", action: "Settle" }
+];
+
+const DELIVERY = [
+  { id: "d1", code: "SS-04", kind: "Checklist", title: "Visa & C-Form verification", meta: "12 of 42 unverified · restricted evidence in Drive" },
+  { id: "d2", code: "SS-11", kind: "Checklist", title: "Accommodation allotment sheet", meta: "Submitted by hostel office · needs sign-off" },
+  { id: "d3", code: "T-207", kind: "Task", title: "Book the valedictory hall", meta: "Required for closure · owner M. George" },
+  { id: "d4", code: "T-214", kind: "Task", title: "Print participation certificates", meta: "42 certificates · vendor quote attached" },
+  { id: "d5", code: "SS-19", kind: "Checklist", title: "Feedback forms collected", meta: "31 of 42 returned" }
+];
+
+const REIMB = [
+  { id: "r1", title: "Transport · Summer School week 2", meta: "Claimed by M. George · 3 receipts", amount: "₹14,200" },
+  { id: "r2", title: "Welcome kits · 42 students", meta: "Claimed by OIA store · invoice attached", amount: "₹31,500" },
+  { id: "r3", title: "Valedictory refreshments", meta: "Claimed by P. Iyer · receipt pending", amount: "₹8,400" }
+];
+
+const PENDING = [
+  { id: "u1", name: "a.mehra", meta: "a.mehra@christuniversity.in · Central Campus", requested: "ICC volunteer" },
+  { id: "u2", name: "s.nair", meta: "s.nair@christuniversity.in · Kengeri Campus", requested: "Wing lead" },
+  { id: "u3", name: "k.dsouza", meta: "k.dsouza@christuniversity.in · Bannerghatta Road", requested: "ICC volunteer" }
+];
+
+const BATCHES = [
+  { id: "i1", title: "Summer School checklist", meta: "62 rows · all valid · uploaded 10 min ago", count: "62", state: "open" },
+  { id: "i2", title: "Daywise buddies · Summer School", meta: "88 rows · 4 need a registration number", count: "84", state: "errors" },
+  { id: "i3", title: "2026 ICC events summary", meta: "214 rows · committed 3 Apr by P. Iyer", count: "214", state: "committed" },
+  { id: "i4", title: "Coffee Meet & Greet folder", meta: "31 rows · committed 2 Aug by P. Iyer", count: "31", state: "committed" }
+];
+
+const PROJECTS = [
+  { id: "p1", code: "IGP-2026-014", title: "Summer School 2026", programme: "International Guest Programme", campus: "Central Campus", dates: "1 – 28 Jun 2026", status: "Active", pct: 78, progressLabel: "4 blockers open" },
+  { id: "p2", code: "ICC-2026-031", title: "University Connect Inaugural", programme: "ICC Signature Event", campus: "Central Campus", dates: "18 Sep 2026", status: "Planned", pct: 34, progressLabel: "11 of 32 done" },
+  { id: "p3", code: "ICC-2026-009", title: "Coffee Meet & Greet", programme: "ICC Community", campus: "Bannerghatta Road", dates: "2 Aug 2026", status: "Completed", pct: 100, progressLabel: "Ready to publish" },
+  { id: "p4", code: "ICC-2026-022", title: "Lamppost Cultural Evening", programme: "ICC Community", campus: "Kengeri Campus", dates: "11 Oct 2026", status: "Active", pct: 61, progressLabel: "Report overdue" },
+  { id: "p5", code: "IGP-2026-006", title: "Semester Exchange · Intake A", programme: "International Guest Programme", campus: "Central Campus", dates: "15 Jul – 30 Nov 2026", status: "Active", pct: 45, progressLabel: "18 of 40 done" },
+  { id: "p6", code: "ICC-2026-002", title: "Global Buddy Orientation", programme: "ICC Community", campus: "Central Campus", dates: "12 Apr 2026", status: "Completed", pct: 100, progressLabel: "Published" }
+];
+
+const ROSTER = [
+  { id: "m1", name: "Lena Fischer", reg: "EXC-2026-004" },
+  { id: "m2", name: "Marco Bianchi", reg: "EXC-2026-011" },
+  { id: "m3", name: "Ananya R", reg: "2140382" },
+  { id: "m4", name: "K. D'Souza", reg: "2140119" },
+  { id: "m5", name: "Yuki Tanaka", reg: "EXC-2026-018" },
+  { id: "m6", name: "M. George", reg: "2140577" },
+  { id: "m7", name: "Sofia Reyes", reg: "EXC-2026-022" },
+  { id: "m8", name: "T. Varghese", reg: "2140904" }
+];
+
+const TOUR = [
+  { title: "Everything waiting on you is here", body: "One list on the home screen. Approve or send back without leaving the page." },
+  { title: "The numbers are links", body: "Tap any counter to see just those records — no separate filter screen." },
+  { title: "Jump anywhere with ⌘K", body: "Search projects, people and sessions from one box. It also runs actions." },
+  { title: "A project shows what's blocking it", body: "Closure blockers sit at the top of every project, already open." }
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: "login", role: "coordinator", tab: "overview",
+    tour: 0, palette: false, filter: "All", moreOpen: false,
+    factsOpen: false, settledOpen: false, decided: {}, marks: {},
+    toast: null, createRoute: null, formTitle: "", closed: false
+  };
+
+  set(patch) { this.setState(patch); }
+  flash(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null }), 2200);
+  }
+  decide(id, label) {
+    this.setState(s => ({ decided: { ...s.decided, [id]: label } }));
+    this.flash(label + ".");
+  }
+  go(screen, extra) { this.setState({ screen, palette: false, ...(extra || {}) }); }
+
+  row(settled) {
+    return "display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(29,31,32,.1);"
+      + (settled ? " opacity:.55;" : "");
+  }
+  navBtn(on) {
+    return "padding:7px 12px; border:1px solid " + (on ? "#5980a6" : "transparent")
+      + "; background:" + (on ? "#5980a6" : "none") + "; color:" + (on ? "#f2f2f3" : "#5d5d60")
+      + "; font:600 13px/1 'Barlow Condensed'; letter-spacing:.05em; text-transform:uppercase; cursor:pointer";
+  }
+  tabBtn(on) {
+    return "padding:8px 13px; border:1px solid " + (on ? "rgba(29,31,32,.28)" : "transparent")
+      + "; border-bottom:2px solid " + (on ? "#5980a6" : "transparent")
+      + "; background:" + (on ? "#fff" : "none") + "; color:" + (on ? "#1d1f20" : "#7a7a7d")
+      + "; font:600 13px/1 'Barlow Condensed'; letter-spacing:.04em; text-transform:uppercase; cursor:pointer";
+  }
+  chip(on) {
+    return "padding:7px 12px; border:1px solid " + (on ? "#5980a6" : "rgba(29,31,32,.2)")
+      + "; background:" + (on ? "#eef6ff" : "none") + "; color:" + (on ? "#416180" : "#5d5d60")
+      + "; font:500 13px/1 Barlow; cursor:pointer";
+  }
+  markBtn(on) {
+    return "width:44px; height:34px; display:grid; place-items:center; border:1px solid "
+      + (on ? "#5980a6" : "rgba(29,31,32,.18)") + "; border-left-width:1px; background:"
+      + (on ? "#5980a6" : "none") + "; color:" + (on ? "#f2f2f3" : "#7a7a7d")
+      + "; font:600 12px/1 'Barlow Condensed'; letter-spacing:.05em; cursor:pointer";
+  }
+
+  renderVals() {
+    const s = this.state;
+    const me = ROLES[s.role];
+    const dec = s.decided;
+    const queueSrc = QUEUES[s.role];
+    const openQueue = queueSrc.filter(q => !dec[q.id]);
+
+    const navItems = [
+      ["home", "Home"], ["projects", "Projects"], ["imports", "Imports"],
+      ["admin", "People"], ["audit", "Audit"], ["public", "Public site"], ["mobile", "Mobile"]
+    ];
+
+    const homeCopy = {
+      coordinator: {
+        greeting: "Good morning, Rakesh.",
+        lede: openQueue.length
+          ? openQueue.length + " decision" + (openQueue.length === 1 ? "" : "s") + " waiting. Nothing else needs you today."
+          : "Nothing waiting. Summer School closes in 4 days.",
+        cta: "Start roll call", ctaGo: "rollcall",
+        queueTitle: "Waiting on you",
+        counters: [
+          { value: openQueue.length, label: "Decisions", tone: "#1d1f20", go: "home" },
+          { value: 14, label: "My projects", tone: "#1d1f20", go: "projects" },
+          { value: 6, label: "Overdue items", tone: "#416180", go: "projects" },
+          { value: 5, label: "Sessions this week", tone: "#1d1f20", go: "projects" }
+        ]
+      },
+      volunteer: {
+        greeting: "Hi Ananya.",
+        lede: "Orientation walk starts at 09:30. You're on airport pickup after.",
+        cta: "Log hours", ctaGo: "mobile",
+        queueTitle: "Your tasks",
+        counters: [
+          { value: openQueue.length, label: "Open tasks", tone: "#1d1f20", go: "home" },
+          { value: "26.5", label: "Hours approved", tone: "#1d1f20", go: "projects" },
+          { value: 2, label: "My sessions", tone: "#1d1f20", go: "projects" },
+          { value: 1, label: "Awaiting decision", tone: "#416180", go: "home" }
+        ]
+      },
+      office: {
+        greeting: "Good morning, Priya.",
+        lede: "Two imports are validated and waiting for a commit.",
+        cta: "Open imports", ctaGo: "imports",
+        queueTitle: "Portfolio needs",
+        counters: [
+          { value: 42, label: "Live projects", tone: "#1d1f20", go: "projects" },
+          { value: 5, label: "Awaiting publication", tone: "#416180", go: "projects" },
+          { value: 2, label: "Imports to commit", tone: "#416180", go: "imports" },
+          { value: 7, label: "Closure blocked", tone: "#416180", go: "projects" }
+        ]
+      }
+    }[s.role];
+
+    const openBlockers = BLOCKERS.filter(b => !dec[b.id]);
+    const filtered = s.filter === "All" ? PROJECTS
+      : PROJECTS.filter(p => p.status === s.filter || p.campus === s.filter);
+
+    const factsAll = [
+      { k: "Campus", v: "Central Campus" }, { k: "Programme", v: "IGP" },
+      { k: "Academic year", v: "2026–27" }, { k: "Dates", v: "1 – 28 Jun 2026" },
+      { k: "Venue", v: "Block II Auditorium" }, { k: "Reach", v: "42 of 60 expected" },
+      { k: "Operating unit", v: "Office of International Affairs" },
+      { k: "Wing", v: "Not set" }, { k: "Type", v: "Multi-day programme" },
+      { k: "Audience", v: "Incoming exchange students, buddies" },
+      { k: "Documents", v: "41 indexed" }, { k: "Components", v: "6" }
+    ];
+
+    const simpleSets = {
+      contributions: { title: "Contributions", meta: "6 waiting · 184 h approved", rows: [
+        { title: "Ananya R · Airport pickup", meta: "Logged 13 Sep · pending", value: "8.0 h" },
+        { title: "M. George · Session support", meta: "Approved 12 Sep", value: "5.5 h" },
+        { title: "K. D'Souza · Registration desk", meta: "Logged 12 Sep · pending", value: "5.5 h" },
+        { title: "T. Varghese · Buddy meet", meta: "Approved 11 Sep", value: "3.0 h" },
+        { title: "Sofia Reyes · Cultural evening", meta: "Approved 10 Sep", value: "4.0 h" }
+      ]},
+      insights: { title: "Insights", meta: "Against last year's intake", rows: [
+        { title: "Attendance across 18 sessions", meta: "Up from 79% in 2025", value: "86%" },
+        { title: "Volunteer hours logged", meta: "36 volunteers", value: "184 h" },
+        { title: "Buddy pairs active", meta: "42 students paired", value: "42" },
+        { title: "Average days to settle a claim", meta: "Target is 5", value: "9" },
+        { title: "Feedback forms returned", meta: "31 of 42", value: "74%" }
+      ]},
+      resources: { title: "Resources", meta: "41 documents indexed", rows: [
+        { title: "Summer School itinerary", meta: "Spreadsheet · updated 2 Jun", value: "Open" },
+        { title: "Buddies allocation sheet", meta: "Spreadsheet · updated 28 May", value: "Open" },
+        { title: "Passport & visa records", meta: "Restricted · Drive reference only", value: "Locked" },
+        { title: "Claim sheet", meta: "PDF · updated 30 Jun", value: "Open" },
+        { title: "Participation certificates", meta: "PDF · 42 files", value: "Open" }
+      ]}
+    };
+    const simple = simpleSets[s.tab] || simpleSets.contributions;
+
+    const paletteItems = [
+      { title: "Summer School 2026", meta: "IGP-2026-014 · Active", kind: "Project", to: "project" },
+      { title: "Roll call · Orientation walk", meta: "Today, 09:30", kind: "Action", to: "rollcall" },
+      { title: "Approve volunteer hours", meta: "6 waiting", kind: "Action", to: "home" },
+      { title: "Lena Fischer", meta: "EXC-2026-004 · exchange student", kind: "Person", to: "project" },
+      { title: "Commit Summer School checklist", meta: "62 rows validated", kind: "Action", to: "imports" },
+      { title: "Audit trail", meta: "Who changed what, append-only", kind: "Record", to: "audit" }
+    ];
+
+    const tourPositions = [
+      "top:150px; left:32px;", "top:250px; left:32px;", "top:70px; right:32px;", "top:200px; right:32px;"
+    ];
+
+    return {
+      noop: () => {},
+      signIn: () => this.setState({ screen: "home", tour: 1 }),
+      goHome: () => this.go("home"), goProjects: () => this.go("projects"),
+      goProject: () => this.go("project", { tab: "overview" }),
+      goNew: () => this.go("new"), goRollcall: () => this.go("rollcall"),
+      goAlerts: () => this.go("alerts"), goImports: () => this.go("imports"),
+      goAudit: () => this.go("audit"),
+
+      isLogin: s.screen === "login", isApp: s.screen !== "login",
+      isHome: s.screen === "home", isProjects: s.screen === "projects",
+      isProject: s.screen === "project", isNew: s.screen === "new",
+      isRollcall: s.screen === "rollcall", isImports: s.screen === "imports",
+      isAlerts: s.screen === "alerts", isAudit: s.screen === "audit",
+      isAdmin: s.screen === "admin", isPublic: s.screen === "public",
+      isMobile: s.screen === "mobile",
+
+      userName: me.name, userInitials: me.initials, roleLabel: me.label,
+      cycleRole: () => {
+        const next = ORDER[(ORDER.indexOf(s.role) + 1) % ORDER.length];
+        this.setState({ role: next, screen: "home", decided: {} });
+        this.flash("Viewing as " + ROLES[next].label + ".");
+      },
+
+      nav: navItems.map(([key, label]) => ({
+        label, style: this.navBtn(s.screen === key || (key === "projects" && s.screen === "project")),
+        go: () => this.go(key === "projects" ? "projects" : key)
+      })),
+
+      toast: s.toast,
+      paletteOpen: s.palette, paletteQuery: "summer",
+      openPalette: () => this.setState({ palette: true }),
+      closePalette: () => this.setState({ palette: false }),
+      paletteResults: paletteItems.map((p, i) => ({
+        ...p,
+        style: "display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; padding:11px 12px; border:1px solid "
+          + (i === 0 ? "#94bce3" : "transparent") + "; background:" + (i === 0 ? "#eef6ff" : "none") + "; cursor:pointer",
+        go: () => this.go(p.to, p.to === "project" ? { tab: "overview" } : {})
+      })),
+
+      tourStep: s.tour, tourTitle: s.tour ? TOUR[s.tour - 1].title : "",
+      tourBody: s.tour ? TOUR[s.tour - 1].body : "",
+      tourPos: s.tour ? tourPositions[s.tour - 1] : "",
+      tourCta: s.tour === 4 ? "Got it" : "Next",
+      tourNext: () => this.setState({ tour: s.tour === 4 ? 0 : s.tour + 1 }),
+      tourSkip: () => this.setState({ tour: 0 }),
+
+      greeting: homeCopy.greeting, homeLede: homeCopy.lede,
+      homeCta: homeCopy.cta, homeCtaGo: () => this.go(homeCopy.ctaGo),
+      counters: homeCopy.counters.map(c => ({ ...c, go: () => this.go(c.go) })),
+      queueTitle: homeCopy.queueTitle,
+      queueCount: openQueue.length + " open · " + (queueSrc.length - openQueue.length) + " settled today",
+      queueEmpty: openQueue.length === 0,
+      queue: queueSrc.map(q => {
+        const settled = !!dec[q.id];
+        return {
+          ...q, rowStyle: this.row(settled), open: !settled, settled,
+          settledLabel: dec[q.id] || "", titleTone: settled ? "#7a7a7d" : "#1d1f20",
+          approveLabel: q.a, rejectLabel: q.r,
+          approve: () => this.decide(q.id, q.done),
+          reject: () => this.decide(q.id, q.undone),
+          openItem: () => this.go("project", { tab: "overview" })
+        };
+      }),
+      today: [
+        { time: "09:30 – 11:00", title: "Campus orientation walk", meta: "Summer School 2026 · 36 expected", action: "Take roll call", go: () => this.go("rollcall") },
+        { time: "16:00 – 17:30", title: "Buddy briefing", meta: "Summer School 2026 · Seminar Hall 3", action: null, go: () => {} }
+      ],
+      resumeTitle: "Summer School 2026 · Delivery",
+      resumeMeta: "You were verifying SS-04 · 12 of 42 left",
+
+      projectsLede: filtered.length + " of " + PROJECTS.length + " projects in your scope",
+      projectsFooter: "Older academic years are in the archive.",
+      filters: ["All", "Active", "Planned", "Completed", "Central Campus"].map(f => ({
+        label: f, style: this.chip(s.filter === f), go: () => this.setState({ filter: f })
+      })),
+      projectRows: filtered.map(p => ({
+        ...p, pct: p.pct + "%",
+        style: "display:grid; grid-template-columns:minmax(0,1fr) 200px 190px 130px; gap:16px; align-items:center; width:100%; padding:14px 0; border:0; border-bottom:1px solid rgba(29,31,32,.1); background:none; cursor:pointer; text-align:left",
+        statusColor: p.status === "Completed" ? "#7a7a7d" : "#416180",
+        statusBorder: p.status === "Completed" ? "rgba(29,31,32,.2)" : "#94bce3",
+        go: () => this.go("project", { tab: "overview" })
+      })),
+
+      tabs: [["overview", "Overview", null], ["delivery", "Delivery", openBlockers.length ? String(DELIVERY.length) : null], ["people", "People", "36"]]
+        .map(([key, label, count]) => ({ label, count, style: this.tabBtn(s.tab === key), go: () => this.setState({ tab: key, moreOpen: false }) })),
+      moreTabs: [["finance", "Budget"], ["contributions", "Contributions"], ["insights", "Insights"], ["resources", "Resources"]]
+        .map(([key, label]) => ({ label, style: this.tabBtn(s.tab === key), go: () => this.setState({ tab: key }) })),
+      moreOpen: s.moreOpen || ["finance", "contributions", "insights", "resources"].indexOf(s.tab) > -1,
+      moreLabel: s.moreOpen ? "Less" : "More ▾",
+      toggleMore: () => this.setState({ moreOpen: !s.moreOpen }),
+      tabOverview: s.tab === "overview", tabDelivery: s.tab === "delivery",
+      tabPeople: s.tab === "people", tabBudget: s.tab === "finance",
+      tabSimple: ["contributions", "insights", "resources"].indexOf(s.tab) > -1,
+
+      closeBtnLabel: s.closed ? "Closed" : (openBlockers.length ? "Close · " + openBlockers.length + " blocking" : "Close project"),
+      closeBtnBg: openBlockers.length || s.closed ? "none" : "#5980a6",
+      closeBtnColor: openBlockers.length || s.closed ? "#7a7a7d" : "#f2f2f3",
+      closeBtnBorder: openBlockers.length || s.closed ? "rgba(29,31,32,.2)" : "#5980a6",
+      closeBtnCursor: openBlockers.length ? "not-allowed" : "pointer",
+      closeProject: () => openBlockers.length
+        ? this.flash(openBlockers.length + " items still block closure.")
+        : (this.setState({ closed: true }), this.flash("Project closed.")),
+      toastReport: () => this.flash("Report generated."),
+      publish: () => this.flash("Publication requested."),
+
+      blockersTitle: openBlockers.length ? "Blocking closure" : "Nothing blocking closure",
+      blockersTone: openBlockers.length ? "#1d1f20" : "#416180",
+      blockersHint: openBlockers.length ? openBlockers.length + " of " + BLOCKERS.length + " left" : "Ready to close",
+      blockers: BLOCKERS.map(b => {
+        const settled = !!dec[b.id];
+        return { ...b, rowStyle: this.row(settled), open: !settled, settled,
+          titleTone: settled ? "#7a7a7d" : "#1d1f20",
+          resolve: () => this.decide(b.id, "Cleared") };
+      }),
+      schedule: [
+        { when: "14 Sep · 09:30", title: "Campus orientation walk", venue: "Block II Auditorium", state: "Today" },
+        { when: "15 Sep · 16:00", title: "Buddy briefing", venue: "Seminar Hall 3", state: "Upcoming" },
+        { when: "17 Sep · 10:00", title: "Academic module I", venue: "Block II Auditorium", state: "Upcoming" },
+        { when: "12 Sep · 11:00", title: "Arrival & registration", venue: "OIA front desk", state: "36 present" }
+      ],
+      facts: s.factsOpen ? factsAll : factsAll.slice(0, 6),
+      factsToggle: s.factsOpen ? "Show less" : "Show all 12 fields",
+      toggleFacts: () => this.setState({ factsOpen: !s.factsOpen }),
+
+      deliveryCount: DELIVERY.filter(d => !dec[d.id]).length + " of " + DELIVERY.length,
+      delivery: DELIVERY.map(d => {
+        const settled = !!dec[d.id];
+        return { ...d, rowStyle: this.row(settled), open: !settled, settled,
+          settledLabel: dec[d.id] || "", titleTone: settled ? "#7a7a7d" : "#1d1f20",
+          approve: () => this.decide(d.id, "Approved"),
+          reject: () => this.decide(d.id, "Sent back") };
+      }),
+      settledOpen: s.settledOpen,
+      settledToggle: s.settledOpen ? "Hide 22 settled" : "Show 22 settled",
+      toggleSettled: () => this.setState({ settledOpen: !s.settledOpen }),
+      settledRows: [
+        { title: "SS-01 · Programme approval from Dean", status: "Approved" },
+        { title: "SS-02 · Budget sanction", status: "Approved" },
+        { title: "T-201 · Book the auditorium", status: "Completed" },
+        { title: "SS-07 · Insurance confirmation", status: "Waived" }
+      ],
+
+      people: [
+        { name: "Lena Fischer", reg: "EXC-2026-004", pair: "Ananya R", role: "Exchange student", hours: "—" },
+        { name: "Ananya R", reg: "2140382", pair: "Lena Fischer", role: "Buddy", hours: "26.5" },
+        { name: "Marco Bianchi", reg: "EXC-2026-011", pair: "K. D'Souza", role: "Exchange student", hours: "—" },
+        { name: "K. D'Souza", reg: "2140119", pair: "Marco Bianchi", role: "Buddy", hours: "18.0" },
+        { name: "M. George", reg: "2140577", pair: "—", role: "Wing lead", hours: "41.0" },
+        { name: "Yuki Tanaka", reg: "EXC-2026-018", pair: "T. Varghese", role: "Exchange student", hours: "—" }
+      ],
+
+      reimbCount: REIMB.filter(r => !dec[r.id]).length + " waiting",
+      reimbursements: REIMB.map(r => {
+        const settled = !!dec[r.id];
+        return { ...r, rowStyle: this.row(settled), open: !settled, settled,
+          settledLabel: dec[r.id] || "", titleTone: settled ? "#7a7a7d" : "#1d1f20",
+          approve: () => this.decide(r.id, "Approved"),
+          reject: () => this.decide(r.id, "Queried") };
+      }),
+      budgetLines: [
+        { line: "Transport", planned: "₹60,000", spent: "₹42,300", pct: "71%" },
+        { line: "Accommodation", planned: "₹2,40,000", spent: "₹2,40,000", pct: "100%" },
+        { line: "Materials & kits", planned: "₹45,000", spent: "₹31,500", pct: "70%" },
+        { line: "Refreshments", planned: "₹30,000", spent: "₹8,400", pct: "28%" }
+      ],
+
+      simpleTitle: simple.title, simpleMeta: simple.meta, simpleRows: simple.rows,
+
+      createRoutes: [
+        { key: "sheet", title: "From a spreadsheet", body: "The ICC events summary or any sheet — each row becomes a project." },
+        { key: "itinerary", title: "From an itinerary", body: "Title, dates and every session are read from the file." },
+        { key: "blank", title: "Blank project", body: "Three fields. Everything else is inferred." }
+      ].map(r => ({
+        ...r,
+        style: "display:flex; align-items:center; justify-content:space-between; gap:20px; width:100%; padding:18px; border:1px solid "
+          + (s.createRoute === r.key ? "#5980a6" : "rgba(29,31,32,.16)") + "; background:"
+          + (s.createRoute === r.key ? "#eef6ff" : "none") + "; cursor:pointer",
+        arrowTone: s.createRoute === r.key ? "#5980a6" : "#b7b7ba",
+        go: () => this.setState({ createRoute: r.key })
+      })),
+      createFormOpen: !!s.createRoute,
+      createFormTitle: s.createRoute === "blank" ? "Project details"
+        : s.createRoute === "itinerary" ? "Confirm what we read" : "Confirm the mapping",
+      createFormHint: s.createRoute === "blank" ? "Only these three are required."
+        : "We filled these in from the file. Change anything that looks wrong.",
+      formTitle: s.formTitle || (s.createRoute === "blank" ? "" : "Summer School 2027"),
+      setFormTitle: e => this.setState({ formTitle: e.target.value }),
+      createProject: () => { this.go("project", { tab: "overview" }); this.flash("Project created."); },
+
+      rollTotal: ROSTER.length,
+      rollPresent: ROSTER.filter(r => (s.marks[r.id] || "P") === "P").length,
+      rollSummary: ROSTER.filter(r => s.marks[r.id] === "A").length + " absent · "
+        + ROSTER.filter(r => s.marks[r.id] === "E").length + " excused · corrections are logged with your name",
+      roster: ROSTER.map(r => ({
+        ...r,
+        options: [["P", "Present"], ["A", "Absent"], ["E", "Excused"]].map(([code, label]) => ({
+          label, style: this.markBtn((s.marks[r.id] || "P") === code) + "; width:78px",
+          set: () => this.setState(st => ({ marks: { ...st.marks, [r.id]: code } }))
+        }))
+      })),
+      markAllPresent: () => { this.setState({ marks: {} }); this.flash("All 8 marked present."); },
+      saveRoll: () => { this.flash("Roll call saved."); this.go("project", { tab: "overview" }); },
+
+      importsMeta: BATCHES.filter(b => b.state === "open" && !dec[b.id]).length + " waiting for a commit",
+      batches: BATCHES.map(b => {
+        const settled = !!dec[b.id] || b.state !== "open";
+        return { ...b, rowStyle: this.row(b.state === "committed"), open: !settled, settled,
+          tone: b.state === "errors" ? "#416180" : "#7a7a7d",
+          settledLabel: dec[b.id] ? "Committed" : b.state === "errors" ? "4 rows need fixing" : "Committed",
+          commit: () => this.decide(b.id, "Committed " + b.count + " rows") };
+      }),
+
+      alerts: [
+        { title: "Transport reimbursement needs your decision", body: "₹14,200 claimed by M. George · Summer School 2026", when: "12 min", unread: true, to: "project" },
+        { title: "Summer School checklist import validated", body: "62 rows, no errors — ready to commit", when: "1 h", unread: true, to: "imports" },
+        { title: "SS-04 evidence uploaded", body: "OIA front desk attached 12 verification records", when: "3 h", unread: true, to: "project" },
+        { title: "Lamppost Cultural Evening report is overdue", body: "Event ended 11 days ago", when: "Yesterday", unread: false, to: "projects" },
+        { title: "Coffee Meet & Greet published", body: "Now visible on the public site", when: "2 days", unread: false, to: "public" }
+      ].map(a => ({
+        ...a,
+        rowStyle: "display:flex; align-items:flex-start; gap:13px; width:100%; padding:15px 0; border:0; border-bottom:1px solid rgba(29,31,32,.1); background:none; cursor:pointer; text-align:left",
+        dot: a.unread ? "#5980a6" : "rgba(29,31,32,.2)",
+        tone: a.unread ? "#1d1f20" : "#7a7a7d",
+        go: () => this.go(a.to, a.to === "project" ? { tab: "overview" } : {})
+      })),
+      readAll: () => this.flash("All alerts marked read."),
+
+      auditRows: [
+        { when: "14 Sep 09:12", what: "Approved volunteer hours", entity: "Contribution · Ananya R · 8.0 h", who: "Dr. R. Thomas" },
+        { when: "14 Sep 08:47", what: "Committed import batch", entity: "Summer School checklist · 62 rows", who: "P. Iyer" },
+        { when: "13 Sep 17:30", what: "Marked session attendance", entity: "Arrival & registration · 36 records", who: "M. George" },
+        { when: "13 Sep 15:02", what: "Granted access", entity: "t.varghese · ICC volunteer", who: "P. Iyer" },
+        { when: "13 Sep 11:18", what: "Requested publication", entity: "Coffee Meet & Greet", who: "Dr. R. Thomas" },
+        { when: "12 Sep 16:40", what: "Changed project status to Active", entity: "Summer School 2026", who: "Dr. R. Thomas" },
+        { when: "12 Sep 09:05", what: "Attached evidence document", entity: "SS-11 · Accommodation sheet", who: "Hostel office" },
+        { when: "11 Sep 14:22", what: "Created project", entity: "Lamppost Cultural Evening", who: "P. Iyer" }
+      ],
+
+      pendingCount: PENDING.filter(u => !dec[u.id]).length + " waiting",
+      pending: PENDING.map(u => {
+        const settled = !!dec[u.id];
+        return { ...u, rowStyle: this.row(settled), open: !settled, settled,
+          settledLabel: dec[u.id] || "", tone: settled ? "#7a7a7d" : "#1d1f20",
+          approve: () => this.decide(u.id, "Approved as " + u.requested),
+          reject: () => this.decide(u.id, "Declined") };
+      }),
+      directory: [
+        { name: "r.thomas", email: "r.thomas@christuniversity.in", role: "Faculty coordinator", campus: "Central Campus" },
+        { name: "p.iyer", email: "p.iyer@christuniversity.in", role: "OIA office", campus: "Central Campus" },
+        { name: "m.george", email: "m.george@christuniversity.in", role: "Wing lead", campus: "Kengeri Campus" },
+        { name: "t.varghese", email: "t.varghese@christuniversity.in", role: "ICC volunteer", campus: "Bannerghatta Road" }
+      ],
+
+      publicStats: [
+        { value: "42", label: "Students hosted this year" },
+        { value: "18", label: "Partner universities" },
+        { value: "9", label: "Published events" }
+      ],
+      publicEvents: [
+        { title: "Coffee Meet & Greet", meta: "Bannerghatta Road · 62 attended", when: "2 Aug 2026" },
+        { title: "Global Buddy Orientation", meta: "Central Campus · 88 attended", when: "12 Apr 2026" },
+        { title: "Lamppost Cultural Evening", meta: "Kengeri Campus · open to all", when: "11 Oct 2026" },
+        { title: "University Connect Inaugural", meta: "Central Campus · invite only", when: "18 Sep 2026" }
+      ],
+
+      mobileQueue: [
+        { title: "Ananya R · 8.0 h pickup", meta: "IGP-2026-014" },
+        { title: "Transport reimbursement", meta: "₹14,200 · 3 receipts" },
+        { title: "SS-04 · Visa verification", meta: "Blocks closure" }
+      ],
+      mobileRoster: ROSTER.slice(0, 6).map((r, i) => ({
+        name: r.name,
+        pStyle: this.markBtn(i !== 2 && i !== 5) + "; width:38px; height:38px",
+        aStyle: this.markBtn(i === 2) + "; width:38px; height:38px",
+        eStyle: this.markBtn(i === 5) + "; width:38px; height:38px"
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

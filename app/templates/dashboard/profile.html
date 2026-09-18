@@ -1,20 +1,26 @@
 {% extends "base.html" %}
 {% block title %}My Account & Activity{% endblock %}
-{% block mobile_title %}My account{% endblock %}
+{% block screen_title %}My account{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Account</span>{% endblock %}
 {% block content %}
-<header class="page-header">
-  <div>
-    <div class="page-eyebrow">Identity and activity</div>
-    <h1 class="page-title">My Account &amp; Activity</h1>
-    <p class="page-subtitle">Your role assignments, scoped projects, recent activity, and account security.</p>
-  </div>
-</header>
+<div class="ds-scroll ds-scroll--plain ds-scroll--page">
 
+{#- Every destination the rail drops on a phone. On a desktop this is a
+    shortcut; below 860px it is the only way in, so it is rendered from the
+    same permission-filtered registry the rail uses. -#}
+<nav class="ds-more" aria-label="More destinations">
+  {% for item in primary_nav if not item.bottom_nav %}
+  <a class="ds-more__item" href="{{ url_for(item.endpoint) }}"><i class="ph {{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</a>
+  {% endfor %}
+  <a class="ds-more__item" href="{{ url_for('public.landing') }}" target="_blank" rel="noopener noreferrer"><i class="ph ph-globe" aria-hidden="true"></i>Public site</a>
+  <a class="ds-more__item" href="{{ url_for('auth.logout') }}"><i class="ph ph-power" aria-hidden="true"></i>Log out</a>
+</nav>
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="aurora-card--padded mb-4 text-center py-4">
       <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3 avatar-xl"><i class="ph ph-user-circle"></i></div>
-      <h4 class="fw-bold mb-1">{{ g.user.username }}</h4>
+      <h2 class="aurora-card__heading justify-content-center mb-1">{{ g.user.person.display_name if g.user.person and g.user.person.display_name else g.user.username }}</h2>
+      <p class="text-muted small mb-1">{{ g.user.username }}</p>
       <p class="text-muted small mb-2"><i class="ph ph-envelope"></i> {{ g.user.email }}</p>
       <div class="border-top border-secondary pt-3 mt-2 text-start px-3">
         <small class="text-muted d-block">Campus</small>
@@ -23,7 +29,7 @@
     </div>
 
     <div class="aurora-card--padded mb-4">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-shield-check text-primary"></i> Role assignments</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-shield-check text-primary"></i> Role assignments</h2>
       {% if role_assignments %}
       <div class="d-flex flex-column gap-3">
         {% for assignment in role_assignments %}
@@ -39,20 +45,20 @@
     </div>
 
     <div class="aurora-card--padded">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-lock-key text-primary"></i> Account security</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-lock-key text-primary"></i> Account security</h2>
       <dl class="row small mb-3">
         <dt class="col-6">Last sign-in</dt><dd class="col-6">{{ g.user.last_login_at|localdatetime if g.user.last_login_at else 'Not recorded' }}</dd>
-        <dt class="col-6">Password last changed</dt><dd class="col-6">{{ g.user.password_changed_at.strftime('%d %b %Y') if g.user.password_changed_at else 'Not recorded' }}</dd>
+        <dt class="col-6">Password last changed</dt><dd class="col-6">{{ g.user.password_changed_at|localdate('%d %b %Y') if g.user.password_changed_at else 'Not recorded' }}</dd>
       </dl>
       {% if g.user.needs_password_reset %}<p class="small text-warning-emphasis mb-3"><i class="ph ph-warning"></i> Your password must be changed at next sign-in.</p>{% endif %}
-      <a class="aurora-button--secondary w-100" href="{{ url_for('auth.forgot_password') }}"><i class="ph ph-key" aria-hidden="true"></i>Send a password reset link</a>
+      <a class="aurora-button--secondary w-100" href="{{ url_for('auth.forgot_password') }}"><i class="ph ph-key" aria-hidden="true"></i>Change or reset password</a>
     </div>
   </div>
 
   <div class="col-lg-8">
     {% if assigned_projects %}
     <div class="aurora-card--padded mb-4">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-folder-simple text-primary"></i> My assigned projects</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-folder-simple text-primary"></i> My assigned projects</h2>
       <div class="aurora-table-scroll" tabindex="0">
         <table class="aurora-table">
           <thead><tr><th>Project</th><th>Campus</th><th>Program</th><th>Status</th><th></th></tr></thead>
@@ -74,7 +80,7 @@
 
     {% if contribution_hours %}
     <div class="aurora-card--padded mb-4">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-award text-success"></i> Approved contribution hours</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-award text-success"></i> Approved contribution hours</h2>
       <div class="d-flex flex-column gap-3">
         {% for skill, hours in contribution_hours.items() %}
         <div>
@@ -88,7 +94,7 @@
 
     {% if recent_requests %}
     <div class="aurora-card--padded mb-4">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-receipt text-primary"></i> My recent operational requests</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-receipt text-primary"></i> My recent operational requests</h2>
       <div class="aurora-list aurora-list--flush">
         {% for item in recent_requests %}
         <a class="aurora-list__item d-flex justify-content-between" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab='finance') }}#{{ item.public_id }}"><span>{{ item.title }}<div class="small text-muted">{{ item.project.title }}</div></span><span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span></a>
@@ -99,7 +105,7 @@
 
     {% if recent_contributions %}
     <div class="aurora-card--padded mb-4">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-hand-heart text-primary"></i> My recent contributions</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-hand-heart text-primary"></i> My recent contributions</h2>
       <div class="aurora-list aurora-list--flush">
         {% for contribution in recent_contributions %}
         <div class="aurora-list__item d-flex justify-content-between"><span>{{ contribution.activity_type }}<div class="small text-muted">{{ contribution.description }}</div></span><span class="aurora-badge aurora-badge--status-{{ contribution.approval_status|lower }}">{{ contribution.approval_status }}</span></div>
@@ -110,10 +116,14 @@
 
     {% if recent_notifications %}
     <div class="aurora-card--padded">
-      <h5 class="aurora-card__heading mb-3"><i class="ph ph-bell text-primary"></i> Recent notifications</h5>
+      <h2 class="aurora-card__heading mb-3"><i class="ph ph-bell text-primary"></i> Recent notifications</h2>
       <div class="aurora-list aurora-list--flush">
         {% for notification in recent_notifications %}
-        <div class="aurora-list__item{% if notification.read_at %} text-muted{% endif %}"><strong>{{ notification.title }}</strong><div class="small">{{ notification.body }}</div></div>
+        <a class="aurora-list__item{% if notification.read_at %} text-muted{% endif %}" href="{{ url_for('erp.notifications') }}#{{ notification.public_id }}">
+          <strong>{{ notification.title }}</strong>
+          <div class="small">{{ notification.body }}</div>
+          <div class="small text-muted">{{ notification.created_at|localdatetime }} · {{ 'Read' if notification.read_at else 'Unread' }}</div>
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -123,5 +133,6 @@
     <div class="aurora-card--padded text-center py-5 text-muted">No activity recorded yet. Activity from assigned projects, requests, and contributions will appear here.</div>
     {% endif %}
   </div>
+</div>
 </div>
 {% endblock %}

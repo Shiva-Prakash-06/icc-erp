@@ -21,7 +21,7 @@ reading on SQLite, where the driver discards the offset.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -52,10 +52,20 @@ def to_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
-def to_campus(value: datetime | None) -> datetime | None:
-    """Return `value` in campus-local time, treating naive input as UTC."""
+def to_campus(value: datetime | date | None) -> datetime | date | None:
+    """Return `value` in campus-local time, treating naive input as UTC.
+
+    A plain ``date`` is returned unchanged: half the columns the templates
+    format are ``db.Date`` (a project's start and end, a document's expiry,
+    a reimbursement's date) and a calendar date has no zone to convert --
+    shifting one by the campus offset would move it a day. Before this, a
+    ``date`` reaching ``localdate`` raised AttributeError on ``.tzinfo``
+    and took the whole page down with a 500.
+    """
     if value is None:
         return None
+    if not isinstance(value, datetime):
+        return value
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(campus_zone())
@@ -75,3 +85,7 @@ def register_filters(app) -> None:
     app.jinja_env.filters["localdate"] = lambda value, fmt="%a, %d %b %Y": format_campus(value, fmt)
     app.jinja_env.filters["localtime"] = lambda value, fmt="%I:%M %p", label=True: format_campus(value, fmt, with_label=label)
     app.jinja_env.filters["localdatetime"] = lambda value, fmt="%d %b %Y, %I:%M %p", label=True: format_campus(value, fmt, with_label=label)
+    # Audit P1-07 and the Audit-history finding: a screen that prints many
+    # timestamps says the zone once in its header instead of repeating a
+    # suffix on every row.
+    app.jinja_env.globals["timezone_label"] = timezone_label

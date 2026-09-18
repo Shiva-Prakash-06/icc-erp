@@ -147,11 +147,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!nameEl) return;
         input.addEventListener('change', function() {
             if (input.files && input.files.length > 1) {
-                nameEl.textContent = `${input.files.length} files selected`;
+                nameEl.textContent = `${input.files.length} files ready to upload`;
             } else if (input.files && input.files.length === 1) {
-                nameEl.textContent = input.files[0].name;
+                nameEl.textContent = `${input.files[0].name} ready to upload`;
             } else {
-                nameEl.textContent = 'No file selected';
+                // Empty, not "No file selected": the native control says
+                // that already, right beside this line.
+                nameEl.textContent = '';
             }
         });
     });

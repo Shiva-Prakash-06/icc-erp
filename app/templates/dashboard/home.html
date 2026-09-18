@@ -1,257 +1,66 @@
 {% extends "base.html" %}
-{% block title %}Home{% endblock %}
-{% block mobile_title %}Home{% endblock %}
-
-{#- The queue row. Approving is a one-click POST that returns you here;
-    sending back opens the record, because every reject path in
-    app.services.operations requires a written reason. "Review" is the
-    accessible name of the open-record link and is asserted by e2e. -#}
-{% macro queue_row(item, return_to) %}
-<tr class="queue-row">
-  <td class="queue-row__kind" data-label="Type">
-    <span class="queue-item__kind-label">{{ item.kind }}</span>
-    {% if item.project %}<span class="queue-item__code font-monospace">{{ item.project.code }}</span>{% endif %}
-  </td>
-  <td class="queue-row__item" data-label="Item">
-    <span class="queue-item__title">{{ item.title }}</span>
-    {% if item.meta %}<span class="queue-item__meta">{{ item.meta }}</span>{% endif %}
-  </td>
-  <td class="queue-row__decision" data-label="Decision">
-    <div class="queue-item__action">
-      {% if item.decide_endpoint %}
-      <form method="POST" action="{{ url_for(item.decide_endpoint, **item.decide_params) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="{{ item.decide_field }}" value="{{ item.approve_value }}">
-        {% if item.version is not none %}<input type="hidden" name="version" value="{{ item.version }}">{% endif %}
-        <input type="hidden" name="next" value="{{ return_to }}">
-        <button class="aurora-button--primary aurora-button--small">{{ item.approve_label }}</button>
-      </form>
-      {% endif %}
-      {% set record_url = url_for('erp.project_detail', public_id=item.project.public_id, tab=item.tab) ~ '#' ~ item.anchor if item.project else '' %}
-      {% if record_url %}
-      <a class="aurora-button--secondary aurora-button--small" href="{{ record_url }}">{{ item.reject_label or 'Open' }}</a>
-      <a class="icon-action" href="{{ record_url }}" aria-label="Review"><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-      {% endif %}
-    </div>
-  </td>
-</tr>
-{% endmacro %}
-
-{% macro queue_table(items, label, return_to) %}
-<div class="aurora-table-scroll" tabindex="0">
-  <table class="aurora-table queue-table" aria-label="{{ label }}">
-    <thead class="visually-hidden"><tr><th scope="col">Type</th><th scope="col">Item</th><th scope="col">Decision</th></tr></thead>
-    <tbody>
-      {% for item in items %}{{ queue_row(item, return_to) }}{% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endmacro %}
-
+{% from "_tiles.html" import tile_art %}
+{% block title %}Campuses{% endblock %}
+{% block screen_title %}Good {{ day_part }}, {{ g.user.username }}{% endblock %}
+{% block tools %}
+  {% if pending_decisions %}<a class="ds-btn ds-btn--primary" href="{{ url_for('dashboard.queue') }}"><i class="ph ph-check-square" aria-hidden="true"></i>{{ pending_decisions }}<span class="ds-btn__wide"> waiting on you</span><span class="visually-hidden"> items waiting on you</span></a>{% endif %}
+{% endblock %}
 {% block content %}
-{% if show_all_queue %}
-<header class="page-header">
-  <div>
-    <h1 class="page-title">Waiting on you</h1>
-    <p class="page-subtitle">Every decision pending across the projects you oversee. Approve here; sending something back opens the record so you can say why.</p>
-  </div>
-  <a class="aurora-button--secondary" href="{{ url_for('dashboard.index') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i>Back to home</a>
-</header>
-
-<section class="page-section" aria-label="Decision queue">
-  <div class="page-section__bar">
-    <h2 class="page-section__title">{{ action_queue_total }} open</h2>
-    <span class="page-section__count">Oldest first</span>
-  </div>
-  {% if action_queue %}
-  {{ queue_table(action_queue, 'Decision queue', url_for('dashboard.index', queue='all')) }}
+{#- The first screen after sign-in: four campus tiles, one row, no scroll.
+    Central is the only one with an href. The other three are plain divs --
+    "not open yet" is a product state, so there is nothing to focus and
+    nothing to click, and no 403 path is involved. -#}
+<div class="ds-tilegrid ds-tilegrid--quad">
+  {% for tile in campus_tiles %}
+  {% if tile.open %}
+  <a class="ds-tile ds-tile--{{ tile.accent }}" href="{{ url_for('erp.campus_detail', public_id=tile.public_id) }}">
+    <span class="ds-tile__code">{{ tile.code }}</span>
+    <h2 class="ds-tile__title">{{ tile.name }}</h2>
+    <p class="ds-tile__note">{{ tile.subtitle }}</p>
+    <p class="ds-tile__stat">{{ tile.divisions }} division{{ '' if tile.divisions == 1 else 's' }} · {{ tile.events }} event{{ '' if tile.events == 1 else 's' }}</p>
+    <span class="ds-tile__go">Open <i class="ph ph-arrow-right" aria-hidden="true"></i></span>
+    {{ tile_art(tile.accent) }}
+  </a>
   {% else %}
-  <div class="empty-state"><i class="ph ph-check-circle" aria-hidden="true"></i><p class="mb-0">Nothing is waiting on you.</p></div>
-  {% endif %}
-</section>
-
-{% else %}
-<header class="page-header">
-  <div>
-    <h1 class="page-title">Home</h1>
-    <p class="page-subtitle">
-      {%- if can_view_decision_queue -%}
-      {{ action_queue_total }} decision{{ '' if action_queue_total == 1 else 's' }} waiting on you across {{ project_count }} project{{ '' if project_count == 1 else 's' }}.
-      {%- else -%}
-      Your projects, sessions and open work in one place.
-      {%- endif -%}
-    </p>
+  <div class="ds-tile ds-tile--locked">
+    <span class="ds-tile__flag"><i class="ph ph-lock-key" aria-hidden="true"></i>Opening soon</span>
+    <h2 class="ds-tile__title">{{ tile.name }}</h2>
+    <p class="ds-tile__note">{{ tile.subtitle }}</p>
+    <span class="ds-tile__go">{{ tile.code }}</span>
+    {{ tile_art(None) }}
   </div>
-  {% if can_view_decision_queue and action_queue_total %}
-  <a class="aurora-button--primary blueprint" href="{{ url_for('dashboard.index', queue='all') }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Start deciding</a>
-  {% else %}
-  <a class="aurora-button--primary blueprint" href="{{ url_for('erp.projects') }}"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Browse projects</a>
   {% endif %}
-</header>
-
-<div class="page-stack">
-
-  {#- Counters. Each one that has a real destination is a link to the
-      filtered list behind it; the rest stay plain tiles rather than
-      pretending to a filter the server does not offer. -#}
-  <section class="counter-grid" aria-label="Home indicators" data-tour="counters">
-    <a class="aurora-card--padded kpi-card blueprint" href="{{ url_for('erp.projects') }}">
-      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-      <span><span class="aurora-card__value">{{ project_count }}</span><span class="aurora-card__title">Projects in scope</span></span>
-      <span class="aurora-card__icon"><i class="ph ph-arrow-up-right" aria-hidden="true"></i></span>
-    </a>
-    {% if can_act %}
-    <a class="aurora-card--padded kpi-card blueprint" href="{{ url_for('dashboard.index', queue='all') }}">
-      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-      <span><span class="aurora-card__value">{{ action_queue_total }}</span><span class="aurora-card__title">Awaiting your decision</span></span>
-      <span class="aurora-card__icon"><i class="ph ph-arrow-up-right" aria-hidden="true"></i></span>
-    </a>
-    <div class="aurora-card--padded kpi-card">
-      <span><span class="aurora-card__value">{{ oversight_metrics.overdue_tasks + oversight_metrics.overdue_checklist_items }}</span><span class="aurora-card__title">Overdue requirements</span></span>
-    </div>
-    {% else %}
-    <div class="aurora-card--padded kpi-card">
-      <span><span class="aurora-card__value">{{ my_tasks|length }}</span><span class="aurora-card__title">My open tasks</span></span>
-    </div>
-    <div class="aurora-card--padded kpi-card">
-      <span><span class="aurora-card__value">{{ my_requests|length }}</span><span class="aurora-card__title">My requests</span></span>
-    </div>
-    {% endif %}
-    <div class="aurora-card--padded kpi-card">
-      <span><span class="aurora-card__value">{{ upcoming_sessions|length }}</span><span class="aurora-card__title">Upcoming sessions</span></span>
-    </div>
-  </section>
-
-  <div class="split-main">
-    <section class="page-section" aria-label="Waiting on you" data-tour="queue">
-      <div class="page-section__bar">
-        <h2 class="page-section__title">Waiting on you</h2>
-        <span class="page-section__count">
-          {%- if can_view_decision_queue -%}{{ action_queue|length }} of {{ action_queue_total }}
-          {%- else -%}{{ my_tasks|length + my_requests|length }} open{%- endif -%}
-        </span>
-      </div>
-
-      {% if can_view_decision_queue %}
-        {% if action_queue %}
-        {{ queue_table(action_queue, 'Waiting on you', url_for('dashboard.index')) }}
-        {% if action_queue_total > action_queue|length %}
-        <p class="m-0"><a class="aurora-button--link" href="{{ url_for('dashboard.index', queue='all') }}">See all {{ action_queue_total }} <i class="ph ph-arrow-right" aria-hidden="true"></i></a></p>
-        {% endif %}
-        {% else %}
-        <div class="empty-state">
-          <div class="h4 mb-0">Nothing waiting on you.</div>
-          <p class="mb-0">When a volunteer logs hours or a checklist item needs a decision, it lands here.</p>
-          <a class="aurora-button--secondary" href="{{ url_for('erp.projects') }}">Browse projects</a>
-        </div>
-        {% endif %}
-
-      {#- Volunteers and buddies have no decision queue; their own open work
-          is the list that belongs here, rather than the three collapsed
-          disclosures this page used to end with. -#}
-      {% elif my_tasks or my_requests %}
-      <div class="aurora-list">
-        {% for task in my_tasks %}
-        <a class="aurora-list__item queue-item" href="{{ url_for('erp.project_detail', public_id=task.project.public_id, tab='delivery') }}#{{ task.public_id }}">
-          <span class="queue-item__text">
-            <span class="queue-item__kind"><span class="queue-item__kind-label">Task</span><span class="queue-item__code font-monospace">{{ task.project.code }}</span></span>
-            <span class="queue-item__title">{{ task.title }}</span>
-            <span class="queue-item__meta">{{ task.project.title }}</span>
-          </span>
-          <span class="aurora-badge aurora-badge--status-{{ task.status|lower|replace(' ', '-') }}">{{ task.status }}</span>
-        </a>
-        {% endfor %}
-        {% for item in my_requests %}
-        <a class="aurora-list__item queue-item" href="{{ url_for('erp.project_detail', public_id=item.project.public_id, tab='finance') }}#{{ item.public_id }}">
-          <span class="queue-item__text">
-            <span class="queue-item__kind"><span class="queue-item__kind-label">Request</span><span class="queue-item__code font-monospace">{{ item.project.code }}</span></span>
-            <span class="queue-item__title">{{ item.title }}</span>
-            <span class="queue-item__meta">{{ item.project.title }}</span>
-          </span>
-          <span class="aurora-badge aurora-badge--status-{{ item.status|lower }}">{{ item.status }}</span>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="empty-state"><p class="mb-0">Nothing is open against your name right now.</p></div>
-      {% endif %}
-    </section>
-
-    <aside class="split-aside">
-      {% if onboarding_checklist %}
-      {#- Getting started. Every row is ticked from a real record -- an
-          approval the user actually made, a roll call they verified, an
-          import they committed -- except the three that leave nothing
-          behind, which the browser reports. See app/services/home.py. -#}
-      <section class="page-section onb-checklist" aria-label="Getting started" data-tour="checklist" id="onboardingChecklist">
-        <div class="page-section__bar">
-          <h2 class="page-section__title">Getting started</h2>
-          <span class="page-section__count">{{ onboarding_checklist.completed }} of {{ onboarding_checklist.total }}</span>
-        </div>
-        <div class="onb-progress" role="img" aria-label="{{ onboarding_checklist.completed }} of {{ onboarding_checklist.total }} done">
-          <span class="onb-progress__fill" data-onboarding-progress="{{ onboarding_checklist.percent }}"></span>
-        </div>
-        <ul class="onb-tasks">
-          {% for item in onboarding_checklist.tasks %}
-          <li class="onb-task{% if item.done %} is-done{% endif %}">
-            <span class="onb-task__mark" aria-hidden="true">{% if item.done %}<i class="ph ph-check"></i>{% endif %}</span>
-            {% if item.endpoint %}
-            <a class="onb-task__label" href="{{ url_for(item.endpoint, **item.params) }}">{{ item.label }}</a>
-            {% else %}
-            <span class="onb-task__label">{{ item.label }}</span>
-            {% endif %}
-            {% if item.done %}<span class="visually-hidden">Done</span>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="onb-checklist__actions">
-          <button class="aurora-button--link" type="button" data-onboarding-replay>Replay the tour</button>
-          <button class="aurora-button--link" type="button" data-onboarding-hide-checklist>Hide this</button>
-        </div>
-      </section>
-      {% endif %}
-
-      <section class="page-section" aria-label="Today">
-        <div class="page-section__bar"><h2 class="page-section__title">Next up</h2></div>
-        <div class="aurora-list">
-          {% for session in upcoming_sessions[:5] %}
-          <div class="aurora-list__item">
-            <div class="font-monospace text-primary text-caption">{{ session.starts_at|localdatetime('%d %b · %H:%M') }}</div>
-            <div class="queue-item__title">{{ session.title }}</div>
-            <div class="queue-item__meta">{{ session.project.title }}</div>
-            {% if has_permission(g.user, 'manage_people', session.project) %}
-            <a class="aurora-button--secondary aurora-button--small mt-2" href="{{ url_for('erp.attendance_roll_call', public_id=session.project.public_id, session_public_id=session.public_id) }}">Roll call</a>
-            {% endif %}
-          </div>
-          {% else %}
-          <div class="aurora-list__item text-muted">No upcoming sessions in your scope.</div>
-          {% endfor %}
-        </div>
-      </section>
-
-      {% if projects_in_scope %}
-      <section class="aurora-card--padded blueprint" aria-label="Where you left off">
-        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-        <div class="page-eyebrow">Where you left off</div>
-        <a class="d-block text-decoration-none" href="{{ url_for('erp.project_detail', public_id=projects_in_scope[0].public_id) }}">
-          <div class="queue-item__title">{{ projects_in_scope[0].title }}</div>
-          <div class="queue-item__meta">{{ projects_in_scope[0].code }} · {{ projects_in_scope[0].status }}</div>
-        </a>
-      </section>
-      {% endif %}
-
-      {% if igp_indicators %}
-      <section class="page-section" aria-label="IGP indicators">
-        <div class="page-section__bar"><h2 class="page-section__title">IGP</h2></div>
-        <div class="facts-list">
-          <div class="facts-list__row"><span class="facts-list__key">Applications pending</span><span class="facts-list__value font-monospace">{{ igp_indicators.pending_applications }}</span></div>
-          <div class="facts-list__row"><span class="facts-list__key">Active buddy pairs</span><span class="facts-list__value font-monospace">{{ igp_indicators.active_buddy_pairs }}</span></div>
-          <div class="facts-list__row"><span class="facts-list__key">Closure blockers</span><span class="facts-list__value font-monospace">{{ igp_indicators.open_closure_blockers }}</span></div>
-        </div>
-      </section>
-      {% endif %}
-    </aside>
-  </div>
+  {% endfor %}
 </div>
+
+{% if onboarding_checklist %}
+{#- First-run only, and floating rather than in flow: the campus screen is
+    four tiles and must stay four tiles. The card ticks itself off as the
+    tasks are done and then disappears for good. -#}
+<aside class="ds-aside" id="onboardingChecklist" aria-labelledby="onboardingChecklistTitle" data-tour="checklist">
+  <div class="ds-aside__head">
+    <h2 class="ds-aside__title" id="onboardingChecklistTitle">Getting started</h2>
+    <span class="ds-aside__count">{{ onboarding_checklist.completed }}/{{ onboarding_checklist.total }}</span>
+  </div>
+  <div class="onb-progress" data-onboarding-progress="{{ onboarding_checklist.percent }}" role="img" aria-label="{{ onboarding_checklist.percent }}% complete"><span class="onb-progress__fill"></span></div>
+  <ul class="onb-tasks">
+    {% for task in onboarding_checklist.tasks %}
+    <li class="onb-task{% if task.done %} is-done{% endif %}">
+      <span class="onb-task__mark" aria-hidden="true">{% if task.done %}<i class="ph ph-check"></i>{% endif %}</span>
+      {#- A ticked task keeps its link: it is struck through, not disabled,
+          and the page it points at is still where that work is done. -#}
+      {% if task.endpoint %}
+      <a class="onb-task__label" href="{{ url_for(task.endpoint, **task.params) }}">{{ task.label }}</a>
+      {% else %}
+      <span class="onb-task__label">{{ task.label }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="onb-checklist__actions">
+    <button class="ds-btn ds-btn--quiet ds-btn--sm" type="button" data-onboarding-replay>Replay the tour</button>
+    <button class="ds-btn ds-btn--quiet ds-btn--sm" type="button" data-onboarding-hide-checklist>Hide this list</button>
+  </div>
+</aside>
 {% endif %}
 {% endblock %}
