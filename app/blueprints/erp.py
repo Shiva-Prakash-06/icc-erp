@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, url_for
 
@@ -495,7 +495,7 @@ PROJECT_TAB_LABELS = {
 _SECTION_ACCENTS = ("pine", "indigo", "brass")
 
 
-def _section(key, label, items=None, *, open_count=None, count=None, note=None, form_only=False, per_page=PAGE_SIZE, anchor=None):
+def _section(key, label, items=None, *, open_count=None, count=None, note=None, form_only=False, per_page=PAGE_SIZE, anchor=None, ids=None):
     """One entry in a tab's section strip.
 
     ``count`` is the number on the tile and ``open_count`` the number still
@@ -518,6 +518,9 @@ def _section(key, label, items=None, *, open_count=None, count=None, note=None, 
         # public_id. The decision queue's publication row points at the
         # literal anchor "publication"; this is how that link still lands.
         "anchor": anchor,
+        # The public_ids one item renders, for rows that print nested
+        # records (see `page_of`). None means the item's own public_id.
+        "ids": ids,
     }
 
 
@@ -575,7 +578,12 @@ def _project_sections(tab, project, *, is_igp, open_tasks, settled_tasks, open_b
         sections.append(_section("contributions", "Contributions", open_contributions + settled_contributions,
                                  open_count=len(open_contributions)))
         if is_igp:
-            sections.append(_section("buddies", "Buddy pairings", list(project.buddy_assignments), per_page=4))
+            sections.append(_section(
+                "buddies", "Buddy pairings", list(project.buddy_assignments), per_page=4,
+                # A pairing prints its interaction logs underneath it, and the
+                # decision queue links to a log, not to the pairing.
+                ids=lambda assignment: [assignment.public_id, *(log.public_id for log in assignment.logs)],
+            ))
         responses = [
             {"form": form, "response": response}
             for form in project.feedback_forms for response in form.responses
@@ -584,6 +592,7 @@ def _project_sections(tab, project, *, is_igp, open_tasks, settled_tasks, open_b
             "feedback", "Feedback", responses,
             open_count=sum(1 for row in responses if row["response"].moderation_status == "Pending"),
             note=f"{approved_feedback_count} approved",
+            ids=lambda row: [row["response"].public_id],
         ))
         return sections
 
@@ -667,7 +676,7 @@ def project_detail(public_id):
             if section["anchor"] == focus:
                 active_section, requested_page = section["key"], 1
                 break
-            found = page_of(section["items"], focus, section["per_page"])
+            found = page_of(section["items"], focus, section["per_page"], section["ids"])
             if found:
                 active_section, requested_page = section["key"], found
                 break
@@ -740,18 +749,29 @@ def project_detail(public_id):
     )
 
 
-def _redirect_to_tab(project, tab, anchor=None):
+def _redirect_to_tab(project, tab, anchor=None, *, reveal=False):
     """Return to the record's tab, unless the form asked to come back to
     where the decision was actually taken.
 
     Home and the project Overview now decide items in place, so posting a
     verdict must not teleport the approver into a tab they never opened.
     Only same-origin relative paths are honoured -- anything carrying a
-    scheme or a host is discarded rather than followed."""
+    scheme or a host is discarded rather than followed.
+
+    ``reveal`` is for a record just created. A verdict returns to the page
+    it was taken on, because the approver is working down that page; a new
+    record is appended to its list and can land on a later page, and
+    "created" with nothing new on screen reads as "lost". So when `next` is
+    this project's workspace, its `page` gives way to `focus`, which opens
+    the page that holds the new record."""
     target = (request.form.get("next") or "").strip()
     if target.startswith("/") and not target.startswith("//"):
         parsed = urlparse(target)
         if not parsed.scheme and not parsed.netloc:
+            workspace = url_for("erp.project_detail", public_id=project.public_id)
+            if reveal and anchor and parsed.path == workspace:
+                query = [(key, value) for key, value in parse_qsl(parsed.query) if key not in {"page", "focus"}]
+                return redirect(f"{workspace}?{urlencode(query + [('focus', anchor)])}#{anchor}")
             return redirect(target)
     # `focus` resolves to the section and page that actually hold the record,
     # which a bare fragment cannot do now that a section is paged.
@@ -1215,7 +1235,7 @@ def add_operational_request(public_id):
     record_audit("operational_request.create", operational_request, after={"project": project.public_id}, actor=g.user)
     db.session.commit()
     flash("Operational request created in Draft.", "success")
-    return _redirect_to_tab(project, "finance")
+    return _redirect_to_tab(project, "finance", operational_request.public_id, reveal=True)
 
 
 @erp_bp.post("/projects/<string:public_id>/operational-requests/<string:request_public_id>/decision")
@@ -1324,7 +1344,7 @@ def submit_feedback_response(public_id):
     record_audit("feedback_response.submit", response, after={"form": form.public_id}, actor=g.user)
     db.session.commit()
     flash("Thank you — your feedback has been recorded.", "success")
-    return _redirect_to_tab(project, "people")
+    return _redirect_to_tab(project, "people", response.public_id, reveal=True)
 
 
 @erp_bp.post("/projects/<string:public_id>/feedback-responses/<string:response_public_id>/moderate")
@@ -1492,6 +1512,7 @@ def add_task(public_id):
         record_audit("task.create", task, after={"title": title, "project": project.public_id})
         db.session.commit()
         flash("Task added.", "success")
+        return _redirect_to_tab(project, "logistics", task.public_id, reveal=True)
     return _redirect_to_tab(project, "logistics")
 
 

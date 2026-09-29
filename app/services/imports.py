@@ -40,7 +40,7 @@ from app.services.timeutil import to_utc
 from app.services.drive import validate_drive_link
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 # Supplied workbooks small enough to ship inside the deployment bundle live

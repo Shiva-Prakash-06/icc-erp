@@ -121,13 +121,20 @@ def paginate(items, page: int | str | None, per_page: int = PAGE_SIZE) -> Page:
     return Page(items=items[start:start + per_page], number=number, pages=pages, total=total, per_page=per_page)
 
 
-def page_of(items, public_id: str | None, per_page: int = PAGE_SIZE) -> int | None:
+def page_of(items, public_id: str | None, per_page: int = PAGE_SIZE, ids=None) -> int | None:
     """The 1-based page holding ``public_id``, or ``None`` if it is not in
     ``items``. Used to resolve a deep link onto the page that contains the
-    record it names."""
+    record it names.
+
+    ``ids`` returns every ``public_id`` one item renders on the page. By
+    default that is the item's own, but a row can print records nested under
+    it -- a buddy pairing prints its interaction logs, a feedback row wraps
+    its response -- and a deep link to one of those must land on the page
+    of the row that carries it."""
     if not public_id:
         return None
+    ids = ids or (lambda item: (getattr(item, "public_id", None),))
     for index, item in enumerate(items):
-        if getattr(item, "public_id", None) == public_id:
+        if public_id in ids(item):
             return index // max(1, per_page) + 1
     return None

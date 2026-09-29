@@ -90,7 +90,11 @@
       </div>
     </header>
 
-    <div class="ds-panel__body">
+    {#- Focusable because it is the one thing on the screen that may scroll
+        (see tiles.css): a page can outgrow it -- four buddy pairings print
+        their logs underneath them -- and a scroll box keyboard users cannot
+        reach hides those rows. -#}
+    <div class="ds-panel__body" tabindex="0" role="region" aria-labelledby="panel-title">
 
 {# ─────────────────────────────────────────────────── LOGISTICS ───────── #}
 

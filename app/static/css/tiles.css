@@ -1272,6 +1272,9 @@ form:has(.ds-cond select option:checked[data-no-reason]) > .aurora-inline-field-
    ("1-4 of 6") and no scrollbar to reach. `auto` paints nothing while the
    page fits, so a roomy screen looks exactly as it did. */
 .ds-panel__body { min-height: 0; min-width: 0; overflow: hidden auto; overscroll-behavior: contain; }
+/* It is focusable so a keyboard can scroll it; the ring sits inside the
+   box because the panel clips anything drawn outside it. */
+.ds-panel__body:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 /* The rows inside a panel are the panel's own children: the `.ds-rows` card
    that used to wrap them would be a second border around the same edge. */
 .ds-panel__body > .ds-row:last-child { border-bottom: 0; }
@@ -1411,4 +1414,27 @@ form:has(.ds-cond select option:checked[data-no-reason]) > .aurora-inline-field-
   .ds-modal:target { padding: var(--space-3); place-items: end stretch; }
   .ds-modal__panel { max-height: calc(100dvh - 2 * var(--space-3)); padding: var(--space-4); }
   .ds-factgrid { grid-template-columns: minmax(0, 1fr); padding: var(--space-3); }
+}
+
+/* ── When the panel cannot hold a page at all ──────────────────────────
+   On a phone, and on any screen under ~560px tall (a laptop at 200% zoom is
+   720x450), the header, tab strip and section strip use nearly all the
+   height, and the `minmax(0, 1fr)` panel track resolved to a few pixels:
+   rows sat under the pager, unreachable by pointer and invisible to the
+   reader -- WCAG 1.4.10 Reflow. There the one-screen rule yields the same
+   way it already has for campus tiles: the panel takes the height of its
+   page and the screen body scrolls, so every row is on the page. The same
+   squeeze hit every `.ds-scroll` (an analytics chart got 81px), so it flows
+   into the body too rather than nesting a second, unreachable scroller. */
+@media (max-width: 860px), (max-height: 560px) {
+  /* Block flow, not `auto` grid tracks: inside a body of definite height an
+     auto track only shares the free space, and the `min-height: 0` these
+     carry for the one-screen grid let the panel body shrink to 0px. A block
+     is as tall as its content, which is the whole point here. The print
+     stylesheet unclamps the frame the same way. */
+  .ds-screen__body, .ds-work, .ds-panel { display: block; }
+  .ds-screen__body { overflow-y: auto; overscroll-behavior: contain; }
+  .ds-screen__body > * + *, .ds-work > * + * { margin-top: var(--space-4); }
+  .ds-scroll, .ds-work, .ds-panel__body { overflow: visible; }
+  .ds-panel__head { min-height: var(--panel-head); }
 }

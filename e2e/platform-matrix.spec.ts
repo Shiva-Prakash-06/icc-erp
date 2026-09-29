@@ -45,7 +45,12 @@ test("protected workflow resources reject generic PATCH and return RFC 7807 erro
   expect(tasksResponse.status()).toBe(200);
   const tasks = (await tasksResponse.json()).data;
   expect(tasks.length).toBeGreaterThan(0);
+  // The acceptance server runs with CSRF on, as production does. Without the
+  // token the request is refused as a CSRF failure (400) before it reaches
+  // the workflow guard this test is about.
+  const csrfToken = await page.locator('meta[name="csrf-token"]').getAttribute("content");
   const blocked = await page.request.patch(`/api/v1/tasks/${tasks[0].public_id}`, {
+    headers: { "X-CSRFToken": csrfToken ?? "" },
     data: { status: "Approved", version: tasks[0].version },
   });
   expect(blocked.status()).toBe(405);

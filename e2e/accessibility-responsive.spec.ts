@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { openProject, signIn } from "./helpers";
+import { openProject, openSection, signIn } from "./helpers";
 
 test("authenticated project state has no automatically detectable WCAG A/AA violations", async ({ page }, testInfo) => {
   await signIn(page, "e2e_events");
@@ -191,6 +191,8 @@ test("P0-05 — the phone bar holds four destinations plus Menu, and covers noth
 test("P1-04 — a row decision opens in place and keeps its exact payload", async ({ page }) => {
   await signIn(page, "e2e_faculty");
   await openProject(page, "E2E-ICC-EVENT", "Logistics");
+  // Logistics opens on Details, a panel of facts with no decisions on it.
+  await openSection(page, "Tasks");
 
   const review = page.locator("details.ds-review").first();
   await expect(review).toBeVisible();

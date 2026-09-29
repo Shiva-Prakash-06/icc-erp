@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openProject, signIn } from "./helpers";
+import { openDialog, openProject, openSection, signIn } from "./helpers";
 
 test("project setup exposes Basics and remains usable with browser history", async ({ page }) => {
   await signIn(page, "e2e_events");
@@ -18,10 +18,12 @@ test("project setup exposes Basics and remains usable with browser history", asy
 test("operational request completes Draft to Submitted to Approved to Completed", async ({ page }, testInfo) => {
   await signIn(page, "e2e_events");
   await openProject(page, "E2E-ICC-EVENT", "Finance");
+  await openSection(page, "Operational requests");
   const title = `Equipment request ${testInfo.project.name}`;
-  // Creating a request is a secondary action on this tab: the form lives
-  // behind "Create a request" so the section opens on what needs deciding.
-  await page.getByRole("button", { name: "Create a request" }).click();
+  // Creating a request is a secondary action on this section: the form
+  // lives in a `:target` dialog behind the "Create a request" link so the
+  // section opens on what needs deciding.
+  await openDialog(page, "Create a request");
   await page.getByLabel("Request type").selectOption({ label: "Equipment" });
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByRole("button", { name: "Create draft" }).click();
@@ -29,6 +31,7 @@ test("operational request completes Draft to Submitted to Approved to Completed"
   // row, and keeps settled items in the same list instead of behind a
   // disclosure -- so the row is located the same way at every stage.
   const rowFor = (text: string) => page.locator(".ds-row").filter({ hasText: text });
+  const requestId = await rowFor(title).getAttribute("id");
   await rowFor(title).getByRole("button", { name: /submit for approval/i }).click();
 
   // Maker/checker is a release control: the Events Head who creates and
@@ -40,12 +43,18 @@ test("operational request completes Draft to Submitted to Approved to Completed"
   await page.goto("/logout");
   await signIn(page, "e2e_faculty");
   await openProject(page, "E2E-ICC-EVENT", "Finance");
+  await openSection(page, "Operational requests");
   // A native <summary> is the disclosure's control. Its computed ARIA
   // role differs between engines, so it is located as the element it is.
   await rowFor(title).locator("summary.ds-review__trigger").click();
   await rowFor(title).getByLabel(new RegExp(`Decision for ${title}`)).selectOption("Approved");
   await rowFor(title).getByRole("button", { name: "Save" }).click();
   await rowFor(title).getByRole("button", { name: /mark completed/i }).click();
+  // A verdict returns to the page it was taken on, and a completed request
+  // moves to the settled end of the list -- on a later page once earlier
+  // projects in the run have filled it. Follow it the way a notification
+  // does: `focus` opens whichever page holds it.
+  await page.goto(`${page.url().split("?")[0]}?tab=finance&focus=${requestId}#${requestId}`);
   await expect(rowFor(title)).toContainText("Completed");
 });
 
@@ -57,9 +66,10 @@ test("dynamic feedback stores canonical rating and chart table stays in parity",
   const responseText = `Clear schedule and roles — ${testInfo.project.name}`;
   await signIn(page, "e2e_volunteer");
   await openProject(page, "E2E-ICC-EVENT", "People");
-  // Responding is a secondary action on this tab: the list of responses is
-  // what needs moderating, so the form sits behind its own disclosure.
-  await page.getByRole("button", { name: /^Respond to/i }).click();
+  await openSection(page, "Feedback");
+  // Responding is a secondary action on this section: the list of responses
+  // is what needs moderating, so the form sits behind its own dialog.
+  await openDialog(page, "Respond");
   await page.getByLabel(/overall rating/i).selectOption("5");
   await page.getByLabel("What worked well?").fill(responseText);
   await page.getByRole("button", { name: /submit feedback/i }).click();

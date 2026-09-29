@@ -30,3 +30,28 @@ export async function openProject(page: Page, code: string, tab?: string) {
   await link.click();
   await page.waitForURL(new RegExp("tab="));
 }
+
+export async function openSection(page: Page, label: string) {
+  // A tab opens on its first section; the others sit behind the section
+  // strip's tiles, which are plain links (`?section=`), so this is a real
+  // navigation in every project, JavaScript-disabled included.
+  const tile = page
+    .locator(".ds-sections a.ds-section")
+    .filter({ has: page.locator(".ds-section__label", { hasText: new RegExp(`^${label}$`, "i") }) })
+    .first();
+  await tile.scrollIntoViewIfNeeded();
+  await tile.click();
+  await page.waitForURL(/[?&]section=/);
+}
+
+export async function openDialog(page: Page, linkName: string) {
+  // Dialogs are `:target` panels behind a plain link, and they rise in over
+  // 0.18s. With JavaScript disabled Playwright's actionability check cannot
+  // re-poll an element it first met mid-animation, so a click inside the
+  // dialog hangs on "element is not stable". Waiting for the entrance to
+  // finish is exact, and a no-op once it has.
+  await page.getByRole("link", { name: linkName, exact: true }).click();
+  const panel = page.locator(".ds-modal:target .ds-modal__panel");
+  await expect(panel).toBeVisible();
+  await panel.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+}

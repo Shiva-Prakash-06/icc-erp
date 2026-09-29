@@ -29,8 +29,8 @@ os.environ["TESTING"] = "true"
 
 from app import create_app
 from app.database import db
-from app.models.erp import BudgetLine, RoleAssignment, WorkTask
-from app.models.project import AcademicYear, Campus, ProgramType, Project
+from app.models.erp import BudgetLine, FeedbackForm, FeedbackResponse, Person, RoleAssignment, WorkTask
+from app.models.project import AcademicYear, BuddyAssignment, BuddyLog, Campus, ProgramType, Project
 from app.models.user import User
 from app.services.paging import PAGE_SIZE, Page, page_of, paginate
 
@@ -82,6 +82,16 @@ class PaginateUnitTestCase(unittest.TestCase):
         self.assertEqual(page_of(rows, "r19", 8), 3)
         self.assertIsNone(page_of(rows, "not-here", 8))
         self.assertIsNone(page_of(rows, None, 8))
+
+    def test_page_of_finds_a_record_nested_under_a_row(self):
+        """A buddy pairing prints its logs underneath it; a link to a log
+        lands on the page of the pairing that carries it."""
+        rows = [{"id": f"p{n}", "logs": [f"p{n}-log{m}" for m in range(3)]} for n in range(10)]
+        ids = lambda row: [row["id"], *row["logs"]]
+        self.assertEqual(page_of(rows, "p0-log2", 4, ids), 1)
+        self.assertEqual(page_of(rows, "p5-log0", 4, ids), 2)
+        self.assertEqual(page_of(rows, "p9", 4, ids), 3)
+        self.assertIsNone(page_of(rows, "p9-log9", 4, ids))
 
 
 class WorkspaceSectionTestCase(unittest.TestCase):
@@ -221,6 +231,57 @@ class WorkspaceSectionTestCase(unittest.TestCase):
         self.assertIn('<span class="ds-section__label">Budget</span>', html)
         self.assertIn("Hall", html)
 
+    def test_focus_opens_the_buddy_pairing_page_holding_a_log(self):
+        """The decision queue links to a buddy log, which is printed under
+        its pairing rather than being a row of its own. Five pairings at four
+        a page put the fifth pairing's log on page 2 of Buddy pairings --
+        not on Team, the People tab's first section."""
+        igp = ProgramType(name="IGP")
+        db.session.add(igp)
+        db.session.flush()
+        project = Project(
+            code="IGP-2026-CEN-900", campus_id=self.campus.id, program_type_id=igp.id,
+            academic_year_id=self.project.academic_year_id, title="Paging test programme", category="Operational",
+            status="Active", start_date=date(2026, 8, 1), end_date=date(2026, 8, 2),
+        )
+        db.session.add(project)
+        db.session.flush()
+        people = [Person(first_name=f"Person {n}") for n in range(10)]
+        db.session.add_all(people)
+        db.session.flush()
+        pairings = [
+            BuddyAssignment(project_id=project.id, buddy_person_id=people[2 * n].id,
+                            exchange_student_person_id=people[2 * n + 1].id,
+                            start_date=date(2026, 8, 1), end_date=date(2026, 8, 2))
+            for n in range(5)
+        ]
+        db.session.add_all(pairings)
+        db.session.flush()
+        log = BuddyLog(buddy_assignment_id=pairings[4].id, activity_date=date(2026, 8, 1), description="Campus tour")
+        db.session.add(log)
+        db.session.commit()
+
+        response = self.client.get(f"/erp/projects/{project.public_id}", query_string={"tab": "people", "focus": log.public_id})
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="panel-title">Buddy pairings</h2>', html)
+        self.assertIn(f'id="{log.public_id}"', html)
+        self.assertIn('<span class="ds-pager__range">5–5</span>', html)
+
+    def test_focus_opens_the_feedback_section_holding_a_response(self):
+        """Feedback rows are form/response pairs, so the response's own
+        public_id is what the decision queue's moderation link names."""
+        form = FeedbackForm(project_id=self.project.id, title="Event feedback", is_open=True)
+        db.session.add(form)
+        db.session.flush()
+        feedback = FeedbackResponse(form_id=form.id, answers_json={"rating": 4})
+        db.session.add(feedback)
+        db.session.commit()
+
+        html = self.get(tab="people", focus=feedback.public_id)
+        self.assertIn('id="panel-title">Feedback</h2>', html)
+        self.assertIn(f'id="{feedback.public_id}"', html)
+
     def test_focus_resolves_the_publication_anchor(self):
         """Public disclosure holds no records, so `focus` cannot find it by
         public_id -- the decision queue's publication row points at the
@@ -255,6 +316,34 @@ class WorkspaceSectionTestCase(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["Location"], target)
+
+    def test_creating_a_record_opens_the_page_it_landed_on(self):
+        """A verdict returns to its page; a new record does not, because it
+        is appended and the 21st task is on page 3, not the page 1 the form
+        was posted from."""
+        origin = f"/erp/projects/{self.project.public_id}?tab=logistics&section=tasks&page=1"
+        response = self.client.post(
+            f"/erp/projects/{self.project.public_id}/tasks",
+            data={"title": "Task 20", "next": origin},
+        )
+        self.assertEqual(response.status_code, 302)
+        created = WorkTask.query.filter_by(project_id=self.project.id, title="Task 20").one()
+        location = response.headers["Location"]
+        self.assertNotIn("page=", location)
+        self.assertIn("section=tasks", location)
+        self.assertTrue(location.endswith(f"focus={created.public_id}#{created.public_id}"), location)
+        html = self.get(tab="logistics", section="tasks", focus=created.public_id)
+        self.assertIn(f'id="{created.public_id}"', html)
+        self.assertIn('<span class="ds-pager__range">17–21</span>', html)
+
+    def test_reveal_never_follows_a_next_outside_the_workspace(self):
+        """`next` pointing anywhere else -- the decision queue -- is still
+        followed exactly."""
+        response = self.client.post(
+            f"/erp/projects/{self.project.public_id}/tasks",
+            data={"title": "From the queue", "next": "/queue"},
+        )
+        self.assertEqual(response.headers["Location"], "/queue")
 
     # ── Dialogs ─────────────────────────────────────────────────────────
 
