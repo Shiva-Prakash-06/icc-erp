@@ -1,10 +1,17 @@
-# ICC ERP — UAT user acceptance guide
+# ICC — user testing guide
 
-This guide is for operational users testing the UAT environment. UAT is a test environment with sample records. Do not enter real student, staff, financial, health, or confidential information.
+This guide is for people testing the app before it goes live. The test site
+has made-up records. Do not type in real student, staff, money, health or
+private details.
 
-## Start the UAT site locally
+Each role has one short journey below. Every journey starts on **My work**,
+the page you see after signing in. If anything takes more presses than the
+journey says, or a word on screen is hard to understand, write it down — that
+is a finding.
 
-Open Terminal and run these commands from the project folder. This starts the local UAT database that contains the sample records and the four UAT accounts listed below.
+## Start the test site on this computer
+
+Open Terminal and run these commands from the project folder:
 
 ```bash
 cd "/Users/Shiva_1/Desktop/ICC ERP/icc-platform-2"
@@ -16,105 +23,155 @@ export SECRET_KEY="local-uat-only-change-me"
 .venv/bin/flask --app run.py run --host 127.0.0.1 --port 5010
 ```
 
-When the server is running, open [http://127.0.0.1:5010/login](http://127.0.0.1:5010/login) in your browser. Keep the Terminal window open while testing. To stop the site, return to that window and press **Control+C**.
-
-If port 5010 is already in use, stop the other local Flask process first or use another port in both the command and the browser address. Do not run database reset or deletion commands against this UAT database; ask the project coordinator if the sample data needs to be restored.
+Then open [http://127.0.0.1:5010/login](http://127.0.0.1:5010/login). Keep
+Terminal open while you test. To stop the site, go back to Terminal and press
+**Control+C**. Do not reset or delete this test database; ask the coordinator
+if the sample records need putting back.
 
 ## Before you begin
 
-1. Open the UAT web address supplied by the project coordinator.
-2. Use the one-time password for your username from the private credential sheet the project coordinator gives you. Each account has its own randomly generated password, and the platform requires you to set a new one at first sign-in.
-3. Use a current version of Chrome, Firefox, Safari, or Edge. If the screen looks crowded, zoom out to 100% and widen the browser window.
+1. Get your username and one-time password from the private sheet the
+   coordinator gives you. Every account has its own password.
+2. Use a current Chrome, Firefox, Safari or Edge. Try at least one journey on
+   a phone as well — event-day work is done on phones.
 
-## Sign in and change your password
+## Sign in
 
-1. On the sign-in page, enter your assigned username from the list below.
-2. Enter the one-time password from the private credential sheet.
-3. Select **Access platform**.
-4. Confirm that your name and role appear in the header. Never share your password with another user.
+1. Type your username and the one-time password.
+2. Press **Sign in**.
+3. Pick your own new password when asked.
+4. You land on **My work** (volunteers land on **My activities**). Check that
+   the badge at the bottom of the left rail says your role.
 
-## UAT usernames and responsibilities
+## Test accounts
 
-| Username | Role | What to test |
+| Username | Role | What they do |
 |---|---|---|
-| `uat_faculty_admin` | OIA Faculty Administrator | User approvals, scoped oversight, project approvals, reports, audit evidence, and privacy boundaries. |
-| `uat_usc` | Central Campus USC | USC/ICC coordination, project basics, people and event operations within the assigned campus and academic year. |
-| `uat_igp_head` | Central Campus IGP Head | IGP project setup, sessions, buddy pairing, sensitive-link visibility, attendance, and feedback. |
-| `uat_icc_events_head` | Central Campus ICC Events Head | ICC Events project creation and event operations within the Events wing. |
-| `uat_volunteer` | Volunteer | Assigned contributions and project activity. |
+| `uat_faculty_admin` | Faculty | Says yes to money, finished events and the website. Makes people heads. |
+| `uat_usc` | USC | Types in event details for any ICC event. Approves nothing. |
+| `uat_icc_events_head` | ICC Events head | Runs ICC events. |
+| `uat_igp_head` | IGP head | Runs IGP programmes. |
+| `uat_media_head` | ICC Media head | Does the Media team's work on any ICC or IGP event. |
+| `uat_culturals_head` | ICC Culturals head | Does the Culturals team's work on any ICC or IGP event. |
+| `uat_volunteer` | Volunteer | Only looks at the events they are on. |
 
-Each of the five UAT accounts has its own randomly generated one-time password, issued on the private
-credential sheet (`instance/UAT_CREDENTIALS.txt`, readable only by the operator who ran the command).
-The platform forces a password change at first sign-in. Provisioning is deliberately gated: it runs
-only with `DEMONSTRATOR=true` and `PROVISION_UAT=1`, so it cannot create pre-approved administrator
-accounts against a production database.
+Accounts are made by an operator with `DEMONSTRATOR=true` and
+`PROVISION_UAT=1` (`flask provision-uat`); the passwords are written to
+`instance/UAT_CREDENTIALS.txt`, readable only by that operator. The command
+refuses to run anywhere else, so it cannot make test accounts on the real
+site.
 
-## Faculty Administrator journey
+## ICC Events head
 
-1. Sign in as `uat_faculty_admin`.
-2. Open **Oversight** from the navigation.
-3. Review the KPI cards and action queue. Select an item; confirm that it opens the exact project tab needing attention.
-4. Open **Users and approvals**. Approve a pending test user, then return to the list and confirm the status changed.
-5. Open a project from Oversight. Review a submitted task, document, contribution, operational request, budget line, feedback response, recruitment decision, and report approval when present.
-6. Reject one test item with a written reason. Confirm that the rejection reason and updated status are visible.
-7. Open **Audit** and confirm that the decision is recorded with the actor, time, item, and action.
-8. Try to open a project outside the assigned scope if one is available. Confirm that it is not displayed or accessible.
+1. Sign in as `uat_icc_events_head`. My work says how many things you have
+   to do today.
+2. Press **+ New event**. Type a name. Leave the date as today, or pick one.
+   Press **Create event**. *(2 presses.)*
+3. You are on the new event. Its to-do list is already filled in. Press the
+   circle next to one item. It is ticked. *(1 press.)*
+4. In **What needs doing?** type "Order T-shirts", pick **Who? → Media
+   team**, and press **Add**.
+5. Open **People**. Paste three names, one per line, and press **Add these
+   people**. They are on the event.
+6. Open **Schedule** and press **Take attendance** for the main session.
+   Everyone starts ticked. Untick one person, type a walk-in, put 2 in
+   **hours**, and save.
+7. Open **Money**. Type "Snacks" and 500, and press **Ask**. It shows as
+   Asked. *(3 presses from My work.)*
+8. Remove a to-do, then press **Undo** in the message that appears.
 
-Expected result: every decision has a visible outcome, a reason where required, a version change, and an audit record. Restricted data is not exposed outside the permitted scope.
+You should see: nothing asks for the same thing twice, every save brings you
+back to the same card, and nothing is lost by Remove.
 
-## USC journey
+## Media head (and Culturals head)
 
-1. Sign in as `uat_usc`.
-2. Open **ERP operations**, then choose the Central Campus ICC project.
-3. Open **Basics** and confirm the project title, dates, campus, program, year, and wing.
-4. Move through **Sessions**, **Team**, **Checklist**, **Documents**, and **Budget**. Enter a harmless test value and save it.
-5. Return to the project page. Confirm the saved value is present after refreshing the page.
-6. Submit a draft operational request for approval.
-7. Open the attendance roll call, mark a test participant, and save. Open attendance history and confirm the verifier, time, version, and immutable change entry are shown.
-8. Open **Insights**, submit a rating and written response, and confirm the response appears as pending moderation.
+1. Sign in as `uat_media_head`. My work lists your team's items from every
+   event — both ICC and IGP — and nobody else's.
+2. Find "Order T-shirts" from the Events head's journey. Press its circle.
+   *(1 press.)*
+3. Find an item about a poster or photos. Press **Add file** and pick any
+   image. The file is sent and the item is ticked. *(2 presses.)*
+4. Open an event from **Your events**. You see only your team's to-dos and
+   the files you added. You do not see People, Money or Schedule.
 
-Expected result: USC can work only within the assigned Central Campus ICC scope and can submit work for approval, but cannot approve restricted decisions reserved for the approving role.
+Repeat with `uat_culturals_head`: you see only Culturals items.
 
-## IGP Head journey
+## Faculty
 
-1. Sign in as `uat_igp_head`.
-2. Open the Central Campus IGP project and select **Basics**.
-3. Review or edit the project details, then continue through sessions, team, checklist, documents, and budget.
-4. Open **People** and pair a buddy with an exchange participant. Confirm the pairing appears with dates and status.
-5. Open attendance and complete a roll call. Correct one test entry with a written reason; confirm the history shows the original and corrected values.
-6. Open **Insights** and create or edit a feedback form. Keep the required 1–5 rating question and add text questions one per line.
-7. Submit a response and open the distribution chart. Confirm that the bars, exact-value table, and approved-response count agree.
-8. Open a sensitive document link. Confirm that the link is visible only to this role and that access is recorded in the audit trail.
+1. Sign in as `uat_faculty_admin`. **Needs your OK** is at the top.
+2. Press **Approve** on the Snacks money request. It disappears and you stay
+   on My work. *(1 press.)*
+3. Press **Not now** on another item. It opens the event; write a short
+   reason and send it back.
+4. If an event is waiting to be finished, press **Sign off**.
+5. Open **People** (in the rail, or the Menu on a phone). Find the volunteer,
+   press **Change**, make them a Culturals head and save. Make them a
+   volunteer again afterwards.
+6. Open **Reports**. Check this year's five numbers and that finished events
+   have a **Report (PDF)**.
+7. Open **Who changed what** from the Menu. Your approval is there as a
+   sentence.
 
-Expected result: IGP operations remain within the Central Campus IGP scope. Sensitive references are available only when the role permits them.
+You should see: only money, finishing an event and the website ever need
+your OK, and you are never asked to approve something you asked for
+yourself.
 
-## ICC Events Head journey
+## USC
 
-1. Sign in as `uat_icc_events_head`.
-2. Select **ERP operations**, then **New project**.
-3. Complete **Basics** with Central Campus, ICC, the current academic year, and the ICC Events wing. Select **Continue**.
-4. Complete sessions, team, checklist, documents, and budget using harmless UAT values. Use **Save and continue** after each step.
-5. Use the **Full project page** link, then use the project tabs to confirm that the saved values are present.
-6. Submit an operational request and a budget line for approval.
-7. Open a project outside the ICC Events scope if one is available. Confirm it is not shown and direct navigation is denied.
+1. Sign in as `uat_usc`. My work shows items handed to the USC and today's
+   event, if there is one.
+2. Open **Events**, pick an ICC event, open **Event details** and fix a
+   spelling. Save. You come back to the same card.
+3. Open **Upload a sheet** from the Menu. Download the empty People sheet,
+   add two rows, and upload it. It is checked, and it says it is waiting for
+   Faculty to save it.
+4. Try to approve anything — there is no button for it.
 
-Expected result: the ICC Events Head can create and manage ICC Events work in the assigned wing, but cannot see IGP records or approve actions outside the assigned scope.
+## IGP head
 
-## Public-site privacy check
+1. Sign in as `uat_igp_head`. You see IGP programmes only.
+2. Make a new event from an itinerary file, or open an IGP programme.
+3. Open **Buddies** and pair a buddy with a student.
+4. Open **Feedback** and press **Make feedback link**. Open the link in a
+   private window and answer it without signing in. The answer shows on the
+   card.
+5. When the programme's last day has passed, press **Finish event**, tick
+   "Also show on the public website", and send it to Faculty.
 
-1. Open the public calendar without signing in, or use a private browser window.
+## Volunteer
+
+1. Sign in as `uat_volunteer`. You see **My activities**: each event you are
+   on, its time and place, your job and your buddy.
+2. Open an event. You see when and where, your job and your buddy — nothing
+   about anyone else, and nothing to fill in.
+3. The rail has only My activities and Account (and the Menu).
+
+## Sign up as someone new
+
+1. Sign out. Press **New here? Sign up**.
+2. Use a `@christuniversity.in` email. You go straight in as a volunteer.
+3. An email from any other domain is refused.
+
+## Public website check
+
+1. Open `/public/` in a private window, without signing in.
 2. Open an event and a published report.
-3. Confirm that public pages show only approved, published descriptions, dates, venues, aggregate charts, and report content.
-4. Confirm that rosters, registration numbers, budgets, buddy pairings, restricted Drive links, and personal information are absent.
+3. You see only what Faculty put on the website. Names of people, register
+   numbers, money, buddy pairs and private Drive links never appear.
 
-## Recovery and help
+## If something goes wrong
 
-- If you enter the wrong password several times, wait for the lockout message and contact the project coordinator; do not keep retrying.
-- If a page reports a conflict, refresh once and repeat the action using the latest visible version. Report the item name and what you were trying to do.
-- If a save appears successful but the value disappears after refresh, stop testing that workflow and report the project, tab, field, and approximate time.
-- For access, privacy, or unexpected-role issues, contact the UAT coordinator immediately. Do not work around a permission message.
-- After acceptance, rotate or delete the private credential sheet and ask the coordinator to disable the UAT accounts.
+- Too many wrong passwords locks the account for a few minutes. Wait, or ask
+  the coordinator. Do not keep trying.
+- If a save seems to work but the value is gone after you reload, stop and
+  report the event, the card, the field and the time.
+- If you can see something you think you should not, tell the coordinator
+  straight away. Do not work around it.
+- When testing ends, delete the password sheet and ask the coordinator to
+  switch the test accounts off.
 
-## UAT status notice
+## What this guide does not prove
 
-This guide and its accounts are for UAT only. Repository-level automated quality evidence is recorded separately and does not constitute production approval, institutional SSO approval, live email/Drive validation, penetration-test approval, pilot acceptance, recovery rehearsal, or stakeholder sign-off.
+Passing these journeys is not sign-off for the real site, university
+sign-in, real email or Drive, a security test, or a backup-and-restore drill.
+Those are recorded separately.

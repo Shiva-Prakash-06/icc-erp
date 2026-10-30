@@ -1,83 +1,54 @@
 {% extends "base.html" %}
-{% from "_tiles.html" import state_chip %}
 {% block title %}Alerts{% endblock %}
 {% block screen_title %}Alerts{% endblock %}
-{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Alerts</span>{% endblock %}
-{#- Audit, Alerts and preferences: "1 records" is grammatically incorrect. -#}
-{% block tools %}<span class="ds-filter__result">{{ notifications|length|pluralise('alert') }}</span>{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">My work</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Alerts</span>{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- Newest first, five at a time. Each alert opens what it is about. One
+    switch decides whether alerts also come by email; anything handed
+    straight to you, and account changes, always arrive. -#}
+{% set shown = notifications if request.args.get('all') else notifications[:5] %}
+{% set emailing = preferences.get('task.deadline').email_enabled if preferences.get('task.deadline') else true %}
 {% block content %}
-<div class="ds-scroll ds-scroll--plain ds-scroll--page">
-
-  <div class="ds-rows">
-    <h2 class="ds-rows__title">Recent alerts<span class="ds-rows__n">{{ notifications|selectattr('read_at', 'none')|list|length }} unread</span></h2>
-    {% for item in notifications %}
-    {#- One flat list, newest first, unread marked by a rule rather than a
-        fill (reports-admin override). Each alert links to the record it is
-        about: the audit found alerts that named a problem and offered no
-        way to reach it. -#}
-    <div class="ds-row ds-row--{{ 'overdue' if item.severity in ['Critical', 'Danger'] else ('upcoming' if not item.read_at else 'complete') }}{% if not item.read_at %} is-unread{% endif %}" id="{{ item.public_id }}">
-      <i class="ds-row__pip" aria-hidden="true"></i>
-      <span class="ds-row__title" data-label="Alert">
-        {%- if item.action_url %}<a href="{{ item.action_url }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif -%}
-      </span>
-      <span class="ds-row__desc" data-label="Detail">{{ item.body }}</span>
-      <span class="ds-row__when" data-label="Received">{{ item.created_at|localdatetime('%d %b %Y, %I:%M %p') }}</span>
-      {{ state_chip('overdue' if item.severity in ['Critical', 'Danger'] else ('upcoming' if not item.read_at else 'complete'),
-                    'Unread' if not item.read_at else 'Read', 'Status') }}
-      <span class="ds-row__docs" data-label="Kind">{{ item.event_type.replace('.', ' · ') }}</span>
-      <span class="ds-row__act">
+<div class="cv-page">
+  <section class="cv-section" aria-labelledby="alerts-title">
+    <div class="cv-section__head">
+      <h2 class="cv-section__title" id="alerts-title">Alerts</h2>
+      <span class="cv-count">{{ notifications|selectattr('read_at', 'none')|list|length }} new</span>
+    </div>
+    <ul class="cv-list">
+      {% for item in shown %}
+      <li class="cv-item{% if item.read_at %} cv-item--read{% endif %}" id="{{ item.public_id }}">
+        <span class="cv-item__main">
+          {% if item.action_url %}<a class="cv-item__title cv-item__link" href="{{ item.action_url }}">{{ item.title }}</a>{% else %}<span class="cv-item__title">{{ item.title }}</span>{% endif %}
+          <span class="cv-item__meta">{% if not item.read_at %}<strong>New</strong> · {% endif %}{{ item.created_at|localdatetime('%a %d %b, %I:%M %p', label=False) }}{% if item.body %} · {{ item.body }}{% endif %}</span>
+        </span>
         {% if not item.read_at %}
-        <form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="ds-btn ds-btn--sm" type="submit">Mark read</button>
-        </form>
-        {% endif %}
-        {% if item.action_url %}<a class="ds-btn ds-btn--sm ds-btn--primary" href="{{ item.action_url }}">Open</a>{% endif %}
-      </span>
-    </div>
-    {% else %}
-    <div class="ds-empty ds-empty--block">
-      <i class="ph ph-bell" aria-hidden="true"></i>
-      <div>
-        <h3 class="ds-empty__title">No alerts</h3>
-        <p class="ds-empty__body">Deadlines, decisions and status changes on the events you work on appear here.</p>
-      </div>
-      <a class="ds-btn" href="{{ url_for('dashboard.queue') }}">See what is waiting on you</a>
-    </div>
-    {% endfor %}
-
-    <div class="ds-rows__foot">
-      {#- Delivery preferences sit behind a disclosure (reports-admin
-          override): they are configuration, not the list. -#}
-      <div class="aurora-disclosure" id="deliveryPreference">
-        <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseDeliveryPreference" aria-expanded="false" aria-controls="collapseDeliveryPreference">Delivery preferences</button>
-        <div class="aurora-collapse aurora-disclosure__content" id="collapseDeliveryPreference" data-ui-parent="#deliveryPreference">
-          <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="row g-3 align-items-start" data-ui-pending-submit data-ui-pending-label="Saving…">
+        <span class="cv-item__act">
+          <form method="post" action="{{ url_for('erp.notification_read', public_id=item.public_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="col-md-5">
-              <label class="aurora-label" for="event_type">Alert type</label>
-              <select class="aurora-select" id="event_type" name="event_type" aria-describedby="event_type_hint">
-                <option value="task.deadline">Task deadlines</option>
-                <option value="checklist.deadline">Checklist deadlines</option>
-                <option value="task.status">Task decisions</option>
-              </select>
-              <p class="aurora-file-field__hint" id="event_type_hint">These three categories are the ones you can turn off. Every other alert is treated as critical.</p>
-            </div>
-            <div class="col-md-4" role="group" aria-label="Delivery channels">
-              <span class="aurora-label d-block">Delivery channels</span>
-              <div class="d-flex gap-3 flex-wrap">
-                <div class="aurora-choice"><input class="aurora-choice__input" id="email_enabled" type="checkbox" name="email_enabled" checked><label class="aurora-choice__label" for="email_enabled">Email</label></div>
-                <div class="aurora-choice"><input class="aurora-choice__input" id="in_app_enabled" type="checkbox" name="in_app_enabled" checked><label class="aurora-choice__label" for="in_app_enabled">In app</label></div>
-              </div>
-              {#- Audit: the copy said critical alerts always stay enabled
-                  without saying which ones those are. It now names them. -#}
-              <p class="aurora-file-field__hint">Critical alerts — security events, an account or role change, and anything assigned directly to you — are always delivered and cannot be switched off here.</p>
-            </div>
-            <div class="col-md-3 align-self-end"><button class="aurora-button--primary" type="submit">Save preference</button></div>
+            <button class="cv-btn cv-btn--quiet" type="submit">Seen<span class="visually-hidden"> — {{ item.title }}</span></button>
           </form>
-        </div>
-      </div>
-    </div>
-  </div>
+        </span>
+        {% endif %}
+      </li>
+      {% else %}
+      <li class="cv-empty">No alerts. When something needs you, it shows here.</li>
+      {% endfor %}
+    </ul>
+    {% if notifications|length > shown|length %}<a class="cv-more" href="{{ url_for('erp.notifications', all=1) }}">Show all {{ notifications|length }}</a>{% endif %}
+  </section>
+
+  <section class="cv-section" aria-labelledby="email-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="email-title">Email</h2></div>
+    <form method="post" action="{{ url_for('erp.notification_preferences') }}" class="cv-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="event_type" value="all">
+      <input type="hidden" name="in_app_enabled" value="on">
+      <label class="cv-check"><input type="checkbox" name="email_enabled"{% if emailing %} checked{% endif %}>Email me when something needs me</label>
+      <p class="cv-note">Things handed straight to you, and changes to your account, are always sent.</p>
+      <div><button class="cv-btn" type="submit">Save</button></div>
+    </form>
+  </section>
 </div>
 {% endblock %}

@@ -158,6 +158,7 @@ class OperationalRequestApprovalTestCase(unittest.TestCase):
         self.igp_lead = make_user("igp_lead", "IGP_PROGRAM_LEAD")
         self.sysadmin = make_user("sysadmin", "SYSTEM_ADMINISTRATOR")
         self.events_head = make_user("events_head", "ICC_EVENTS_HEAD")
+        self.other_faculty = make_user("other_faculty", "FACULTY_COORDINATOR")
         db.session.commit()
 
         self.request = OperationalRequest(project_id=self.project.id, request_type="Vehicle", title="Airport pickup", created_by_id=self.creator.id)
@@ -186,8 +187,13 @@ class OperationalRequestApprovalTestCase(unittest.TestCase):
         with self.assertRaises(PermissionError):
             decide_operational_request(self.request, "Approved", self.creator, expected_version=self.request.version)
 
-    def test_scoped_head_can_approve_operational_request(self):
-        decide_operational_request(self.request, "Approved", self.events_head, expected_version=self.request.version)
+    def test_a_head_cannot_approve_operational_request(self):
+        # Only Faculty approves money; heads run events but never sign off.
+        with self.assertRaises(PermissionError):
+            decide_operational_request(self.request, "Approved", self.events_head, expected_version=self.request.version)
+
+    def test_another_faculty_member_can_approve_operational_request(self):
+        decide_operational_request(self.request, "Approved", self.other_faculty, expected_version=self.request.version)
         self.assertEqual(self.request.status, "Approved")
 
     def _login(self, user):
@@ -231,7 +237,7 @@ class OperationalRequestApprovalTestCase(unittest.TestCase):
         db.session.add(ambiguous)
         db.session.commit()
         with self.assertRaisesRegex(ValueError, "incomplete maker/submission history"):
-            decide_operational_request(ambiguous, "Approved", self.events_head, expected_version=ambiguous.version)
+            decide_operational_request(ambiguous, "Approved", self.other_faculty, expected_version=ambiguous.version)
 
 
 class PeopleApiScopeTestCase(unittest.TestCase):

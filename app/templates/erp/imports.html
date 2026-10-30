@@ -1,115 +1,96 @@
 {% extends "base.html" %}
-{% from "_tiles.html" import file_picker, state_chip %}
-{% block title %}Imports{% endblock %}
-{% block screen_title %}Imports{% endblock %}
-{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Imports</span>{% endblock %}
-{% block tools %}<span class="ds-filter__result">{{ batches|length|pluralise('batch', 'batches') }}</span>{% endblock %}
+{% from "_tiles.html" import file_picker %}
+{% block title %}Upload a sheet{% endblock %}
+{% block screen_title %}Upload a sheet{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">My work</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Upload a sheet</span>{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- Three steps: get the right empty sheet, fill it in, upload it. The rows
+    are checked first and nothing is added until someone presses Save, so a
+    bad sheet never lands. Uploading the same file twice gives back the same
+    check rather than a second copy. Saving needs Faculty (audit B11): the
+    USC sees who it is waiting for instead of a button that would refuse. -#}
+{% set KINDS = {'attendance': 'Attendance', 'checklists': 'To-do lists', 'documents': 'Files', 'icc_roster': 'ICC volunteer list',
+                'participants': 'Participants', 'people': 'People', 'projects': 'Events'} %}
+{% macro kind(value) %}{{ KINDS.get(value, value.replace('_', ' ')|capitalize) }}{% endmacro %}
+
 {% block content %}
-<div class="ds-scroll ds-scroll--plain ds-scroll--page">
-
-  <div class="ds-rows">
-    <h2 class="ds-rows__title">Bring data in</h2>
-    <div class="ds-rows__foot">
-      <p class="mb-2">Upload a spreadsheet (.xlsx or .csv) against one of the standard column templates.{% if not supplied_sources %} No pre-supplied source is bundled with this deployment, so this is the way to bring data in.{% endif %}</p>
-
-      {#- Audit, Imports: "Download a starter template always points to the
-          people template while the visible selector may be Attendance or
-          another type", and "template download and upload controls are
-          separated, making it hard to understand which schema applies".
-          Each template now names itself and links to its own file, beside
-          the selector that uses it. -#}
-      <p class="aurora-label mb-1" id="template_downloads_label">Column templates</p>
-      <div class="ds-chipbar mb-3" role="group" aria-labelledby="template_downloads_label">
-        {% for import_type in standard_import_types %}
-        <a class="ds-btn ds-btn--sm" href="{{ url_for('api_v1.import_template', import_type=import_type) }}" download>
-          <i class="ph ph-download-simple" aria-hidden="true"></i>{{ import_type.replace('_', ' ')|title }}
-        </a>
-        {% endfor %}
-      </div>
-
-      <form method="POST" action="{{ url_for('erp.upload_import') }}" enctype="multipart/form-data" class="row g-3 align-items-start">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="col-md-4">
-          <label class="aurora-label" for="import_type_upload">Template this file follows</label>
-          <select class="aurora-select" id="import_type_upload" name="import_type">
-            {% for import_type in standard_import_types %}<option value="{{ import_type }}">{{ import_type.replace('_', ' ')|title }}</option>{% endfor %}
-          </select>
+<div class="cv-page">
+  <section class="cv-section" aria-labelledby="upload-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="upload-title">Add many rows at once</h2></div>
+    <ol class="cv-steps">
+      <li>
+        <span class="cv-label" id="template_downloads_label">Get the empty sheet for what you are adding</span>
+        <div class="cv-chips" role="group" aria-labelledby="template_downloads_label">
+          {% for import_type in standard_import_types %}
+          <a class="cv-chip-link" href="{{ url_for('api_v1.import_template', import_type=import_type) }}" download>{{ kind(import_type) }}</a>
+          {% endfor %}
         </div>
-        {{ file_picker('source_file', 'source_file', 'Spreadsheet', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='col-md-5') }}
-        <div class="col-md-3 align-self-end mb-3"><button class="aurora-button--primary">Upload and stage</button></div>
-      </form>
-
-      {% if supplied_sources %}
-      <form method="POST" action="{{ url_for('erp.stage_import') }}" class="row g-3 align-items-start">
+      </li>
+      <li>Fill it in. Keep the top row as it is.</li>
+      <li>
+        <form method="POST" action="{{ url_for('erp.upload_import') }}" enctype="multipart/form-data" class="cv-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="cv-field">
+            <label for="import_type_upload">What is in the sheet?</label>
+            <select id="import_type_upload" name="import_type">
+              {% for import_type in standard_import_types %}<option value="{{ import_type }}">{{ kind(import_type) }}</option>{% endfor %}
+            </select>
+          </div>
+          {{ file_picker('source_file', 'source_file', 'The sheet', 'An Excel (.xlsx) or .csv file.', '.xlsx,.csv') }}
+          <div><button class="cv-btn cv-btn--primary" type="submit">Check the sheet</button></div>
+        </form>
+      </li>
+    </ol>
+    {% if supplied_sources %}
+    <details class="cv-done">
+      <summary>Use a sheet that came with the app</summary>
+      <form method="POST" action="{{ url_for('erp.stage_import') }}" class="cv-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="col-md-4">
-          <label class="aurora-label" for="import_type">Or stage a bundled source</label>
-          <select class="aurora-select" id="import_type" name="import_type">
+        <div class="cv-field">
+          <label for="import_type">Which one?</label>
+          <select id="import_type" name="import_type">
             {% for value, label in supplied_sources %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
           </select>
         </div>
-        <div class="col-md-3 align-self-end mb-3"><button class="aurora-button--secondary">Stage source</button></div>
+        <div><button class="cv-btn" type="submit">Check it</button></div>
       </form>
-      {% endif %}
+    </details>
+    {% endif %}
+  </section>
 
-      {#- The safety note is true and worth reading once. It sits under the
-          form rather than above it: the audit found the panel "visually
-          dominates the form" it is meant to qualify. -#}
-      <p class="ds-review__hint"><i class="ph ph-shield-check" aria-hidden="true"></i> Staging never writes source rows straight into operational tables, and re-staging an unchanged file returns the existing batch rather than duplicating it. Nothing reaches the records until somebody commits the batch below.</p>
-    </div>
-  </div>
-
-  <div class="ds-rows">
-    <h2 class="ds-rows__title">Batches<span class="ds-rows__n">{{ batches|length }}</span></h2>
-    <div class="ds-rows__head" aria-hidden="true"><span></span><span>Batch</span><span>Rows</span><span></span><span>State</span><span></span><span></span></div>
-    {% for batch in batches %}
-    {#- One row per batch: name, one metadata line, one action. Checksum,
-        row counts and file provenance live behind a per-row disclosure and
-        never stand between the operator and the Commit (reports-admin
-        override, "Imports"). -#}
-    <div class="ds-row ds-row--{{ 'complete' if batch.status == 'Committed' else ('overdue' if batch.error_count else 'active') }}">
-      <i class="ds-row__pip" aria-hidden="true"></i>
-      <span class="ds-row__title" data-label="Batch">{{ batch.import_type.replace('_',' ')|title }}</span>
-      <span class="ds-row__desc" data-label="Source">{{ batch.source_file }}</span>
-      <span class="ds-row__when" data-label="Rows">{{ batch.staged_count|pluralise('row') }}</span>
-      {{ state_chip('complete' if batch.status == 'Committed' else ('overdue' if batch.error_count else 'active'), batch.status, 'State') }}
-      <span class="ds-row__docs" data-label="Errors">{% if batch.error_count %}{{ batch.error_count }} need attention{% else %}all valid{% endif %}</span>
-      <span class="ds-row__act">
-        {% if batch.status != 'Committed' and batch.error_count == 0 %}
+  <section class="cv-section" aria-labelledby="sheets-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="sheets-title">Sheets</h2><span class="cv-count">{{ batch_total }}</span></div>
+    <ul class="cv-list">
+      {% for batch in batches %}
+      {% set saved = batch.status == 'Committed' %}
+      <li class="cv-item">
+        <span class="cv-item__main">
+          <span class="cv-item__title">{{ kind(batch.import_type) }} · {{ batch.source_file }}</span>
+          <span class="cv-item__meta{% if batch.error_count and not saved %} cv-item__meta--late{% endif %}">
+            {%- if saved %}Saved · {{ batch.committed_count }} {{ 'row' if batch.committed_count == 1 else 'rows' }} added
+            {%- elif batch.error_count %}{{ batch.error_count }} {{ 'row has' if batch.error_count == 1 else 'rows have' }} problems — fix the sheet and upload it again
+            {%- else %}Checked · {{ batch.valid_count }} {{ 'row is' if batch.valid_count == 1 else 'rows are' }} fine, not saved yet{% endif -%}
+          </span>
+        </span>
+        {% if not saved and batch.error_count == 0 %}
+        <span class="cv-item__act">
           {% if can_commit %}
           <form method="POST" action="{{ url_for('erp.commit_import', public_id=batch.public_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="ds-btn ds-btn--sm ds-btn--primary">Commit {{ batch.valid_count }}</button>
+            <button class="cv-btn cv-btn--primary" type="submit">Save {{ batch.valid_count }} {{ 'row' if batch.valid_count == 1 else 'rows' }}</button>
           </form>
           {% else %}
-          <span class="ds-row__empty">Awaiting faculty commit</span>
+          <span class="cv-note">Waiting for Faculty to save it</span>
           {% endif %}
+        </span>
         {% endif %}
-      </span>
-      <details class="ds-review ds-review--wide">
-        <summary class="ds-review__trigger">Provenance</summary>
-        <div class="ds-review__panel">
-          <h3 class="ds-review__title">Where this batch came from</h3>
-          <dl class="ds-facts">
-            <div class="ds-facts__row"><dt>File</dt><dd class="ds-facts__wrap">{{ batch.source_file }}</dd></div>
-            <div class="ds-facts__row"><dt>Checksum</dt><dd class="ds-facts__wrap">{{ batch.source_sha256 }}</dd></div>
-            <div class="ds-facts__row"><dt>Staged</dt><dd>{{ batch.staged_count }}</dd></div>
-            <div class="ds-facts__row"><dt>Valid</dt><dd>{{ batch.valid_count }}</dd></div>
-            <div class="ds-facts__row"><dt>Errors</dt><dd>{{ batch.error_count }}</dd></div>
-            <div class="ds-facts__row"><dt>Committed</dt><dd>{{ batch.committed_count }}</dd></div>
-          </dl>
-        </div>
-      </details>
-    </div>
-    {% else %}
-    <div class="ds-empty ds-empty--block">
-      <i class="ph ph-database" aria-hidden="true"></i>
-      <div>
-        <h3 class="ds-empty__title">Nothing staged yet</h3>
-        <p class="ds-empty__body">Download the template that matches your data, fill it in, and upload it above. The rows are checked and shown here before anything is written.</p>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
+      </li>
+      {% else %}
+      <li class="cv-empty">No sheets yet. Uploaded sheets show here after they are checked.</li>
+      {% endfor %}
+    </ul>
+    {% if batch_total > batches|length %}<a class="cv-more" href="{{ url_for('erp.imports', all=1) }}">Show all {{ batch_total }}</a>{% endif %}
+  </section>
 </div>
 {% endblock %}

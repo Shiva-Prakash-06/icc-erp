@@ -1,14 +1,20 @@
-# Project Workspace Override
+# The event page
 
 Inherits `MASTER.md`.
 
-- The identity bar is sticky: code, status, title and the lifecycle actions stay on screen while a long workspace scrolls. It goes static below 767px.
-- **Closure blockers open the Overview tab, uncollapsed, each with a Resolve link to the record that clears it.** They decide whether the project can close; they are never an accordion.
-- The sidebar is one `.facts-list` "Record" panel — the facts, not forms. The two definition lists it replaced are gone.
-- Four sections sit in the tab bar (Overview, Delivery, People, Budget); Contributions, Insights and Resources sit behind "More". Every one of the seven links stays in the DOM and keeps its existing `tab` query value, so no-JS navigation and emailed deep links keep working.
-- Tabs are real links preserving browser history. Mobile uses a section selector plus in-page headings; no swipe-only tabs.
-- A tab's primary content is never behind a disclosure. Disclosures hold settled records, provenance, and secondary "add" forms.
-- A deep link to a record inside a disclosure opens that disclosure (`revealFragmentTarget` in `app.js`) so the link always lands on something visible.
-- Forms remain server-rendered. Sticky regions never obscure validation errors or the final field.
-- Restricted references use explicit locked states; never render protected values into hidden DOM or island props.
-- Roll call is a segmented radio control per person, posting the same `status_<person_id>` field the server already reads.
+- One line at the top: where the event is (Coming up, Happening now, Needs
+  finishing…), its dates and place, and how many things are left.
+- The to-do list comes first and is open. The circle ticks an item; "⋯"
+  holds Add file, Skip (with a reason) and Remove (with Undo). "Tick several
+  at once" and "✓ N done" are folded underneath.
+- Everything else is a folded card with a one-line summary: Schedule,
+  People, Money, Files, Buddies (IGP), Feedback, Applications, Event details,
+  Finish. `?card=` opens one; older `?tab=`, `?section=` and `?focus=` links
+  open the card that now holds what they pointed at.
+- Every form saves and comes back to the same card with "Saved ✓".
+- Media and Culturals heads see only their team's items and the files they
+  added. Volunteers see only their job, their buddy and the times.
+- Roll call starts with everyone ticked: untick who did not come, add
+  walk-ins, give hours, save — one screen, made for a phone at the door.
+- Finish shows what is still missing, then **Send for sign-off**. Faculty
+  signs it off in one press.

@@ -1,19 +1,15 @@
 """Single source of truth for the rail, the command palette, and the
 narrow-viewport bottom bar.
 
-Previously each of those surfaces hand-duplicated the same link list in
-base.html with no shared "is this active" logic, so they could (and did)
-drift out of sync and show more than one active item at once. See PLAN.md
-"USC sidebar" finding.
+Four places and a Menu, and no more: My work, Events, + New event, and
+Reports (Faculty and the USC) or Account (everyone else). Everything that
+is not one of those four -- alerts, people, imports, the audit trail, your
+account -- sits in the Menu on a phone and lower down the rail on a laptop.
+Entries are dropped for anyone who cannot use them, so a volunteer's bar is
+My activities, Account and the Menu.
 
-The Tile System put navigation back in a rail, so ``topnav`` (which chose
-the deleted desktop top bar) is gone and every visible entry is a rail
-entry. ``foot`` sinks an entry to the bottom of the rail: the account chip
-and the alert bell are destinations, but they are not part of the
-drill-down, and grouping them at the foot is what keeps the rail readable
-at four to seven icons.
-
-``icon`` values are ``ph-*`` classes and are named only here, in Python --
+``foot`` sinks an entry to the bottom of the rail. ``icon`` values are
+``ph-*`` classes and are named only here, in Python --
 ``app/services/**/*.py`` must stay in the PurgeCSS content globs or the
 mask rules behind these names are stripped and every rail icon renders as
 a solid square.
@@ -23,35 +19,29 @@ from __future__ import annotations
 
 from app.services.authorization import has_any_permission
 
+#: The roles that see the Reports page: Faculty and the USC.
+REPORT_TEAMS = {"faculty", "usc"}
+
 NAV_REGISTRY = [
-    {"key": "home", "label": "Campuses", "mobile_label": "Campuses", "bottom_nav": True, "rail": True, "icon": "ph-buildings", "group": "Workspace", "endpoint": "dashboard.index",
-     "active_endpoints": {"dashboard.index", "erp.campus_detail", "erp.division"}},
+    {"key": "home", "label": "My work", "mobile_label": "My work", "bottom_nav": True, "rail": True, "icon": "ph-check-square", "group": "Go to", "endpoint": "dashboard.index",
+     "active_endpoints": {"dashboard.index", "dashboard.queue"}},
     {
-        "key": "projects", "label": "Events", "mobile_label": "Events", "bottom_nav": True, "rail": True, "icon": "ph-calendar", "group": "Workspace",
-        "endpoint": "erp.projects", "active_blueprint": "erp",
-        "active_exclude_endpoints": {
-            "erp.notifications", "erp.audit", "erp.campuses", "erp.campus_detail",
-            "erp.division", "erp.imports", "erp.analytics", "erp.analytics_division",
-        },
+        "key": "projects", "label": "Events", "mobile_label": "Events", "bottom_nav": True, "rail": True, "icon": "ph-calendar", "group": "Go to",
+        "endpoint": "erp.projects", "active_blueprint": "erp", "hide_for_view_only": True,
+        "active_exclude_endpoints": {"erp.notifications", "erp.audit", "erp.imports", "erp.new_project"},
     },
-    {"key": "analytics", "label": "Analytics", "mobile_label": "Analytics", "bottom_nav": True, "rail": True, "icon": "ph-chart-bar", "group": "Workspace", "endpoint": "erp.analytics",
-     "active_endpoints": {"erp.analytics", "erp.analytics_division"}},
-    {"key": "reports", "label": "Published reports", "mobile_label": "Reports", "bottom_nav": True, "rail": True, "icon": "ph-file-pdf", "group": "Workspace", "endpoint": "public.reports"},
+    {"key": "new", "label": "New event", "mobile_label": "New", "bottom_nav": True, "rail": True, "icon": "ph-plus-circle", "group": "Go to", "endpoint": "erp.new_project",
+     "permission": "manage_projects"},
+    {"key": "reports", "label": "Reports", "mobile_label": "Reports", "bottom_nav": True, "rail": True, "icon": "ph-chart-bar", "group": "Go to", "endpoint": "dashboard.reports",
+     "teams": REPORT_TEAMS},
 
-    {"key": "imports", "label": "Data imports", "mobile_label": "Imports", "bottom_nav": False, "rail": True, "icon": "ph-database", "group": "Records", "endpoint": "erp.imports", "permission": "manage_imports"},
-    {"key": "audit", "label": "Audit trail", "mobile_label": "Audit", "bottom_nav": False, "rail": True, "icon": "ph-clock-counter-clockwise", "group": "Records", "endpoint": "erp.audit", "permission": "audit"},
-    {"key": "admin_users", "label": "Administration", "mobile_label": "Admin", "bottom_nav": False, "rail": True, "icon": "ph-shield-check", "group": "Records", "endpoint": "dashboard.admin_users", "permission": "manage_users"},
+    {"key": "people", "label": "People", "mobile_label": "People", "bottom_nav": False, "rail": True, "icon": "ph-users", "group": "More", "endpoint": "dashboard.admin_users", "permission": "manage_users"},
+    {"key": "imports", "label": "Upload a sheet", "mobile_label": "Upload", "bottom_nav": False, "rail": True, "icon": "ph-database", "group": "More", "endpoint": "erp.imports", "permission": "manage_imports"},
+    {"key": "audit", "label": "Who changed what", "mobile_label": "History", "bottom_nav": False, "rail": True, "icon": "ph-clock-counter-clockwise", "group": "More", "endpoint": "erp.audit", "permission": "audit"},
 
-    # Neither of these is in the phone bar. The design-system contract is
-    # four primary destinations plus Menu, and the bar was carrying seven
-    # icons plus a sign-out (audit P0-05). Both live in the Menu drawer,
-    # which is labelled and lists every remaining destination.
-    {"key": "notifications", "label": "Notification centre", "mobile_label": "Alerts", "bottom_nav": False, "rail": True, "foot": True, "icon": "ph-bell", "group": "Records", "endpoint": "erp.notifications"},
-    {"key": "profile", "label": "My account", "mobile_label": "Account", "bottom_nav": False, "rail": True, "foot": True, "icon": "ph-user-circle", "group": "Workspace", "endpoint": "dashboard.profile"},
-
-    # Reachable from the command palette and from the campus tiles; it has
-    # no rail slot because the campus screen IS the campus list.
-    {"key": "campuses", "label": "Campus list", "mobile_label": "Campus list", "bottom_nav": False, "rail": False, "icon": "ph-buildings", "group": "Records", "endpoint": "erp.campuses"},
+    {"key": "notifications", "label": "Alerts", "mobile_label": "Alerts", "bottom_nav": False, "rail": True, "foot": True, "icon": "ph-bell", "group": "More", "endpoint": "erp.notifications"},
+    # Account takes the fourth phone slot from anyone who has no Reports.
+    {"key": "profile", "label": "Account", "mobile_label": "Account", "bottom_nav": False, "rail": True, "foot": True, "icon": "ph-user-circle", "group": "More", "endpoint": "dashboard.profile"},
 ]
 
 
@@ -63,13 +53,19 @@ MAX_BOTTOM_NAV_ITEMS = 4
 
 def build_nav(user, current_endpoint, current_blueprint):
     """Return NAV_REGISTRY entries visible to `user`, each with a resolved
-    `active` flag. Exactly one entry can be active for any given request:
-    Campuses claims the drill-down endpoints it owns, and Events explicitly
-    excludes every endpoint owned by a more specific entry so it does not
-    also light up for those pages."""
+    `active` flag. Exactly one entry can be active for any given request."""
+    from app.services.home import is_view_only
+    from app.services.teams import user_teams
+
+    view_only = is_view_only(user)
+    teams = user_teams(user)
     items = []
     for entry in NAV_REGISTRY:
         if entry.get("permission") and not has_any_permission(user, entry["permission"]):
+            continue
+        if entry.get("teams") and not (teams & entry["teams"]):
+            continue
+        if entry.get("hide_for_view_only") and view_only:
             continue
         if entry.get("active_endpoints"):
             active = current_endpoint in entry["active_endpoints"]
@@ -77,5 +73,13 @@ def build_nav(user, current_endpoint, current_blueprint):
             active = current_blueprint == entry["active_blueprint"] and current_endpoint not in entry.get("active_exclude_endpoints", set())
         else:
             active = current_endpoint == entry["endpoint"]
-        items.append({**{"rail": True, "bottom_nav": False, "foot": False}, **entry, "active": active})
+        item = {**{"rail": True, "bottom_nav": False, "foot": False}, **entry, "active": active}
+        if entry["key"] == "home" and view_only:
+            item.update(label="My activities", mobile_label="My activities")
+        items.append(item)
+    # Account fills the fourth phone slot when Reports is not there.
+    if sum(item["bottom_nav"] for item in items) < MAX_BOTTOM_NAV_ITEMS:
+        for item in items:
+            if item["key"] == "profile":
+                item.update(bottom_nav=True, foot=False)
     return items

@@ -13,6 +13,7 @@ from app import create_app
 from app.database import db
 from app.models.erp import ChecklistInstance, ChecklistItemStatus, ChecklistTemplate, ChecklistTemplateItem, DocumentRecord, FeedbackForm, FeedbackResponse, OperatingUnit, OperationalRequest, Person, ProjectSession, RoleAssignment, SessionAttendance, TeamAssignment, WorkTask
 from app.models.production import (
+    AttendanceChangeEvent,
     Notification,
     NotificationPreference,
     ContributionRecord,
@@ -206,17 +207,19 @@ class ProductionCompletionTestCase(unittest.TestCase):
         decide_recruitment(application, "Selected", self.user, expected_version=2)
         self.assertEqual(len(person.team_assignments), 1)
 
-    def test_attendance_correction_requires_reason_and_records_history(self):
+    def test_attendance_correction_records_history_with_a_default_reason(self):
         person = Person(first_name="Participant")
         session = ProjectSession(project_id=self.project.id, code="MAIN", title="Main", starts_at=datetime(2026, 8, 1, 9, tzinfo=timezone.utc), ends_at=datetime(2026, 8, 1, 10, tzinfo=timezone.utc))
         db.session.add_all([person, session])
         db.session.commit()
         record = mark_attendance(session, person, "Present", self.user)
-        with self.assertRaises(ValueError):
-            mark_attendance(session, person, "Absent", self.user, expected_version=record.version)
-        mark_attendance(session, person, "Absent", self.user, expected_version=record.version, reason="Corrected from signed roster")
-        self.assertEqual(record.version, 2)
+        # A reason is kept when given, but no longer stops a correction.
+        mark_attendance(session, person, "Absent", self.user, expected_version=record.version)
+        mark_attendance(session, person, "Present", self.user, expected_version=record.version, reason="Corrected from signed roster")
+        self.assertEqual(record.version, 3)
         self.assertEqual(len(record.__class__.query.all()), 1)
+        reasons = [event.reason for event in AttendanceChangeEvent.query.order_by(AttendanceChangeEvent.id).all()]
+        self.assertEqual(reasons, [None, "Changed at roll call", "Corrected from signed roster"])
 
     def test_attendance_batch_is_idempotent(self):
         person = Person(first_name="Participant")
@@ -266,12 +269,13 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.assertEqual(job.status, "Completed")
         self.assertEqual(job.snapshot.snapshot_json["project"]["code"], self.project.code)
 
-    def test_critical_risk_blocks_project_closure(self):
-        self.project.closure_summary = "Complete narrative"
+    def test_a_critical_risk_no_longer_blocks_finishing(self):
+        """Risks were removed from the screens; one left over from before
+        must not stop an event being finished."""
         risk = ProjectRisk(project_id=self.project.id, title="Unresolved safety concern", is_critical=True, status="Open")
         db.session.add(risk)
         db.session.commit()
-        self.assertIn("Risk", {item.kind for item in closure_blockers(self.project)})
+        self.assertNotIn("Risk", {item.kind for item in closure_blockers(self.project)})
 
     def test_drive_validation_rejects_non_google_and_mock_preserves_classification(self):
         self.assertFalse(validate_drive_link("https://example.com/file")["valid"])
@@ -412,7 +416,7 @@ class ProductionCompletionTestCase(unittest.TestCase):
         db.session.commit()
         response = self.client.get("/reset-password")
         html = response.get_data(as_text=True)
-        self.assertIn("Secure your account", html)
+        self.assertIn("Set your password", html)
         self.assertIn("At least 12 characters", html)
         self.assertNotIn("Security Protocol", html)
 
@@ -884,32 +888,13 @@ class ProductionCompletionTestCase(unittest.TestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 422)
 
-    def test_project_form_uses_public_scope_and_api_warns_about_schedule_conflicts(self):
+    def test_session_api_warns_about_schedule_conflicts(self):
         _reference_data()
         db.session.commit()
-        wing = self.unit.wings[0]
         self.login()
         self.assertEqual(self.client.get("/erp/projects").status_code, 200)
         self.assertEqual(self.client.get("/admin/users").status_code, 200)
-        response = self.client.post(
-            "/erp/projects",
-            data={
-                "title": "Scoped form project",
-                "project_type": "ICC event",
-                "category": "Operational",
-                "campus_public_id": self.campus.public_id,
-                "program_type_public_id": self.program_type.public_id,
-                "academic_year_public_id": self.year.public_id,
-                "wing_public_id": wing.public_id,
-                "start_date": "2026-11-01",
-                "end_date": "2026-11-01",
-            },
-        )
-        self.assertEqual(response.status_code, 302)
-        project = Project.query.filter_by(title="Scoped form project").one()
-        self.assertEqual(project.operating_unit_id, self.unit.id)
-        self.assertEqual(project.wing_id, wing.id)
-        self.assertTrue(project.code.startswith("ICC-2026-CEN-"))
+        project = self.project
 
         base = {
             "project_public_id": project.public_id,
@@ -986,13 +971,6 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         db.drop_all()
         self.context.pop()
 
-    def test_team_enroll_route(self):
-        response = self.client.post(f"/erp/projects/{self.project.public_id}/team", data={
-            "registration_number": "REG-1", "assignment_type": "Project Team", "role_label": "Volunteer",
-        })
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(TeamAssignment.query.filter_by(project_id=self.project.id, person_id=self.person.id).count(), 1)
-
     def _login_as_volunteer(self):
         volunteer = User(username="volunteer2", email="volunteer2@example.com", role="Volunteer", status="Approved", needs_password_reset=False, person_id=self.person.id)
         volunteer.set_password("A-secure-test-password-2026")
@@ -1006,67 +984,6 @@ class ErpTabRoutesTestCase(unittest.TestCase):
             session["user_id"] = volunteer.id
             session["session_version"] = volunteer.session_version
         return volunteer
-
-    def test_contribution_log_and_decision_routes(self):
-        self._login_as_volunteer()
-        response = self.client.post(f"/erp/projects/{self.project.public_id}/contributions", data={
-            "activity_type": "Event support", "description": "Helped set up", "duration_hours": "2",
-        })
-        self.assertEqual(response.status_code, 302)
-        contribution = ContributionRecord.query.filter_by(project_id=self.project.id).one()
-        with self.client.session_transaction() as session:
-            session["user_id"] = self.user.id
-            session["session_version"] = self.user.session_version
-        response = self.client.post(f"/erp/projects/{self.project.public_id}/contributions/{contribution.public_id}/decision", data={
-            "version": str(contribution.version), "status": "Approved",
-        })
-        self.assertEqual(response.status_code, 302)
-        db.session.refresh(contribution)
-        self.assertEqual(contribution.approval_status, "Approved")
-
-    def test_budget_line_lifecycle_route(self):
-        self.client.post(f"/erp/projects/{self.project.public_id}/budgets", data={
-            "category": "Venue", "description": "Hall rental", "estimated_amount": "1000",
-        })
-        line = BudgetLine.query.filter_by(project_id=self.project.id).one()
-        self.client.post(f"/erp/projects/{self.project.public_id}/budgets/{line.public_id}/decision", data={
-            "version": str(line.version), "status": "Submitted",
-        })
-        db.session.refresh(line)
-        response = self.client.post(f"/erp/projects/{self.project.public_id}/budgets/{line.public_id}/decision", data={
-            "version": str(line.version), "status": "Approved",
-        })
-        self.assertEqual(response.status_code, 302)
-        db.session.refresh(line)
-        self.assertEqual(line.status, "Approved")
-
-    def test_document_add_and_decision_route(self):
-        self.client.post(f"/erp/projects/{self.project.public_id}/documents", data={
-            "title": "Final report", "category": "Report", "drive_url": "", "permission_classification": "Internal",
-        })
-        document = DocumentRecord.query.filter_by(project_id=self.project.id, title="Final report").one()
-        self.assertEqual(document.status, "Submitted")
-        response = self.client.post(f"/erp/projects/{self.project.public_id}/documents/{document.public_id}/decision", data={
-            "version": str(document.version), "status": "Approved",
-        })
-        self.assertEqual(response.status_code, 302)
-        db.session.refresh(document)
-        self.assertEqual(document.status, "Approved")
-
-    def test_feedback_form_open_and_submit_and_moderate_routes(self):
-        self.user.person_id = self.person.id
-        db.session.commit()
-        self.client.post(f"/erp/projects/{self.project.public_id}/feedback-forms", data={"title": "Project Feedback"})
-        form = FeedbackForm.query.filter_by(project_id=self.project.id).one()
-        self.client.post(f"/erp/projects/{self.project.public_id}/feedback-responses", data={
-            "rating": "5", "comments": "Great", "suggestions": "None",
-        })
-        response_row = FeedbackResponse.query.filter_by(form_id=form.id).one()
-        self.assertEqual(response_row.answers_json["rating"], 5)
-        moderate = self.client.post(f"/erp/projects/{self.project.public_id}/feedback-responses/{response_row.public_id}/moderate", data={"status": "Approved"})
-        self.assertEqual(moderate.status_code, 302)
-        db.session.refresh(response_row)
-        self.assertEqual(response_row.moderation_status, "Approved")
 
     def test_igp_buddy_pairing_and_interaction_log_routes(self):
         self.project.program_type_id = self.igp.id
@@ -1094,16 +1011,16 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         log_response = self.client.post(f"/erp/projects/{self.project.public_id}/buddy-assignments/{assignment.public_id}/logs", data={
             "activity_date": "2026-08-02", "description": "Coffee chat", "duration_hours": "1",
         })
-        self.assertEqual(log_response.status_code, 302)
-        log = BuddyLog.query.filter_by(buddy_assignment_id=assignment.id).one()
+        self.assertEqual(log_response.status_code, 403)  # volunteers only view
         with self.client.session_transaction() as session:
             session["user_id"] = self.user.id
             session["session_version"] = self.user.session_version
-        decide_response = self.client.post(f"/erp/projects/{self.project.public_id}/buddy-logs/{log.public_id}/decision", data={
-            "version": str(log.version), "status": "Approved",
+        log_response = self.client.post(f"/erp/projects/{self.project.public_id}/buddy-assignments/{assignment.public_id}/logs", data={
+            "activity_date": "2026-08-02", "description": "Coffee chat", "duration_hours": "1",
         })
-        self.assertEqual(decide_response.status_code, 302)
-        db.session.refresh(log)
+        self.assertEqual(log_response.status_code, 302)
+        # A buddy log needs nobody's OK.
+        log = BuddyLog.query.filter_by(buddy_assignment_id=assignment.id).one()
         self.assertEqual(log.status, "Approved")
 
     def test_oversight_dashboard_gated_and_shows_pending_items(self):
@@ -1113,8 +1030,9 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         # home the campus tiles. The 403 gate for non-approvers is preserved
         # on the redirect route itself, load-bearing for e2e/auth-and-rbac
         # and platform-matrix.
-        task = WorkTask(project_id=self.project.id, title="Needs approval", status="Submitted", version=1)
-        db.session.add(task)
+        from app.models.erp import ReimbursementEntry
+
+        db.session.add(ReimbursementEntry(project_id=self.project.id, date=date(2026, 8, 1), party_name="", amount=100, particular="Needs approval", status="Asked"))
         db.session.commit()
 
         volunteer = User(username="volunteer3", email="volunteer3@example.com", role="Volunteer", status="Approved", needs_password_reset=False)
@@ -1136,41 +1054,24 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Needs approval", response.data)
 
-    def test_project_setup_wizard_walks_through_steps_and_completes(self):
-        # A brand-new project (no sessions/team/checklist/documents/budget
-        # yet) should land on the "sessions" step first.
-        response = self.client.get(f"/erp/projects/{self.project.public_id}/setup")
-        self.assertEqual(response.status_code, 200)
+    def test_retired_setup_wizard_links_land_on_the_matching_card(self):
+        for step, card in (("basics", "details"), ("sessions", "schedule"), ("team", "people"),
+                           ("checklist", "todo"), ("documents", "files"), ("budget", "money"), (None, "todo")):
+            with self.subTest(step=step):
+                url = f"/erp/projects/{self.project.public_id}/setup" + (f"?step={step}" if step else "")
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(f"card={card}", response.location)
 
-        self.client.post(f"/erp/projects/{self.project.public_id}/sessions", data={
-            "next": "setup", "title": "Opening", "starts_at": "2026-08-01T09:00", "ends_at": "2026-08-01T10:00",
+    def test_adding_a_session_needs_only_two_times(self):
+        response = self.client.post(f"/erp/projects/{self.project.public_id}/sessions", data={
+            "start_time": "09:00", "end_time": "10:30",
         })
-        self.assertEqual(ProjectSession.query.filter_by(project_id=self.project.id).count(), 1)
-        response = self.client.get(f"/erp/projects/{self.project.public_id}/setup")
-        self.assertIn(b"Team", response.data)  # now on the team step
-
-        self.client.post(f"/erp/projects/{self.project.public_id}/team", data={
-            "next": "setup", "registration_number": "REG-1", "assignment_type": "Project Team",
-        })
-        template = ChecklistTemplate(code="WIZ-TEST", name="Wizard checklist", project_type="Operational")
-        db.session.add(template)
-        db.session.commit()
-        self.client.post(f"/erp/projects/{self.project.public_id}/checklists", data={
-            "next": "setup", "template_public_id": template.public_id,
-        })
-        self.client.post(f"/erp/projects/{self.project.public_id}/documents", data={
-            "next": "setup", "title": "Schedule", "category": "Report", "drive_url": "", "permission_classification": "Internal",
-        })
-        self.client.post(f"/erp/projects/{self.project.public_id}/budgets", data={
-            "next": "setup", "category": "Venue", "description": "Hall", "estimated_amount": "200",
-        })
-
-        # Every step is now complete -- the wizard should redirect to the
-        # full project page instead of showing another step.
-        response = self.client.get(f"/erp/projects/{self.project.public_id}/setup", follow_redirects=False)
         self.assertEqual(response.status_code, 302)
-        self.assertIn(f"/erp/projects/{self.project.public_id}", response.location)
-        self.assertNotIn("setup", response.location)
+        session = ProjectSession.query.filter_by(project_id=self.project.id).one()
+        self.assertEqual(session.title, "Main session")
+        self.assertEqual(session.venue, self.project.venue)
+        self.assertEqual(session.starts_at.date(), self.project.start_date)
 
     def test_attendance_roll_call_get_and_post(self):
         session_item = ProjectSession(project_id=self.project.id, code="S1", title="Day 1", starts_at=datetime(2026, 8, 1, 9), ends_at=datetime(2026, 8, 1, 10))
@@ -1184,6 +1085,32 @@ class ErpTabRoutesTestCase(unittest.TestCase):
         })
         self.assertEqual(post_response.status_code, 302)
         self.assertEqual(SessionAttendance.query.filter_by(session_id=session_item.id, person_id=self.person.id).one().status, "Present")
+
+    def test_roll_call_ticks_walk_ins_and_hours(self):
+        session_item = ProjectSession(project_id=self.project.id, code="S1", title="Day 1", starts_at=datetime(2026, 8, 1, 9), ends_at=datetime(2026, 8, 1, 10))
+        absent = Person(first_name="Away")
+        db.session.add_all([session_item, absent])
+        db.session.flush()
+        db.session.add_all([
+            TeamAssignment(project_id=self.project.id, person_id=self.person.id, assignment_type="Project Team"),
+            TeamAssignment(project_id=self.project.id, person_id=absent.id, assignment_type="Project Team"),
+        ])
+        db.session.commit()
+        response = self.client.post(f"/erp/projects/{self.project.public_id}/sessions/{session_item.public_id}/attendance", data={
+            "roster": [str(self.person.id), str(absent.id)],
+            f"present_{self.person.id}": "yes",
+            "walk_ins": "Surprise Guest",
+            "hours": "2",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("card=schedule", response.location)
+        statuses = {row.person_id: row.status for row in SessionAttendance.query.filter_by(session_id=session_item.id)}
+        self.assertEqual(statuses[self.person.id], "Present")
+        self.assertEqual(statuses[absent.id], "Absent")
+        guest = Person.query.filter_by(first_name="Surprise", last_name="Guest").one()
+        self.assertEqual(statuses[guest.id], "Present")
+        hours = {row.person_id: float(row.duration_hours) for row in ContributionRecord.query.filter_by(project_id=self.project.id)}
+        self.assertEqual(hours, {self.person.id: 2.0, guest.id: 2.0})
 
 
 if __name__ == "__main__":

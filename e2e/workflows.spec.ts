@@ -1,79 +1,71 @@
 import { expect, test } from "@playwright/test";
-import { openDialog, openProject, openSection, signIn } from "./helpers";
+import { openCard, openProject, signIn } from "./helpers";
 
-test("project setup exposes Basics and remains usable with browser history", async ({ page }) => {
+test("event details are edited in place and the page comes back to them", async ({ page }) => {
   await signIn(page, "e2e_events");
   await openProject(page, "E2E-ICC-EVENT");
-  await page.goto(`${page.url()}/setup?step=basics`);
-  await expect(page.getByRole("heading", { name: "Project basics" })).toBeVisible();
-  await page.getByLabel("Venue").fill("Central Campus Auditorium");
-  await page.getByRole("button", { name: /save and continue/i }).click();
-  await expect(page).toHaveURL(/step=sessions/);
-  await page.goBack();
-  await expect(page.getByRole("heading", { name: "Project basics" })).toBeVisible();
-  await page.goForward();
-  await expect(page.getByRole("heading", { name: /sessions/i })).toBeVisible();
+  const card = await openCard(page, "Event details");
+  await card.getByLabel("Where").fill("Central Campus Auditorium");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/card=details/);
+  await expect(page.locator("#card-details")).toHaveAttribute("open", "");
+  await expect(page.locator("#card-details").getByLabel("Where")).toHaveValue("Central Campus Auditorium");
+  // The retired setup wizard's links still land somewhere useful.
+  await page.goto(`${page.url().split("?")[0]}/setup?step=basics`);
+  await expect(page).toHaveURL(/card=details/);
 });
 
-test("operational request completes Draft to Submitted to Approved to Completed", async ({ page }, testInfo) => {
+test("money is asked for, approved by Faculty, then marked paid", async ({ page }, testInfo) => {
+  const whatFor = `Banner printing ${testInfo.project.name} ${Date.now()}`;
   await signIn(page, "e2e_events");
-  await openProject(page, "E2E-ICC-EVENT", "Finance");
-  await openSection(page, "Operational requests");
-  const title = `Equipment request ${testInfo.project.name}`;
-  // Creating a request is a secondary action on this section: the form
-  // lives in a `:target` dialog behind the "Create a request" link so the
-  // section opens on what needs deciding.
-  await openDialog(page, "Create a request");
-  await page.getByLabel("Request type").selectOption({ label: "Equipment" });
-  await page.getByLabel("Title", { exact: true }).fill(title);
-  await page.getByRole("button", { name: "Create draft" }).click();
-  // The Tile System renders each item as one `.ds-row` rather than a table
-  // row, and keeps settled items in the same list instead of behind a
-  // disclosure -- so the row is located the same way at every stage.
-  const rowFor = (text: string) => page.locator(".ds-row").filter({ hasText: text });
-  const requestId = await rowFor(title).getAttribute("id");
-  await rowFor(title).getByRole("button", { name: /submit for approval/i }).click();
+  await openProject(page, "E2E-ICC-EVENT", "Money");
+  const money = page.locator("#card-money");
+  await money.getByLabel("What for?").fill(whatFor);
+  await money.getByLabel("How much (₹)?").fill("750");
+  await money.getByRole("button", { name: "Ask", exact: true }).click();
+  const row = page.locator("#card-money li.cv-item").filter({ hasText: whatFor });
+  await expect(row).toContainText("Asked");
+  // The person who asked is never offered the approval.
+  await expect(row.getByRole("button", { name: "Approve" })).toHaveCount(0);
 
-  // Maker/checker is a release control: the Events Head who creates and
-  // submits the request must not be offered its approval action. Since the
-  // audit's P1-04 rework the decision form opens from a "Review"
-  // disclosure, so the absence to assert is the disclosure itself -- an
-  // assertion on the hidden select inside it would pass either way.
-  await expect(rowFor(title).locator("details.ds-review")).toHaveCount(0);
-  await page.goto("/logout");
   await signIn(page, "e2e_faculty");
-  await openProject(page, "E2E-ICC-EVENT", "Finance");
-  await openSection(page, "Operational requests");
-  // A native <summary> is the disclosure's control. Its computed ARIA
-  // role differs between engines, so it is located as the element it is.
-  await rowFor(title).locator("summary.ds-review__trigger").click();
-  await rowFor(title).getByLabel(new RegExp(`Decision for ${title}`)).selectOption("Approved");
-  await rowFor(title).getByRole("button", { name: "Save" }).click();
-  await rowFor(title).getByRole("button", { name: /mark completed/i }).click();
-  // A verdict returns to the page it was taken on, and a completed request
-  // moves to the settled end of the list -- on a later page once earlier
-  // projects in the run have filled it. Follow it the way a notification
-  // does: `focus` opens whichever page holds it.
-  await page.goto(`${page.url().split("?")[0]}?tab=finance&focus=${requestId}#${requestId}`);
-  await expect(rowFor(title)).toContainText("Completed");
+  await page.goto("/queue");
+  const queued = page.locator("li.cv-item").filter({ hasText: whatFor });
+  await queued.getByRole("button", { name: /^Approve/ }).click();
+  await expect(page).toHaveURL(/\/queue$/);
+  await expect(page.locator("li.cv-item").filter({ hasText: whatFor })).toHaveCount(0);
+
+  await signIn(page, "e2e_events");
+  await openProject(page, "E2E-ICC-EVENT", "Money");
+  const approved = page.locator("#card-money li.cv-item").filter({ hasText: whatFor });
+  await expect(approved).toContainText("Approved");
+  await approved.getByRole("button", { name: "Mark paid" }).click();
+  await expect(page.locator("#card-money li.cv-item").filter({ hasText: whatFor })).toContainText("Paid");
 });
 
-test("dynamic feedback stores canonical rating and chart table stays in parity", async ({ page }, testInfo) => {
-  // This journey performs authentication, project navigation, a form POST, and
-  // a complete server-rendered reload when JavaScript is disabled. Keep every
-  // assertion, but allow the deliberately no-JS path enough time on PostgreSQL.
+test("a feedback link is answered without signing in", async ({ page, browser }, testInfo) => {
   test.slow();
-  const responseText = `Clear schedule and roles — ${testInfo.project.name}`;
-  await signIn(page, "e2e_volunteer");
-  await openProject(page, "E2E-ICC-EVENT", "People");
-  await openSection(page, "Feedback");
-  // Responding is a secondary action on this section: the list of responses
-  // is what needs moderating, so the form sits behind its own dialog.
-  await openDialog(page, "Respond");
-  await page.getByLabel(/overall rating/i).selectOption("5");
-  await page.getByLabel("What worked well?").fill(responseText);
-  await page.getByRole("button", { name: /submit feedback/i }).click();
-  await expect(page.locator(".ds-row").filter({ hasText: responseText })).toContainText("Pending");
+  const answer = `Clear schedule and roles — ${testInfo.project.name}`;
+  await signIn(page, "e2e_events");
+  await openProject(page, "E2E-ICC-EVENT", "Feedback");
+  const card = page.locator("#card-feedback");
+  if (await card.getByRole("button", { name: "Make feedback link" }).count()) {
+    await card.getByRole("button", { name: "Make feedback link" }).click();
+  }
+  const link = await page.locator("#feedback-link").inputValue();
+  expect(link).toMatch(/\/public\/feedback\/[\w-]+$/);
+
+  const visitor = await browser.newContext({ javaScriptEnabled: testInfo.project.name !== "javascript-disabled" });
+  const stranger = await visitor.newPage();
+  await stranger.goto(new URL(link).pathname);
+  await stranger.getByRole("radio", { name: "5" }).check();
+  await stranger.locator("textarea").first().fill(answer);
+  await stranger.getByRole("button", { name: "Send" }).click();
+  await expect(stranger.getByText(/thank you/i)).toBeVisible();
+  await visitor.close();
+
+  await page.reload();
+  await expect(page.locator("#card-feedback")).toContainText(answer);
 });
 
 test("public site exposes published content without operational or personal data", async ({ page }) => {

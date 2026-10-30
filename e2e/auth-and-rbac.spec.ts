@@ -5,12 +5,12 @@ test("authentication handles invalid login, valid login, logout, and session pur
   await page.goto("/login");
   await page.getByLabel(/username or email/i).fill("e2e_faculty");
   await page.getByLabel(/^password/i).fill("wrong-password");
-  await page.getByRole("button", { name: /access platform/i }).click();
-  await expect(page.getByRole("alert")).toContainText(/invalid/i);
+  await page.getByRole("button", { name: /^sign in$/i }).click();
+  await expect(page.getByRole("alert")).toContainText(/not right/i);
 
   await page.getByLabel(/username or email/i).fill("e2e_faculty");
   await page.getByLabel(/^password/i).fill(acceptancePassword);
-  await page.getByRole("button", { name: /access platform/i }).click();
+  await page.getByRole("button", { name: /^sign in$/i }).click();
   await expect(page).toHaveURL("http://127.0.0.1:5010/");
   // The phone bar carries four destinations plus Menu (audit P0-05), so
   // below 860px sign-out lives in the Menu drawer rather than as a ninth
@@ -43,18 +43,16 @@ test("scoped ICC Events Head reaches project creation but cannot see IGP", async
   // create, is never offered IGP, and never sees the IGP project.
   await signIn(page, "e2e_events");
   await page.goto("/erp/projects/new");
-  await expect(page.getByRole("heading", { name: /create a project/i })).toBeVisible();
-  const manual = page.locator("form", { has: page.locator("#manual_title") });
-  const programs = manual.getByLabel("Program");
-  await expect(programs.locator("option")).toContainText(["ICC"]);
-  await expect(programs.locator("option").filter({ hasText: "IGP" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /what is the event\?/i })).toBeVisible();
+  // An Events head can only make ICC events, so they are not even asked.
+  await expect(page.getByRole("radio", { name: "IGP" })).toHaveCount(0);
+  await expect(page.getByText(/have an igp itinerary file/i)).toHaveCount(0);
 
   const uniqueTitle = `Scoped browser project ${testInfo.project.name}`;
-  await manual.locator("#manual_title").fill(uniqueTitle);
-  await manual.locator("#manual_start").fill("2026-09-01");
-  await manual.locator("#manual_end").fill("2026-09-01");
-  await manual.getByRole("button", { name: "Create project" }).click();
-  await expect(page.getByText(uniqueTitle)).toBeVisible();
+  await page.getByLabel("Name").fill(uniqueTitle);
+  await page.getByLabel("Date", { exact: true }).fill("2026-09-01");
+  await page.getByRole("button", { name: "Create event" }).click();
+  await expect(page.locator("h1")).toHaveText(uniqueTitle);
 
   expect((await page.request.get("/api/v1/projects")).status()).toBe(200);
   const payload = await (await page.request.get("/api/v1/projects")).json();

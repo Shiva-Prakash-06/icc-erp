@@ -29,6 +29,7 @@ from app.database import db
 from app.models.erp import (
     AuditEvent,
     BudgetLine,
+    ChecklistItemStatus,
     ChecklistTemplate,
     ChecklistTemplateItem,
     DocumentRecord,
@@ -40,6 +41,7 @@ from app.models.erp import (
     Person,
     ProjectComponent,
     ProjectSession,
+    ReimbursementEntry,
     ReportSnapshot,
     RoleAssignment,
     SessionAttendance,
@@ -122,12 +124,12 @@ USER_ROSTER: list[tuple[str, str, str, str, str, str, str]] = [
     ("faculty4", "Samuel", "George", "OIA Faculty Administrator", "OIA_FACULTY_ADMINISTRATOR", "platform", "Faculty / Staff"),
     ("usc", "Ananya", "Sharma", "ICC Secretary / USC", "ICC_SECRETARY_USC", "icc", "Student"),
     ("secretary", "Rohit", "Menon", "ICC Secretary / USC", "ICC_SECRETARY_USC", "icc", "Student"),
-    ("events1", "Kavya", "Nair", "ICC Events Head", "ICC_EVENTS_HEAD", "icc:EVENTS", "Student"),
-    ("events2", "Arjun", "Pillai", "ICC Events Head", "ICC_EVENTS_HEAD", "icc:EVENTS", "Student"),
-    ("media1", "Sneha", "Iyer", "ICC Media Head", "ICC_MEDIA_HEAD", "icc:MEDIA", "Student"),
-    ("media2", "Nikhil", "Verma", "ICC Media Head", "ICC_MEDIA_HEAD", "icc:MEDIA", "Student"),
-    ("cultural1", "Divya", "Reddy", "ICC Culturals Head", "ICC_CULTURALS_HEAD", "icc:CULTURALS", "Student"),
-    ("cultural2", "Aditya", "Kulkarni", "ICC Culturals Head", "ICC_CULTURALS_HEAD", "icc:CULTURALS", "Student"),
+    ("events1", "Kavya", "Nair", "ICC Events Head", "ICC_EVENTS_HEAD", "icc", "Student"),
+    ("events2", "Arjun", "Pillai", "ICC Events Head", "ICC_EVENTS_HEAD", "icc", "Student"),
+    ("media1", "Sneha", "Iyer", "ICC Media Head", "ICC_MEDIA_HEAD", "icc", "Student"),
+    ("media2", "Nikhil", "Verma", "ICC Media Head", "ICC_MEDIA_HEAD", "icc", "Student"),
+    ("cultural1", "Divya", "Reddy", "ICC Culturals Head", "ICC_CULTURALS_HEAD", "icc", "Student"),
+    ("cultural2", "Aditya", "Kulkarni", "ICC Culturals Head", "ICC_CULTURALS_HEAD", "icc", "Student"),
     ("igp1", "Priya", "Desai", "IGP Head", "IGP_HEAD", "igp", "Student"),
     ("igp2", "Vikram", "Shetty", "IGP Head", "IGP_HEAD", "igp", "Student"),
 ]
@@ -324,28 +326,9 @@ def _coffee_meet_people(project, campus, wings, users, components, sessions):
             ends_on=project.end_date + timedelta(days=30),
         ))
 
-    # The Media and Culturals heads own a component of an event that sits in the
-    # Events wing, so their standing wing-scoped assignment cannot reach it --
-    # it would grant them view access through the team row above and nothing
-    # more. A second, project-scoped assignment is exactly what RoleAssignment's
-    # project_id is for: a delegated stake in one cross-wing event, granted by
-    # the Events head, and expiring with the project rather than the term.
-    for username in ("media1", "media2", "cultural1", "cultural2"):
-        db.session.add(RoleAssignment(
-            user_id=users[username].id,
-            role_code=RoleAssignment.query.filter_by(
-                user_id=users[username].id, is_active=True,
-            ).first().role_code,
-            project_id=project.id,
-            campus_id=project.campus_id,
-            operating_unit_id=project.operating_unit_id,
-            academic_year_id=project.academic_year_id,
-            is_active=True,
-            starts_on=project.start_date - timedelta(days=30),
-            ends_on=project.end_date + timedelta(days=45),
-            delegated_by_id=users["events1"].id,
-            assignment_reason=f"Owns a {project.title} workstream for their wing",
-        ))
+    # The Media and Culturals heads own no events. They reach this one through
+    # the items handed to their teams below (publicity, showcase) -- see
+    # app/services/teams.py -- not through a second, project-scoped grant.
 
     # Volunteers without sign-in accounts -- the roster a head actually manages.
     volunteers = []
@@ -447,6 +430,10 @@ def _coffee_meet_people(project, campus, wings, users, components, sessions):
     return volunteers, attendees
 
 
+#: Which team a Coffee Meet workstream's tasks are handed to.
+COMPONENT_TEAMS = {"PUBLICITY": "media", "SHOWCASE": "culturals"}
+
+
 def _coffee_meet_operations(project, components, users, volunteers, attendees):
     """Tasks, documents, budget, requests, feedback, risk and reporting."""
     tasks = {}
@@ -461,6 +448,7 @@ def _coffee_meet_operations(project, components, users, volunteers, attendees):
         task = WorkTask(
             project_id=project.id, component_id=components[comp].id,
             title=title, status=status, priority="High" if mandatory else "Medium",
+            assigned_team=COMPONENT_TEAMS.get(comp),
             owner_person_id=owner_user.person_id,
             accountable_person_id=users["events1"].person_id,
             mandatory_for_closure=mandatory,
@@ -805,6 +793,18 @@ def _summer_school_people(project, cohort, campus, users, sessions):
 
 
 def _summer_school_operations(project, partner, users, participants):
+    # ICC's Media and Culturals heads contribute to IGP programmes too: these
+    # two items are how the Summer School appears on their home screens.
+    for title, team, day_offset in (
+        ("Photograph the welcome dinner and share the album", "media", -30),
+        ("Plan a cultural evening with the visiting students", "culturals", -15),
+    ):
+        db.session.add(WorkTask(
+            project_id=project.id, title=title, status="Not Started", priority="Medium",
+            assigned_team=team, accountable_person_id=users["igp1"].person_id,
+            due_at=to_utc(datetime.combine(SUMMER_END + timedelta(days=day_offset), datetime.min.time()).replace(hour=17)),
+            description=f"{title} for {project.title}.",
+        ))
     for title, status, owner_user, mandatory, day_offset in (
         ("Confirm partner MoU addendum for 2026 intake", "Completed", users["igp1"], True, -120),
         ("Collect visa and insurance documents from all participants", "Completed", users["igp2"], True, -45),
@@ -1090,6 +1090,42 @@ def _attach_checklists(coffee, summer, users):
 # Entry point
 # --------------------------------------------------------------------------
 
+def _match_the_simplified_workflow(users):
+    """The story above is told in the old workflow's words (submitted tasks,
+    budget lines, requests, pending logs). Bring it into today's: the same
+    mapping migration e5b8d2f40a63 applies to a real database, so the beta
+    shows what an upgraded install would."""
+    status_map = {"Draft": "Active", "Pending Approval": "Active", "Planned": "Active", "Closing": "Active"}
+    for project in Project.query.all():
+        project.status = status_map.get(project.status, project.status)
+    for task in WorkTask.query.filter_by(status="Submitted"):
+        task.status = "Completed"
+    for item in ChecklistItemStatus.query.filter_by(status="Submitted"):
+        item.status = "Completed"
+    for record in ContributionRecord.query.filter_by(approval_status="Pending"):
+        record.approval_status = "Approved"
+    for log in BuddyLog.query.filter_by(status="Pending"):
+        log.status = "Approved"
+    for response in FeedbackResponse.query.filter_by(moderation_status="Pending"):
+        response.moderation_status = "Approved"
+    budget_status = {"Approved": "Approved", "Rejected": "Not approved"}
+    for line in BudgetLine.query.all():
+        db.session.add(ReimbursementEntry(
+            project_id=line.project_id, date=line.project.start_date, party_name="",
+            amount=line.approved_amount if line.status == "Approved" and line.approved_amount is not None else line.estimated_amount,
+            particular=" · ".join(part for part in (line.category, line.description) if part),
+            status=budget_status.get(line.status, "Asked"), source_kind="budget_line", source_id=line.id,
+            created_by_id=users["events1"].id if line.project.program_type.name == "ICC" else users["igp1"].id,
+        ))
+    request_status = {"Approved": "Approved", "Completed": "Paid", "Rejected": "Not approved", "Cancelled": "Not approved"}
+    for request in OperationalRequest.query.all():
+        db.session.add(ReimbursementEntry(
+            project_id=request.project_id, date=request.project.start_date, party_name="",
+            amount=request.amount or 0, particular=request.title, status=request_status.get(request.status, "Asked"),
+            created_by_id=request.created_by_id, source_kind="request", source_id=request.id,
+        ))
+
+
 def seed_beta(*, reset: bool = True) -> dict[str, object]:
     """Reset the database and build the complete beta dataset."""
     summary: dict[str, object] = {}
@@ -1120,6 +1156,8 @@ def seed_beta(*, reset: bool = True) -> dict[str, object]:
 
     # instantiate_checklist commits internally, so it runs after the main commit.
     _attach_checklists(coffee, summer, users)
+    db.session.commit()
+    _match_the_simplified_workflow(users)
     db.session.commit()
 
     summary.update({

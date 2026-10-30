@@ -34,3 +34,6 @@ body > footer { flex: 0 0 auto; margin-top: auto; }
   .public-container .aurora-card__header { padding: var(--space-4); }
   .public-container .content-grid { row-gap: var(--space-4); }
 }
+
+/* The feedback link page: one short form, so one comfortable column. */
+.public-narrow { max-width: 640px; }

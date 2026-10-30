@@ -1,12 +1,18 @@
-# Home Override
+# My work
 
 Inherits `MASTER.md`.
 
-- The page answers one question: what is waiting on me. Greeting, a one-line count, and a single primary action, then the counters, then the queue.
-- Counters are `.kpi-card` tiles in an auto-fit grid. Each one with a real destination is an `<a>` to the filtered list behind it; the rest are plain `<div>`s. Never fabricate a filter the server does not offer just to make a tile clickable.
-- The decision queue is a real `<table>` — one `<tr>` per record, with a visually hidden header row — laid out as stacked rows. Table semantics matter: the queue is the app's primary list and assistive tech, and the e2e row matcher, both depend on them.
-- Each row carries the approve action inline (a `POST` to the entity's existing `.../decision` endpoint with `status`, `version` and a relative `next`), a send-back link to the record, and an open-record link whose accessible name is `Review` and whose `href` ends in the record's anchor.
-- Approving must return the approver to where they were. Send-back must not, because it needs a reason.
-- Non-approvers get their own open tasks and requests in the same list, not three collapsed disclosures at the foot of the page.
-- The aside holds what is next (upcoming sessions, with a roll-call action where permitted), where you left off, and IGP indicators.
-- Charts always include a text insight and an accessible data table or disclosure.
+- The page answers one question: what do I have to do? One sentence first —
+  "You have 3 things to do today, and 1 needs your OK."
+- Then, each only when it has something in it: **Needs your OK** (Faculty),
+  **To do** (Today / This week / Later, only the first open), **Today's
+  event** (a big Take attendance button) and **Your events** (three at most).
+- Ticking is one press on the circle and returns to My work. Approving is one
+  press; "Not now" opens the item, because it needs a reason.
+- An item about a poster, photos, a report or a bill shows **Add file**:
+  picking the file sends it and ticks the item.
+- Whose items appear: yours by name; your team's; and on the kind of event
+  your team runs, items nobody was named for. Faculty sees only items
+  handed to Faculty.
+- Volunteers get **My activities** instead: each event they are on, when and
+  where, their job and their buddy, past ones folded into one line.

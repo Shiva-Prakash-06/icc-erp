@@ -231,6 +231,9 @@ class WorkTask(PublicIdMixin, TimestampMixin, db.Model):
     evidence_reference = db.Column(db.String(500), nullable=True)
     decision_comment = db.Column(db.Text, nullable=True)
     mandatory_for_closure = db.Column(db.Boolean, nullable=False, default=False)
+    # A team key from app/services/teams.py when the item is for a team
+    # ("media", "culturals", ...) rather than one named person.
+    assigned_team = db.Column(db.String(20), nullable=True, index=True)
     waived = db.Column(db.Boolean, nullable=False, default=False)
     waiver_reason = db.Column(db.Text, nullable=True)
     waived_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
@@ -292,6 +295,7 @@ class ChecklistItemStatus(PublicIdMixin, TimestampMixin, db.Model):
     template_item_id = db.Column(db.Integer, db.ForeignKey("checklist_template_items.id"), nullable=False)
     owner_person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     external_owner = db.Column(db.String(255), nullable=True)
+    assigned_team = db.Column(db.String(20), nullable=True, index=True)
     due_at = db.Column(db.DateTime(timezone=True), nullable=True)
     status = db.Column(db.String(30), nullable=False, default="Not Started")
     evidence_reference = db.Column(db.String(500), nullable=True)
@@ -567,12 +571,14 @@ class ReportSnapshot(PublicIdMixin, TimestampMixin, db.Model):
 
 
 class ReimbursementEntry(PublicIdMixin, TimestampMixin, db.Model):
-    """A lightweight, project-scoped expense line.
+    """One line on an event's money list: what for, how much, paid to whom.
 
-    Deliberately not a governance/payment-ledger workflow: `status` is free
-    text carried through from import or set by the coordinator, with no
-    approval routing. `S. No` is never stored -- ordering is derived from
-    `date` then `id` at display/export time.
+    This is the single place money is entered. A line moves
+    Asked -> Approved -> Paid (or Not approved); only Faculty approves, from
+    their home screen. `party_name` ("Paid to") may be an empty string.
+    `S. No` is never stored -- ordering is derived from `date` then `id` at
+    display/export time. `source_kind`/`source_id` record a line carried
+    over from the retired budget-line and request lists.
     """
     __tablename__ = "reimbursement_entries"
 
@@ -584,8 +590,14 @@ class ReimbursementEntry(PublicIdMixin, TimestampMixin, db.Model):
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     currency = db.Column(db.String(3), nullable=False, default="INR")
     particular = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(30), nullable=False, default="Pending")
+    status = db.Column(db.String(30), nullable=False, default="Asked")
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    decision_comment = db.Column(db.Text, nullable=True)
+    bill_document_id = db.Column(db.Integer, db.ForeignKey("document_records.id", ondelete="SET NULL"), nullable=True)
+    source_kind = db.Column(db.String(30), nullable=True)
+    source_id = db.Column(db.Integer, nullable=True)
     source_import_row_id = db.Column(db.Integer, db.ForeignKey("import_rows.id", ondelete="SET NULL"), nullable=True)
 
     project = db.relationship("Project", backref=db.backref("reimbursement_entries", cascade="all, delete-orphan"))

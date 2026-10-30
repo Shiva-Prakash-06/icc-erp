@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qsl, urlencode, urlparse
 
@@ -10,31 +10,23 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from app.database import db
 from app.models.erp import (
     AuditEvent,
-    BudgetLine,
-    ChecklistInstance,
-    ChecklistItemStatus,
-    ChecklistTemplate,
     DocumentRecord,
-    FeedbackForm,
-    FeedbackResponse,
     ImportBatch,
-    OperatingUnit,
-    OperationalRequest,
     Person,
     ProjectSession,
-    ReportSnapshot,
     SessionAttendance,
     TeamAssignment,
-    Wing,
-    WorkTask,
 )
-from app.models.production import AttendanceChangeEvent, ContributionRecord, Notification, NotificationPreference, ProjectRisk, RecruitmentApplication
-from app.models.project import AcademicYear, BuddyAssignment, BuddyLog, Campus, ProgramType, Project
+from app.models.production import ContributionRecord, Notification, NotificationPreference, RecruitmentApplication
+from app.models.project import BuddyAssignment, BuddyLog, Project
 from app.models.user import User
 from app.services.audit import record_audit, record_sensitive_access
 from app.services.authorization import can_view_project, has_any_permission, has_permission
+from app.services.event_page import build_event_page
+from app.services.todo import add_todo
+from app.services.teams import can_contribute
 from app.services.buddy import validate_buddy_assignment
-from app.services.drive import DriveStorageError, extract_drive_id, refresh_document_metadata
+from app.services.drive import DriveStorageError, extract_drive_id
 from app.services.imports import (
     STANDARD_IMPORTS,
     MissingSourceError,
@@ -49,16 +41,16 @@ from app.services.itinerary import (
     create_igp_project_from_itinerary,
     stage_itinerary_import,
 )
-from app.services.paging import PAGE_SIZE, page_of, paginate
 from app.services.project_quickcreate import create_minimal_project, creatable_program_types
-from app.services.scope import visible_projects
-from app.services.analytics import division_dashboard, division_dashboards, event_dashboard, row_state
-from app.services.hierarchy import DIVISIONS, FILTER_SEGMENTS, STATE_LABELS, campus_tiles, division_tiles, event_cards, event_state, filter_counts, matches_filter
+from app.services.stage import CANCELLED, FINISHED, HAPPENING, NEEDS_FINISHING, STAGE_LABELS, WAITING, event_stage
 from app.services.timeutil import to_utc
 from app.services.buddy_import import BuddyImportError, commit_buddy_batch, stage_buddy_import
 from app.models.erp import ReimbursementEntry
 from app.services.reimbursements import (
+    MONEY_ASKED,
+    MoneyDecisionError,
     ReimbursementImportError,
+    change_money_status,
     commit_reimbursement_batch,
     export_reimbursements,
     stage_reimbursement_import,
@@ -66,27 +58,14 @@ from app.services.reimbursements import (
 from app.services.icc_import import (
     commit_icc_attendance_batch,
     stage_icc_attendance_import,
-    stage_icc_event_folder_import,
 )
 from app.services.upload_sessions import UploadSessionError, upload_file_single_shot
-from app.services.documents import compute_availability
 from app.services.report_assembly import ReportIncompleteError, assemble_complete_report, preflight_report
-from app.services.lifecycle import TRANSITIONS, closure_blockers, transition_project
-from app.services.people import create_and_enroll_participant
-from app.services.vocabulary import resolve_vocabulary_value, vocabulary_options
+from app.services.lifecycle import transition_project
+from app.services.people import enrol
+from app.services.vocabulary import resolve_vocabulary_value
 from app.services.publication import decide_project_publication, submit_project_publication
-from app.services.operations import (
-    change_checklist_status,
-    change_task_status,
-    decide_budget_line,
-    decide_buddy_log,
-    decide_contribution,
-    decide_document,
-    decide_operational_request,
-    instantiate_checklist,
-    mark_attendance,
-    moderate_feedback,
-)
+from app.services.operations import decide_recruitment, mark_attendance
 from app.services.reporting import compile_project_snapshot
 
 
@@ -100,101 +79,38 @@ def hub():
     return redirect(url_for("dashboard.index"))
 
 
+# The campus tiles, the ICC/IGP division screens and the analytics
+# dashboards are gone: an event is found on the Events list (filtered by
+# campus for anyone who can see more than one), and the year's numbers are
+# on Reports. The old addresses still work so bookmarks do not break.
+
+
 @erp_bp.get("/campuses")
 def campuses():
-    """Scoped, read-only campus list derived from projects the caller can
-    already see -- not a restoration of the deleted legacy campus-hierarchy
-    analytics module. See PLAN.md "ICC campus definition" finding."""
-    campus_rows = {}
-    for project in visible_projects(g.user):
-        row = campus_rows.setdefault(project.campus_id, {"campus": project.campus, "project_count": 0, "active_count": 0})
-        row["project_count"] += 1
-        if project.status in {"Planned", "Active", "Closing"}:
-            row["active_count"] += 1
-    rows = sorted(campus_rows.values(), key=lambda row: row["campus"].name)
-    return render_template("erp/campuses.html", rows=rows)
+    return redirect(url_for("erp.projects"))
 
 
 @erp_bp.get("/campuses/<string:public_id>")
 def campus_detail(public_id):
-    """Level two of the drill-down: the campus's two divisions.
-
-    404 on a campus outside the roster's open set rather than 403 -- a
-    campus that is not open yet is not a permission failure, and answering
-    403 would confirm it exists as a record when it does not. A campus that
-    IS open but happens to hold nothing still renders: the campus is live,
-    it is simply empty, and the division tiles say so.
-    """
-    campus = Campus.query.filter_by(public_id=public_id).first_or_404()
-    tile = _open_campus_tile(public_id)
-    if tile is None:
-        abort(404)
-    return render_template(
-        "erp/campus_detail.html",
-        campus=campus,
-        campus_label=tile["name"],
-        divisions=division_tiles(g.user, campus),
-    )
-
-
-def _open_campus_tile(public_id):
-    for tile in campus_tiles(g.user):
-        if tile["open"] and tile["public_id"] == public_id:
-            return tile
-    return None
+    return redirect(url_for("erp.projects", campus=public_id))
 
 
 @erp_bp.get("/campuses/<string:public_id>/<string:division>")
 def division(public_id, division):
-    """Level three: every event in one division of one campus, filterable.
-
-    The four segment counts describe the whole division and are computed
-    before the filter is applied, so a segment reading "Upcoming 5" is true
-    before you click it. Filtering is this same route with a query argument,
-    which keeps counts and cards drawn from one query.
-    """
-    slug = (division or "").lower()
-    if slug not in DIVISIONS:
-        abort(404)
-    campus = Campus.query.filter_by(public_id=public_id).first_or_404()
-    tile = _open_campus_tile(public_id)
-    if tile is None:
-        abort(404)
-    entry = DIVISIONS[slug]
-    segment = (request.args.get("state") or "all").lower()
-    if segment not in FILTER_SEGMENTS:
-        segment = "all"
-    cards, counts = event_cards(g.user, campus, entry, segment)
-    return render_template(
-        "erp/division.html",
-        campus=campus,
-        campus_label=tile["name"],
-        division=entry,
-        cards=cards,
-        counts=counts,
-        segment=segment,
-        segments=[(key, key.title() if key != "all" else "All") for key in FILTER_SEGMENTS],
-        can_create=has_any_permission(g.user, "manage_projects"),
-    )
+    return redirect(url_for("erp.projects", campus=public_id))
 
 
 @erp_bp.get("/analytics")
 def analytics():
-    """Two dashboard tiles and nothing else."""
-    return render_template("erp/analytics.html", dashboards=division_dashboards(g.user))
+    from app.services.navigation import REPORT_TEAMS
+    from app.services.teams import user_teams
+
+    return redirect(url_for("dashboard.reports") if user_teams(g.user) & REPORT_TEAMS else url_for("erp.projects"))
 
 
 @erp_bp.get("/analytics/<string:division>")
 def analytics_division(division):
-    slug = (division or "").lower()
-    if slug not in DIVISIONS:
-        abort(404)
-    entry = DIVISIONS[slug]
-    return render_template(
-        "erp/analytics_division.html",
-        division=entry,
-        dashboard=division_dashboard(g.user, entry),
-    )
+    return analytics()
 
 
 @erp_bp.get("/oversight")
@@ -210,92 +126,68 @@ def oversight():
     return redirect(url_for("dashboard.queue"))
 
 
-@erp_bp.route("/projects", methods=["GET", "POST"])
+@erp_bp.get("/projects")
 def projects():
-    if request.method == "POST":
-        if not has_any_permission(g.user, "manage_projects"):
-            abort(403)
-        required = ["title", "campus_public_id", "program_type_public_id", "academic_year_public_id", "start_date", "end_date"]
-        if any(not request.form.get(field) for field in required):
-            flash("Complete every required project field.", "danger")
-        else:
-            start_date = datetime.strptime(request.form["start_date"], "%Y-%m-%d").date()
-            end_date = datetime.strptime(request.form["end_date"], "%Y-%m-%d").date()
-            if end_date < start_date:
-                flash("End date cannot precede start date.", "danger")
-            else:
-                program = ProgramType.query.filter_by(public_id=request.form["program_type_public_id"]).first_or_404()
-                campus = Campus.query.filter_by(public_id=request.form["campus_public_id"]).first_or_404()
-                academic_year = AcademicYear.query.filter_by(public_id=request.form["academic_year_public_id"]).first_or_404()
-                unit = OperatingUnit.query.filter_by(code=program.name.upper()).first()
-                wing = Wing.query.filter_by(public_id=request.form.get("wing_public_id")).first() if request.form.get("wing_public_id") else None
-                if not unit or (wing and wing.operating_unit_id != unit.id):
-                    flash("Choose a valid operating unit and wing combination.", "danger")
-                    return redirect(url_for("erp.projects"))
-                try:
-                    category = resolve_vocabulary_value(request.form.get("category", "Operational"), request.form.get("category_other"), domain="project_category")
-                    project_type = resolve_vocabulary_value(request.form.get("project_type", "ICC event"), request.form.get("project_type_other"), domain="project_type")
-                except ValueError as error:
-                    flash(str(error), "danger")
-                    return redirect(url_for("erp.projects"))
-                project = Project(
-                    title=request.form["title"].strip(),
-                    description=request.form.get("description", "").strip(),
-                    project_type=project_type,
-                    category=category,
-                    campus_id=campus.id,
-                    program_type_id=program.id,
-                    academic_year_id=academic_year.id,
-                    operating_unit_id=unit.id,
-                    wing_id=getattr(wing, "id", None),
-                    status="Draft",
-                    start_date=start_date,
-                    end_date=end_date,
-                    venue=request.form.get("venue", "").strip(),
-                    target_audience=request.form.get("target_audience", "").strip(),
-                )
-                if not has_permission(g.user, "manage_projects", project):
-                    abort(403)
-                db.session.add(project)
-                db.session.flush()
-                project.code = f"{program.name.upper()}-{start_date.year}-{campus.code or 'CAMP'}-{project.id:04d}"
-                code = project.code
-                record_audit("project.create", project, after={"code": code, "title": project.title})
-                db.session.commit()
-                flash(f"Project {code} created in Draft. Continue setting it up below.", "success")
-                return redirect(url_for("erp.project_setup", public_id=project.public_id, step="sessions"))
-    return _render_projects(show_create=request.args.get("new") == "1")
+    return _render_projects()
 
 
 @erp_bp.get("/projects/new")
 def new_project():
     if not has_any_permission(g.user, "manage_projects"):
         abort(403)
+    program_types = creatable_program_types(g.user)
+    past_events = [
+        project for project in Project.query.order_by(Project.start_date.desc()).limit(60).all()
+        if has_permission(g.user, "manage_projects", project)
+    ][:20]
     return render_template(
         "erp/create_project.html",
-        program_types=creatable_program_types(g.user),
+        program_types=program_types,
+        past_events=past_events,
+        today=date.today(),
     )
+
+
+def _form_time(field):
+    try:
+        return datetime.strptime((request.form.get(field) or "").strip(), "%H:%M").time()
+    except ValueError:
+        return None
 
 
 @erp_bp.post("/projects/quick-create")
 def quick_create_project():
+    """New event: a name and a date. A time and a place are optional and
+    make the main session; "Start from a past event" copies its to-do list."""
     if not has_any_permission(g.user, "manage_projects"):
         abort(403)
+    program_types = creatable_program_types(g.user)
+    program_name = request.form.get("program_type_name") or (program_types[0].name if len(program_types) == 1 else None)
+    start_date = _form_date("start_date")
+    end_date = _form_date("end_date") or start_date
+    copy_from = None
+    if request.form.get("copy_from"):
+        copy_from = Project.query.filter_by(public_id=request.form["copy_from"]).first()
+        if copy_from is None or not has_permission(g.user, "manage_projects", copy_from):
+            copy_from = None
+    if start_date is None:
+        flash("Pick the date of the event.", "danger")
+        return redirect(url_for("erp.new_project"))
     try:
-        start_date = datetime.strptime(request.form["start_date"], "%Y-%m-%d").date()
-        end_date = datetime.strptime(request.form["end_date"], "%Y-%m-%d").date()
         project = create_minimal_project(
-            program_type_name=request.form.get("program_type_name"),
+            program_type_name=program_name or (copy_from.program_type.name if copy_from else None),
             title=request.form.get("title"), start_date=start_date, end_date=end_date,
             actor=g.user, venue=request.form.get("venue"), target_audience=request.form.get("target_audience"),
+            start_time=_form_time("start_time"), end_time=_form_time("end_time"),
+            copy_from=copy_from, standard_todos=copy_from is None,
         )
     except (ValueError, KeyError) as error:
         flash(str(error), "danger")
         return redirect(url_for("erp.new_project"))
     record_audit("project.create", project, after={"code": project.code, "title": project.title, "source": "quick_create"})
     db.session.commit()
-    flash(f"Project {project.code} created.", "success")
-    return redirect(url_for("erp.project_detail", public_id=project.public_id))
+    flash(f"{project.title} is ready \u2713 Here is its to-do list.", "success")
+    return redirect(url_for("erp.project_detail", public_id=project.public_id, card="todo"))
 
 
 @erp_bp.post("/projects/quick-create-from-itinerary")
@@ -304,126 +196,77 @@ def quick_create_from_itinerary():
         abort(403)
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose an itinerary file to upload.", "danger")
+        flash("Choose the itinerary file first.", "danger")
         return redirect(url_for("erp.new_project"))
     try:
         project, batch = create_igp_project_from_itinerary(uploaded_file, g.user)
     except (ItineraryParseError, ValueError) as error:
-        flash(f"Could not create the project from this itinerary: {error}", "danger")
+        flash(f"No event was made from that itinerary: {error}", "danger")
         return redirect(url_for("erp.new_project"))
-    flash(f"Project {project.code} created with {batch.committed_count} itinerary sessions.", "success")
+    flash(f"{project.title} is ready ✓ {batch.committed_count} times were added from the itinerary.", "success")
     return redirect(url_for("erp.project_detail", public_id=project.public_id))
 
 
-@erp_bp.post("/projects/quick-create-with-documents")
-def quick_create_with_documents():
-    if not has_any_permission(g.user, "manage_projects"):
-        abort(403)
-    uploaded_files = [f for f in request.files.getlist("source_files") if f and f.filename]
-    try:
-        start_date = datetime.strptime(request.form["start_date"], "%Y-%m-%d").date()
-        end_date = datetime.strptime(request.form["end_date"], "%Y-%m-%d").date()
-        project = create_minimal_project(
-            program_type_name=request.form.get("program_type_name"),
-            title=request.form.get("title"), start_date=start_date, end_date=end_date, actor=g.user,
-        )
-    except (ValueError, KeyError) as error:
-        flash(str(error), "danger")
-        return redirect(url_for("erp.new_project"))
-    attached = 0
-    for uploaded_file in uploaded_files:
-        try:
-            upload_file_single_shot(project, uploaded_file.filename, uploaded_file.read(), g.user)
-            attached += 1
-        except UploadSessionError as error:
-            flash(f"{uploaded_file.filename}: {error}", "danger")
-    flash(f"Project {project.code} created with {attached} document(s) uploaded.", "success")
-    return redirect(url_for("erp.project_detail", public_id=project.public_id))
+#: Events shown before "Show all".
+EVENTS_SHOWN = 10
+#: The old state filter, read as the new one so its links still work.
+_OLD_STATE = {"upcoming": "now", "active": "now", "overdue": "now", "complete": "finished", "all": "all"}
 
 
-def _render_projects(*, show_create=False):
-    visible = [project for project in Project.query.order_by(Project.start_date.desc(), Project.id.desc()).all() if can_view_project(g.user, project)]
-    # Counted before any filter is applied: a facet reading "Upcoming 5"
-    # has to be true before you click it, not after.
-    visible_unfiltered = list(visible)
+def _render_projects():
+    """Events: what is on now and next by default, finished ones a press
+    away. A search box, and a campus picker for anyone who can see more than
+    one campus. Media and Culturals heads see the events their team has
+    items on."""
+    found = {}
+    for project in Project.query.order_by(Project.start_date.desc(), Project.id.desc()).all():
+        if can_view_project(g.user, project) or can_contribute(g.user, project):
+            found[project.id] = project
+    projects = list(found.values())
+
+    campuses = sorted({project.campus for project in projects if project.campus}, key=lambda campus: campus.name)
+    campus_filter = (request.args.get("campus") or "").strip()
+    if campus_filter and len(campuses) > 1:
+        projects = [project for project in projects if project.campus and project.campus.public_id == campus_filter]
+    else:
+        campus_filter = ""
+
     search_query = (request.args.get("q") or "").strip()
     if search_query:
         needle = search_query.lower()
-        visible = [
-            project for project in visible
-            if needle in (project.title or "").lower() or needle in (project.code or "").lower()
-        ]
-    # Free-text search alone meant finding the one project you own required
-    # reading every card. Both filters are query params on the existing
-    # route, so the frozen URL map is untouched.
-    #
-    # Two filters, because there are two questions. `status` matches the
-    # stored column exactly and is what a facet chip sets. `state` matches
-    # the four reserved Tile System states through `matches_filter`, which
-    # is what every KPI and counter is actually counting.
-    #
-    # Audit finding P0-03: the analytics tile "Active programmes 1 of 1"
-    # linked to `?status=Active` and landed on "0 in scope". The programme
-    # was `Closing`, which `event_state` reports as active (it is still in
-    # flight) while `status == "Active"` excludes it. A counted record must
-    # appear in the list its own counter opens, so a counter now links to
-    # `state` and never to `status`.
-    status_filter = (request.args.get("status") or "").strip()
-    state_filter = (request.args.get("state") or "").strip().lower()
-    if status_filter and status_filter != "All":
-        visible = [project for project in visible if project.status == status_filter]
-    if state_filter and state_filter != "all":
-        visible = [project for project in visible if matches_filter(event_state(project), state_filter)]
-    status_facets = ["All", "Draft", "Planned", "Active", "Closing", "Completed"]
-    state_facets = [
-        {"key": key, "label": "All" if key == "all" else STATE_LABELS[key]}
-        for key in FILTER_SEGMENTS
-    ]
+        projects = [p for p in projects if needle in (p.title or "").lower() or needle in (p.code or "").lower()]
 
-    campuses = Campus.query.order_by(Campus.name).all()
-    programs = ProgramType.query.order_by(ProgramType.name).all()
-    academic_years = AcademicYear.query.order_by(AcademicYear.start_date.desc()).all()
-    wings = Wing.query.order_by(Wing.name).all()
+    today = date.today()
+    stages = {project.id: event_stage(project, today) for project in projects}
+    counts = {
+        "now": sum(stage not in {FINISHED, CANCELLED} for stage in stages.values()),
+        "finished": sum(stage == FINISHED for stage in stages.values()),
+        "all": len(projects),
+    }
+    show = (request.args.get("show") or _OLD_STATE.get((request.args.get("state") or "").lower()) or "now").lower()
+    if show not in counts:
+        show = "now"
+    if show == "now":
+        projects = sorted(
+            (p for p in projects if stages[p.id] not in {FINISHED, CANCELLED}),
+            key=lambda p: (stages[p.id] not in {HAPPENING, NEEDS_FINISHING, WAITING}, p.start_date or date.max),
+        )
+    elif show == "finished":
+        projects = [p for p in projects if stages[p.id] == FINISHED]
 
-    # Do not offer a value that cannot participate in at least one project
-    # candidate authorized by the caller's active assignments.
-    allowed_campus_ids, allowed_program_ids, allowed_year_ids, allowed_wing_ids = set(), set(), set(), set()
-    for campus in campuses:
-        for program in programs:
-            unit = OperatingUnit.query.filter_by(code=program.name.upper()).first()
-            if not unit:
-                continue
-            program_wings = [None] + [wing for wing in wings if wing.operating_unit_id == unit.id]
-            for academic_year in academic_years:
-                for wing in program_wings:
-                    candidate = Project(
-                        campus_id=campus.id, program_type_id=program.id,
-                        operating_unit_id=unit.id, wing_id=getattr(wing, "id", None),
-                        academic_year_id=academic_year.id,
-                    )
-                    if has_permission(g.user, "manage_projects", candidate):
-                        allowed_campus_ids.add(campus.id)
-                        allowed_program_ids.add(program.id)
-                        allowed_year_ids.add(academic_year.id)
-                        if wing:
-                            allowed_wing_ids.add(wing.id)
+    show_all = bool(request.args.get("all")) or bool(search_query)
     return render_template(
         "erp/projects.html",
-        projects=visible,
-        campuses=[item for item in campuses if item.id in allowed_campus_ids],
-        program_types=[item for item in programs if item.id in allowed_program_ids],
-        academic_years=[item for item in academic_years if item.id in allowed_year_ids],
-        wings=[item for item in wings if item.id in allowed_wing_ids],
-        can_create=has_any_permission(g.user, "manage_projects"),
-        show_create=show_create,
+        projects=projects if show_all else projects[:EVENTS_SHOWN],
+        total=len(projects),
+        stages=stages,
+        stage_labels=STAGE_LABELS,
+        show=show,
+        counts=counts,
         search_query=search_query,
-        status_filter=status_filter or "All",
-        status_facets=status_facets,
-        state_filter=state_filter or "all",
-        state_facets=state_facets,
-        state_counts=filter_counts(visible_unfiltered),
-        project_category_options=vocabulary_options("project_category"),
-        project_type_options=vocabulary_options("project_type"),
+        campuses=campuses if len(campuses) > 1 else [],
+        campus_filter=campus_filter,
+        can_create=has_any_permission(g.user, "manage_projects"),
     )
 
 
@@ -434,319 +277,27 @@ def _project(public_id):
     return project
 
 
-# A record is "settled" once nobody needs to act on it further -- used to
-# split each operational section into an always-visible "needs action" list
-# and a same-shaped list behind a "show settled" disclosure, so a deep link
-# from the home decision queue always lands on visible content. See
-# in-the-operation-checklists-crystalline-dongarra.md Step 8.
-SETTLED_WORK_STATUSES = frozenset({"Approved", "Rejected", "Waived", "Completed", "Cancelled"})
-
-# Four work tabs and Analytics -- the Tile System's ceiling. There is no
-# Overview: it restated facts that live one tab away, and the questions it
-# was really there to answer (how much is committed, what is late, who is
-# unassigned) need aggregation, which is what Analytics does.
-_PROJECT_TABS = ("logistics", "finance", "documents", "people", "analytics")
-_DEFAULT_PROJECT_TAB = "logistics"
-
-# Every tab name this workspace has ever had resolves to one of the five, so
-# bookmarks, emailed links and the notification rows written before the
-# migration all still land somewhere real. "operations" predates even the
-# seven-tab set -- see in-the-operation-checklists-crystalline-dongarra.md
-# Step 8. Query arguments are not part of the frozen URL map, so re-pointing
-# them is presentation, not a route change.
-_PROJECT_TAB_ALIASES = {
-    "operations": "logistics",
-    "delivery": "logistics",
-    "overview": "logistics",
-    "contributions": "people",
-    "resources": "documents",
-    "insights": "analytics",
-}
-
-PROJECT_TAB_LABELS = {
-    "logistics": "Logistics",
-    "finance": "Finance",
-    "documents": "Documents",
-    "people": "People",
-    "analytics": "Analytics",
-}
-
-
-# ── Sections inside a tab ───────────────────────────────────────────────
-#
-# A tab used to render every one of its lists at once: Logistics stacked the
-# fact strip, the tasks, every checklist and the schedule into a single
-# scrolling column, and People stacked five more. That is the information
-# overload, and the scrolling it needed is what broke the one-screen rule.
-#
-# A tab is now a strip of section tiles and exactly one open section. The
-# tile carries the section's name, its total and how many items in it still
-# need somebody -- so the counts that used to justify scrolling the whole tab
-# are visible without opening anything, and the reader chooses what to look
-# at instead of being handed all of it.
-#
-# `section` and `page` are query arguments. The URL map is frozen; query
-# arguments are not part of it, so this is presentation, exactly as the `tab`
-# argument already was.
-
-#: Section tiles rotate through the three family accents so a strip reads as
-#: a set rather than as a wall of one colour. Position, not meaning: the four
-#: reserved state colours still carry state, on the tile's own pip.
-_SECTION_ACCENTS = ("pine", "indigo", "brass")
-
-
-def _section(key, label, items=None, *, open_count=None, count=None, note=None, form_only=False, per_page=PAGE_SIZE, anchor=None, ids=None):
-    """One entry in a tab's section strip.
-
-    ``count`` is the number on the tile and ``open_count`` the number still
-    wanting a decision; a section with neither (Details, Public disclosure)
-    is ``form_only`` and shows a note instead of a count, because a tile that
-    printed "0" for a panel of facts would read as "nothing here".
-    """
-    return {
-        "key": key,
-        "label": label,
-        "items": list(items or []),
-        "count": len(items) if (count is None and items is not None) else count,
-        "open": open_count,
-        "note": note,
-        "form_only": form_only,
-        # Buddy pairings print their interaction logs underneath the pairing,
-        # so one "row" there is several lines and fewer of them fit.
-        "per_page": per_page,
-        # A form-only section holds no records, so `focus` cannot find it by
-        # public_id. The decision queue's publication row points at the
-        # literal anchor "publication"; this is how that link still lands.
-        "anchor": anchor,
-        # The public_ids one item renders, for rows that print nested
-        # records (see `page_of`). None means the item's own public_id.
-        "ids": ids,
-    }
-
-
-def _project_sections(tab, project, *, is_igp, open_tasks, settled_tasks, open_budget_lines,
-                      settled_budget_lines, open_requests, settled_requests, open_contributions,
-                      settled_contributions, report_snapshots, recruitment_applications,
-                      approved_feedback_count):
-    """The ordered sections of one tab, each carrying the list it pages."""
-    if tab == "logistics":
-        sections = [
-            _section("details", "Details", note="Campus, dates, venue, reach", form_only=True),
-            _section("tasks", "Tasks", open_tasks + settled_tasks, open_count=len(open_tasks)),
-        ]
-        for checklist in project.checklists:
-            items = sorted(checklist.item_statuses, key=lambda row: row.template_item.sequence)
-            sections.append(_section(
-                f"checklist-{checklist.public_id}", checklist.name, items,
-                open_count=sum(1 for item in items if item.status not in SETTLED_WORK_STATUSES),
-            ))
-        sections.append(_section("schedule", "Schedule", sorted(project.sessions, key=lambda s: s.starts_at)))
-        return sections
-
-    if tab == "finance":
-        sections = [
-            _section("budget", "Budget", open_budget_lines + settled_budget_lines, open_count=len(open_budget_lines)),
-            _section("requests", "Operational requests", open_requests + settled_requests, open_count=len(open_requests)),
-        ]
-        if is_igp:
-            entries = sorted(project.reimbursement_entries, key=lambda e: e.date)
-            sections.append(_section(
-                "reimbursements", "Reimbursements", entries,
-                open_count=sum(1 for e in entries if e.status not in {"Approved", "Paid"}),
-            ))
-        return sections
-
-    if tab == "documents":
-        return [
-            _section("index", "Document index", list(project.document_records),
-                     open_count=sum(1 for d in project.document_records if d.status == "Submitted")),
-            _section("reports", "Reports", report_snapshots,
-                     open_count=sum(1 for s in report_snapshots if s.approval_status == "Draft")),
-            _section("disclosure", "Public disclosure", note=project.publication_status, form_only=True, anchor="publication"),
-        ]
-
-    if tab == "people":
-        sections = [_section("team", "Team", list(project.team_assignments),
-                             open_count=sum(1 for a in project.team_assignments if a.status != "Active"))]
-        if recruitment_applications:
-            sections.append(_section(
-                "recruitment", "Recruitment", recruitment_applications,
-                # `decision`, not `status`, and "Submitted"/"Interview Scheduled" are the
-                # two values the row itself still offers a Review control for.
-                open_count=sum(1 for a in recruitment_applications if a.decision in {"Submitted", "Interview Scheduled"}),
-            ))
-        sections.append(_section("contributions", "Contributions", open_contributions + settled_contributions,
-                                 open_count=len(open_contributions)))
-        if is_igp:
-            sections.append(_section(
-                "buddies", "Buddy pairings", list(project.buddy_assignments), per_page=4,
-                # A pairing prints its interaction logs underneath it, and the
-                # decision queue links to a log, not to the pairing.
-                ids=lambda assignment: [assignment.public_id, *(log.public_id for log in assignment.logs)],
-            ))
-        responses = [
-            {"form": form, "response": response}
-            for form in project.feedback_forms for response in form.responses
-        ]
-        sections.append(_section(
-            "feedback", "Feedback", responses,
-            open_count=sum(1 for row in responses if row["response"].moderation_status == "Pending"),
-            note=f"{approved_feedback_count} approved",
-            ids=lambda row: [row["response"].public_id],
-        ))
-        return sections
-
-    return []
-
-
 @erp_bp.get("/projects/<string:public_id>")
 def project_detail(public_id):
-    project = _project(public_id)
-    blockers = closure_blockers(project)
-    requested_tab = _PROJECT_TAB_ALIASES.get(request.args.get("tab"), request.args.get("tab"))
-    active_tab = requested_tab if requested_tab in _PROJECT_TABS else _DEFAULT_PROJECT_TAB
-    people_query = (request.args.get("people_q") or "").strip()
-    people_matches = []
-    if active_tab == "people" and len(people_query) >= 2:
-        like = f"%{people_query}%"
-        member_person_ids = {
-            row.person_id for row in TeamAssignment.query.filter_by(project_id=project.id, status="Active").with_entities(TeamAssignment.person_id).all()
-        }
-        matches = (
-            Person.query.filter(
-                Person.is_archived.is_(False),
-                db.or_(
-                    Person.first_name.ilike(like), Person.last_name.ilike(like),
-                    Person.preferred_name.ilike(like), Person.primary_email.ilike(like),
-                    Person.registration_number.ilike(like),
-                ),
-            ).order_by(Person.first_name).limit(20).all()
-        )
-        people_matches = [
-            {"public_id": p.public_id, "display_name": p.display_name, "registration_number": p.registration_number, "is_member": p.id in member_person_ids}
-            for p in matches
-        ]
-    approved_responses = [
-        response for form in project.feedback_forms for response in form.responses
-        if response.moderation_status == "Approved"
-    ]
-    feedback_distribution = {value: 0 for value in range(1, 6)}
-    for response in approved_responses:
-        try:
-            rating = int((response.answers_json or {}).get("rating"))
-        except (TypeError, ValueError):
-            continue
-        if rating in feedback_distribution:
-            feedback_distribution[rating] += 1
-    state = event_state(project)
-    open_tasks = [task for task in project.work_tasks if task.status not in SETTLED_WORK_STATUSES]
-    settled_tasks = [task for task in project.work_tasks if task.status in SETTLED_WORK_STATUSES]
-    open_contributions = [c for c in project.contribution_records if c.approval_status == "Pending"]
-    settled_contributions = [c for c in project.contribution_records if c.approval_status != "Pending"]
-    # Approved requests still need completion; rejected requests can be
-    # revised/resubmitted. Keep their actions reachable until terminal.
-    open_requests = [r for r in project.operational_requests if r.status not in {"Completed", "Cancelled"}]
-    settled_requests = [r for r in project.operational_requests if r.status in {"Completed", "Cancelled"}]
-    open_budget_lines = [b for b in project.budget_lines if b.status not in {"Approved", "Rejected"}]
-    settled_budget_lines = [b for b in project.budget_lines if b.status in {"Approved", "Rejected"}]
-    report_snapshots = ReportSnapshot.query.filter_by(project_id=project.id).order_by(ReportSnapshot.created_at.desc()).all()
-    recruitment_applications = RecruitmentApplication.query.filter_by(project_id=project.id).order_by(RecruitmentApplication.created_at.desc()).all()
-    is_igp = project.program_type.name == "IGP"
+    """One page per event: what is left to do, then folded cards.
 
-    sections = _project_sections(
-        active_tab, project, is_igp=is_igp,
-        open_tasks=open_tasks, settled_tasks=settled_tasks,
-        open_budget_lines=open_budget_lines, settled_budget_lines=settled_budget_lines,
-        open_requests=open_requests, settled_requests=settled_requests,
-        open_contributions=open_contributions, settled_contributions=settled_contributions,
-        report_snapshots=report_snapshots, recruitment_applications=recruitment_applications,
-        approved_feedback_count=sum(feedback_distribution.values()),
-    )
-    section_keys = [section["key"] for section in sections]
-    # `focus` names a record: a deep link from the decision queue, a
-    # notification or a blocker's Resolve button. It wins over `section` and
-    # `page`, because landing on page 1 of a list that does not contain the
-    # row you were sent to is the same as not arriving at all.
-    focus = (request.args.get("focus") or "").strip()
-    requested_section = request.args.get("section")
-    active_section = requested_section if requested_section in section_keys else (section_keys[0] if section_keys else None)
-    requested_page = request.args.get("page")
-    if focus:
-        for section in sections:
-            if section["anchor"] == focus:
-                active_section, requested_page = section["key"], 1
-                break
-            found = page_of(section["items"], focus, section["per_page"], section["ids"])
-            if found:
-                active_section, requested_page = section["key"], found
-                break
-    active = next((section for section in sections if section["key"] == active_section), None)
-    page = paginate(active["items"], requested_page, active["per_page"]) if active else paginate([], 1)
-    # The checklist behind a `checklist-<public_id>` section, so the panel can
-    # title itself and the evidence modal knows which requirements to list.
-    active_checklist = None
-    if active_section and active_section.startswith("checklist-"):
-        wanted = active_section[len("checklist-"):]
-        active_checklist = next((c for c in project.checklists if c.public_id == wanted), None)
-    open_feedback_form = next((form for form in project.feedback_forms if form.is_open), None)
+    ``?card=`` opens a card; the older ``?tab=``, ``?section=`` and
+    ``?focus=`` links still land on the card that now holds what they
+    pointed at (app/services/event_page.py).
+    """
+    project = Project.query.filter_by(public_id=public_id).first_or_404()
+    if not (can_view_project(g.user, project) or can_contribute(g.user, project)):
+        abort(403)
+    context = build_event_page(project, g.user, request.args)
+    if not (context["can_manage"] or context["can_approve"]) and not has_permission(g.user, "report", project) \
+            and not context["can_contribute"]:
+        # A volunteer listed on the event sees only what concerns them.
+        return render_template("erp/event_volunteer.html", **context)
+    return render_template("erp/event.html", return_to=request.full_path.rstrip("?"), **context)
 
-    tab_strip = [
-        ("logistics", "Logistics", len(project.work_tasks) + sum(len(c.item_statuses) for c in project.checklists)),
-        ("finance", "Finance", len(project.budget_lines) + len(project.operational_requests)),
-        ("documents", "Documents", len(project.document_records)),
-        ("people", "People", len(project.team_assignments)),
-        ("analytics", "Analytics", None),
-    ]
-    return render_template(
-        "erp/project_detail.html",
-        project=project,
-        blockers=blockers,
-        event_state=state,
-        event_state_label=STATE_LABELS[state],
-        tab_strip=tab_strip,
-        item_state=row_state,
-        task_statuses=("Not Started", "In Progress", "Blocked", "Submitted", "Approved", "Rejected", "Waived", "Completed"),
-        dashboard=event_dashboard(project, blockers=blockers) if active_tab == "analytics" else None,
-        transitions=sorted(TRANSITIONS.get(project.status, set())),
-        can_manage=has_permission(g.user, "manage_projects", project),
-        can_contribute=has_permission(g.user, "contribute", project),
-        current_person_id=g.user.person_id,
-        current_user_id=g.user.id,
-        can_approve=has_permission(g.user, "approve", project),
-        can_approve_operational_requests=has_permission(g.user, "approve_operational_requests", project),
-        can_decide_publication=has_permission(g.user, "manage_governance", project),
-        can_waive=has_permission(g.user, "waive", project),
-        can_view_sensitive=has_permission(g.user, "sensitive_links", project, sensitive=True),
-        active_tab=active_tab,
-        is_igp=is_igp,
-        checklist_templates=ChecklistTemplate.query.filter_by(is_active=True).order_by(ChecklistTemplate.name).all(),
-        contribution_statuses=("Approved", "Rejected"),
-        feedback_distribution=feedback_distribution,
-        approved_feedback_count=sum(feedback_distribution.values()),
-        recruitment_applications=recruitment_applications,
-        report_snapshots=report_snapshots,
-        sections=sections,
-        active_section=active_section,
-        checklist=active_checklist,
-        checklist_items=(active["items"] if active_checklist else []),
-        open_form=open_feedback_form,
-        section=active,
-        page=page,
-        # Every form inside a panel posts this back as `next`, so a verdict
-        # returns to the section and page it was taken on rather than to
-        # page 1 of the tab's first section.
-        return_to=request.full_path.rstrip("?"),
-        people_query=people_query,
-        people_matches=people_matches,
-        eligible_participants=[assignment.person for assignment in project.team_assignments if assignment.status == "Active"],
-        assignment_role_options=vocabulary_options("assignment_role"),
-        operational_request_type_options=vocabulary_options("operational_request_type"),
-        budget_category_options=vocabulary_options("budget_category"),
-        contribution_activity_options=vocabulary_options("contribution_activity"),
-        document_category_options=vocabulary_options("document_category"),
-        compute_availability=compute_availability,
-        settled_statuses=SETTLED_WORK_STATUSES,
-    )
+
+#: Where each old tab's work now lives on the event page.
+_TAB_CARD = {"logistics": "todo", "finance": "money", "documents": "files", "people": "people", "analytics": "finish"}
 
 
 def _redirect_to_tab(project, tab, anchor=None, *, reveal=False):
@@ -775,9 +326,9 @@ def _redirect_to_tab(project, tab, anchor=None, *, reveal=False):
             return redirect(target)
     # `focus` resolves to the section and page that actually hold the record,
     # which a bare fragment cannot do now that a section is paged.
-    target = url_for("erp.project_detail", public_id=project.public_id, tab=tab, focus=anchor) if anchor \
-        else url_for("erp.project_detail", public_id=project.public_id, tab=tab)
-    return redirect(target + (f"#{anchor}" if anchor else ""))
+    card = _TAB_CARD.get(tab, tab)
+    target = url_for("erp.project_detail", public_id=project.public_id, card=card)
+    return redirect(target + (f"#{anchor}" if anchor else f"#card-{card}"))
 
 
 @erp_bp.post("/projects/<string:public_id>/applications/<string:application_public_id>/decision")
@@ -787,97 +338,28 @@ def decide_recruitment_route(public_id, application_public_id):
         abort(403)
     application = RecruitmentApplication.query.filter_by(public_id=application_public_id, project_id=project.id).first_or_404()
     try:
+        decision = request.form.get("decision")
         decide_recruitment(
-            application, request.form.get("decision"), g.user,
-            expected_version=request.form.get("version"), reason=request.form.get("reason"),
+            application, decision, g.user,
+            expected_version=int(request.form.get("version") or application.version),
+            reason=(request.form.get("reason") or "").strip() or ("Not picked" if decision == "Rejected" else None),
         )
-        flash("Recruitment decision recorded.", "success")
+        flash("Saved \u2713", "success")
     except ValueError as error:
         flash(str(error), "danger")
     return _redirect_to_tab(project, "people", application.public_id)
 
 
-@erp_bp.post("/projects/<string:public_id>/reports/<string:snapshot_public_id>/approve")
-def approve_report_route(public_id, snapshot_public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "approve", project):
-        abort(403)
-    snapshot = ReportSnapshot.query.filter_by(public_id=snapshot_public_id, project_id=project.id).first_or_404()
-    if snapshot.approval_status != "Approved":
-        snapshot.approval_status = "Approved"
-        snapshot.approved_by_id = g.user.id
-        snapshot.approved_at = datetime.now(timezone.utc)
-        record_audit("report.approve", snapshot, after={"approval_status": "Approved"}, actor=g.user)
-        db.session.commit()
-    flash("Report approved.", "success")
-    return _redirect_to_tab(project, "documents", snapshot.public_id)
-
-
-WIZARD_STEPS = ["basics", "sessions", "team", "checklist", "documents", "budget"]
-
-
-def _first_incomplete_step(project):
-    if not project.sessions:
-        return "sessions"
-    if not project.team_assignments:
-        return "team"
-    if not project.checklists:
-        return "checklist"
-    if not project.document_records:
-        return "documents"
-    if not project.budget_lines:
-        return "budget"
-    return None
-
-
 @erp_bp.get("/projects/<string:public_id>/setup")
 def project_setup(public_id):
+    """The six-step setup wizard is gone: everything it asked for is added
+    in place on the event page. Old links land on the matching card."""
     project = _project(public_id)
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
-    requested_step = request.args.get("step")
-    step = requested_step if requested_step in WIZARD_STEPS else _first_incomplete_step(project)
-    if step is None:
-        flash("This project's setup is complete — you're on the full project page.", "success")
-        return redirect(url_for("erp.project_detail", public_id=project.public_id))
-    people_query = (request.args.get("people_q") or "").strip()
-    people_matches = []
-    if step == "team" and len(people_query) >= 2:
-        like = f"%{people_query}%"
-        member_person_ids = {
-            row.person_id for row in TeamAssignment.query.filter_by(project_id=project.id, status="Active").with_entities(TeamAssignment.person_id).all()
-        }
-        matches = (
-            Person.query.filter(
-                Person.is_archived.is_(False),
-                db.or_(
-                    Person.first_name.ilike(like), Person.last_name.ilike(like),
-                    Person.preferred_name.ilike(like), Person.primary_email.ilike(like),
-                    Person.registration_number.ilike(like),
-                ),
-            ).order_by(Person.first_name).limit(20).all()
-        )
-        people_matches = [
-            {"public_id": p.public_id, "display_name": p.display_name, "registration_number": p.registration_number, "is_member": p.id in member_person_ids}
-            for p in matches
-        ]
-    return render_template(
-        "erp/project_setup.html",
-        project=project, step=step, steps=WIZARD_STEPS,
-        is_igp=project.program_type.name == "IGP",
-        checklist_templates=ChecklistTemplate.query.filter_by(is_active=True).order_by(ChecklistTemplate.name).all(),
-        completed={
-            "basics": True,
-            "sessions": bool(project.sessions), "team": bool(project.team_assignments),
-            "checklist": bool(project.checklists), "documents": bool(project.document_records),
-            "budget": bool(project.budget_lines),
-        },
-        people_query=people_query,
-        people_matches=people_matches,
-        session_type_options=vocabulary_options("session_type"),
-        assignment_role_options=vocabulary_options("assignment_role"),
-        budget_category_options=vocabulary_options("budget_category"),
-    )
+    card = {"basics": "details", "sessions": "schedule", "team": "people", "checklist": "todo",
+            "documents": "files", "budget": "money"}.get(request.args.get("step"), "todo")
+    return redirect(url_for("erp.project_detail", public_id=project.public_id, card=card) + f"#card-{card}")
 
 
 @erp_bp.post("/projects/<string:public_id>/basics")
@@ -886,18 +368,18 @@ def update_project_basics(public_id):
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
     title = (request.form.get("title") or "").strip()
-    try:
-        start_date = datetime.strptime(request.form.get("start_date", ""), "%Y-%m-%d").date()
-        end_date = datetime.strptime(request.form.get("end_date", ""), "%Y-%m-%d").date()
-    except ValueError:
-        flash("Provide valid project start and end dates.", "danger")
-        return redirect(url_for("erp.project_setup", public_id=project.public_id, step="basics"))
-    if not title or end_date < start_date:
-        flash("A title is required and the end date cannot precede the start date.", "danger")
-        return redirect(url_for("erp.project_setup", public_id=project.public_id, step="basics"))
+    start_date = _form_date("start_date")
+    end_date = _form_date("end_date") or start_date
+    if not title or start_date is None:
+        flash("Give the event a name and a date.", "danger")
+        return _redirect_to_tab(project, "details")
+    if end_date < start_date:
+        flash("The last day cannot be before the first day.", "danger")
+        return _redirect_to_tab(project, "details")
     before = {"title": project.title, "start_date": str(project.start_date), "end_date": str(project.end_date)}
     project.title = title
-    project.description = (request.form.get("description") or "").strip()
+    if "description" in request.form:
+        project.description = (request.form.get("description") or "").strip()
     project.venue = (request.form.get("venue") or "").strip()
     project.target_audience = (request.form.get("target_audience") or "").strip()
     project.start_date = start_date
@@ -905,45 +387,56 @@ def update_project_basics(public_id):
     project.version += 1
     record_audit("project.basics", project, before=before, after={"title": title, "start_date": str(start_date), "end_date": str(end_date)}, actor=g.user)
     db.session.commit()
-    flash("Project basics updated.", "success")
-    return redirect(url_for("erp.project_setup", public_id=project.public_id, step="sessions"))
+    flash("Saved \u2713", "success")
+    return _redirect_to_tab(project, "details")
+
+
+def _form_date(field, default=None):
+    try:
+        return datetime.strptime((request.form.get(field) or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return default
 
 
 def _redirect_after_action(project, default_tab):
-    """Forms shared between the project_detail tabs and the wizard
-    (`project_setup`) pass a hidden `next=setup` field so the same route
-    can return the user to whichever flow they came from."""
+    """Kept for the routes that called it; ``next=setup`` (the retired
+    wizard) now simply means "back to the event page"."""
     if request.form.get("next") == "setup":
-        return redirect(url_for("erp.project_setup", public_id=project.public_id))
+        return redirect(url_for("erp.project_detail", public_id=project.public_id))
     return _redirect_to_tab(project, default_tab)
 
 
 @erp_bp.post("/projects/<string:public_id>/sessions")
 def add_session(public_id):
+    """Add a session from a day and two times. Name, day and venue all
+    default from the event, so the common case is just the two times."""
     project = _project(public_id)
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
-    title = (request.form.get("title") or "").strip()
-    if not title:
-        flash("Session title is required.", "danger")
-        return _redirect_after_action(project, "logistics")
+    existing_count = ProjectSession.query.filter_by(project_id=project.id).count()
+    title = (request.form.get("title") or "").strip() or ("Main session" if existing_count == 0 else f"Session {existing_count + 1}")
     try:
-        # The browser sends campus-local wall-clock time with no offset;
-        # storage is UTC throughout (audit B09).
-        starts_at = to_utc(datetime.strptime(request.form["starts_at"], "%Y-%m-%dT%H:%M"))
-        ends_at = to_utc(datetime.strptime(request.form["ends_at"], "%Y-%m-%dT%H:%M"))
+        if request.form.get("starts_at"):
+            # The API and older forms send one campus-local datetime each;
+            # storage is UTC throughout (audit B09).
+            starts_at = to_utc(datetime.strptime(request.form["starts_at"], "%Y-%m-%dT%H:%M"))
+            ends_at = to_utc(datetime.strptime(request.form["ends_at"], "%Y-%m-%dT%H:%M"))
+        else:
+            day = _form_date("day", project.start_date)
+            start = datetime.strptime(request.form.get("start_time") or "", "%H:%M").time()
+            end = datetime.strptime(request.form.get("end_time") or "", "%H:%M").time()
+            starts_at, ends_at = to_utc(datetime.combine(day, start)), to_utc(datetime.combine(day, end))
     except (KeyError, ValueError):
-        flash("Provide valid start and end times.", "danger")
-        return _redirect_after_action(project, "logistics")
+        flash("Pick a start time and an end time.", "danger")
+        return _redirect_after_action(project, "schedule")
     if ends_at < starts_at:
-        flash("Session end time cannot precede its start time.", "danger")
-        return _redirect_after_action(project, "logistics")
+        flash("It has to end after it starts.", "danger")
+        return _redirect_after_action(project, "schedule")
     try:
         session_type = resolve_vocabulary_value(request.form.get("session_type") or "Session", request.form.get("session_type_other"), domain="session_type")
     except ValueError as error:
         flash(str(error), "danger")
-        return _redirect_after_action(project, "logistics")
-    existing_count = ProjectSession.query.filter_by(project_id=project.id).count()
+        return _redirect_after_action(project, "schedule")
     session_item = ProjectSession(
         project_id=project.id, code=request.form.get("code") or f"S{existing_count + 1}",
         title=title, session_type=session_type,
@@ -952,89 +445,8 @@ def add_session(public_id):
     db.session.add(session_item)
     record_audit("session.create", session_item, after={"project": project.public_id, "title": title}, actor=g.user)
     db.session.commit()
-    flash("Session added.", "success")
-    return _redirect_after_action(project, "logistics")
-
-
-@erp_bp.post("/projects/<string:public_id>/checklists")
-def instantiate_project_checklist(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    template = ChecklistTemplate.query.filter_by(public_id=request.form.get("template_public_id")).first()
-    if not template:
-        flash("Choose a valid checklist template.", "danger")
-    else:
-        instantiate_checklist(project, template, actor=g.user)
-        flash(f"{template.name} checklist added to this project.", "success")
-    return _redirect_after_action(project, "logistics")
-
-
-@erp_bp.post("/projects/<string:public_id>/team")
-def add_team_member(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    person_public_id = (request.form.get("person_public_id") or "").strip()
-    registration_number = (request.form.get("registration_number") or "").strip()
-    person = None
-    if person_public_id:
-        person = Person.query.filter_by(public_id=person_public_id).first()
-    elif registration_number:
-        # Compatibility path for the legacy registration-number lookup;
-        # UI enrollment now uses person_public_id via the scoped search.
-        person = Person.query.filter_by(registration_number=registration_number).first()
-    if not person:
-        flash("No matching person found.", "danger")
-        return _redirect_after_action(project, "people")
-    if TeamAssignment.query.filter_by(person_id=person.id, project_id=project.id).first():
-        flash(f"{person.display_name} is already on this project's team.", "warning")
-        return _redirect_after_action(project, "people")
-    try:
-        role_label = _resolve_role_label()
-    except ValueError as error:
-        flash(str(error), "danger")
-        return _redirect_after_action(project, "people")
-    assignment = TeamAssignment(
-        person_id=person.id, project_id=project.id,
-        assignment_type=request.form.get("assignment_type") or "Project Team",
-        role_label=role_label,
-    )
-    db.session.add(assignment)
-    record_audit("team.enroll", assignment, after={"person": person.public_id, "project": project.public_id}, actor=g.user)
-    db.session.commit()
-    flash(f"{person.display_name} added to the project team.", "success")
-    return _redirect_after_action(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/team/create-and-enroll")
-def create_and_enroll_team_member(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    try:
-        role_label = _resolve_role_label()
-        person, _assignment, created_new_person = create_and_enroll_participant(
-            project, g.user,
-            first_name=request.form.get("first_name"),
-            last_name=request.form.get("last_name"),
-            email=request.form.get("email"),
-            registration_number=request.form.get("registration_number"),
-            assignment_type=request.form.get("assignment_type") or "Project Team",
-            role_label=role_label,
-        )
-        verb = "created and added" if created_new_person else "found and added"
-        flash(f"{person.display_name} {verb} to the project team.", "success")
-    except ValueError as error:
-        flash(str(error), "danger")
-    return _redirect_after_action(project, "people")
-
-
-def _resolve_role_label():
-    value = (request.form.get("role_label") or "").strip()
-    if not value:
-        return None
-    return resolve_vocabulary_value(value, request.form.get("role_label_other"), domain="assignment_role")
+    flash("Added \u2713 Add another?", "success")
+    return _redirect_after_action(project, "schedule")
 
 
 def _active_participant(project, person_public_id):
@@ -1060,14 +472,14 @@ def add_buddy_assignment(public_id):
     buddy_person = _active_participant(project, request.form.get("buddy_person_public_id"))
     student_person = _active_participant(project, request.form.get("exchange_student_person_public_id"))
     if not buddy_person or not student_person:
-        flash("Both the buddy and exchange student must be active participants of this project.", "danger")
+        flash("Both people need to be on this event first. Add them under People.", "danger")
         return _redirect_to_tab(project, "people")
     if buddy_person.id == student_person.id:
         flash("A buddy cannot be paired with themselves.", "danger")
         return _redirect_to_tab(project, "people")
     try:
-        start_date = datetime.strptime(request.form["start_date"], "%Y-%m-%d").date()
-        end_date = datetime.strptime(request.form["end_date"], "%Y-%m-%d").date()
+        start_date = _form_date("start_date", project.start_date)
+        end_date = _form_date("end_date", project.end_date)
         validate_buddy_assignment(
             project, None, None, start_date, end_date,
             buddy_person_id=buddy_person.id, exchange_student_person_id=student_person.id,
@@ -1092,17 +504,11 @@ def attendance_roll_call(public_id, session_public_id):
         abort(403)
     session_item = ProjectSession.query.filter_by(public_id=session_public_id, project_id=project.id).first_or_404()
     records = {record.person_id: record for record in SessionAttendance.query.filter_by(session_id=session_item.id).all()}
-    events = (
-        AttendanceChangeEvent.query.join(SessionAttendance)
-        .filter(SessionAttendance.session_id == session_item.id)
-        .order_by(AttendanceChangeEvent.occurred_at.desc(), AttendanceChangeEvent.id.desc())
-        .all()
-    )
-    actor_ids = {event.actor_user_id for event in events if event.actor_user_id}
-    actors = {user.id: user.username for user in User.query.filter(User.id.in_(actor_ids or [-1])).all()}
+    team = sorted((a for a in project.team_assignments if a.status == "Active"), key=lambda a: a.person.display_name.lower())
+    back_to = request.args.get("from") if (request.args.get("from") or "").startswith("/") else None
     return render_template(
         "erp/attendance_roll_call.html", project=project, session=session_item,
-        team=project.team_assignments, records=records, events=events, actors=actors,
+        team=team, records=records, back_to=back_to,
     )
 
 
@@ -1112,340 +518,103 @@ def mark_session_attendance(public_id, session_public_id):
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
     session_item = ProjectSession.query.filter_by(public_id=session_public_id, project_id=project.id).first_or_404()
+    # Walk-ins: someone who turned up but was not on the list. They are
+    # added to the event and marked present in the same save.
+    walk_ins = []
+    for name in (request.form.get("walk_ins") or "").splitlines():
+        name = name.strip()
+        if name:
+            first, _, last = name.partition(" ")
+            person = Person(first_name=first, last_name=last or None, campus_id=project.campus_id, person_type="Guest")
+            db.session.add(person)
+            db.session.flush()
+            enrol(project, person, "Guest", g.user)
+            mark_attendance(session_item, person, "Present", g.user, commit=False)
+            walk_ins.append(person)
     failures = []
-    for team_assignment in project.team_assignments:
+    present = list(walk_ins)
+    # The roll-call screen sends one tick box per person (ticked = here);
+    # the API and older forms send a status per person.
+    roster = set(request.form.getlist("roster"))
+    for team_assignment in [a for a in project.team_assignments if a.status == "Active" and a.person not in walk_ins]:
         field = f"status_{team_assignment.person_id}"
-        if field not in request.form:
+        if field in request.form:
+            status = request.form[field]
+        elif str(team_assignment.person_id) in roster:
+            status = "Present" if request.form.get(f"present_{team_assignment.person_id}") else "Absent"
+        else:
             continue
-        status = request.form[field]
         existing = SessionAttendance.query.filter_by(session_id=session_item.id, person_id=team_assignment.person_id).first()
         try:
             mark_attendance(
                 session_item, team_assignment.person, status, g.user,
                 expected_version=existing.version if existing else None,
-                reason=(request.form.get(f"reason_{team_assignment.person_id}") or "").strip() if existing else None,
+                # A reason helps the record but no longer stops the save.
+                reason=((request.form.get(f"reason_{team_assignment.person_id}") or "").strip() or "Changed at roll call") if existing else None,
                 commit=False,
             )
         except ValueError as error:
             failures.append(f"{team_assignment.person.display_name}: {error}")
+        if status == "Present":
+            present.append(team_assignment.person)
     if failures:
         db.session.rollback()
-        flash("No attendance changes were saved. " + " ".join(failures), "danger")
+        flash("Nothing was saved. " + " ".join(failures), "danger")
         return redirect(url_for("erp.attendance_roll_call", public_id=project.public_id, session_public_id=session_item.public_id))
-    db.session.commit()
-    flash("Attendance recorded.", "success")
-    return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/contributions")
-def log_contribution(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "contribute", project):
-        abort(403)
-    if not g.user.person_id:
-        flash("Your account has no linked person record; contact an administrator.", "danger")
-        return _redirect_to_tab(project, "people")
     try:
-        activity_type = resolve_vocabulary_value(
-            request.form.get("activity_type") or "Event support",
-            request.form.get("activity_type_other"),
-            domain="contribution_activity",
-        )
-    except ValueError as error:
-        flash(str(error), "danger")
-        return _redirect_to_tab(project, "people")
-    contribution = ContributionRecord(
-        project_id=project.id, person_id=g.user.person_id,
-        activity_type=activity_type,
-        description=(request.form.get("description") or "").strip() or "Contribution",
-        duration_hours=request.form.get("duration_hours") or 1,
-    )
-    db.session.add(contribution)
-    record_audit("contribution.log", contribution, after={"project": project.public_id}, actor=g.user)
+        hours = float(request.form.get("hours") or 0)
+    except ValueError:
+        hours = 0
+    if 0 < hours <= 24:
+        for person in present:
+            db.session.add(ContributionRecord(
+                project_id=project.id, person_id=person.id, activity_type="Event support",
+                description=f"Attended {session_item.title}", duration_hours=hours,
+                approval_status="Approved", approved_by_id=g.user.id, approved_at=datetime.now(timezone.utc),
+            ))
     db.session.commit()
-    flash("Contribution logged for approval.", "success")
-    return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/contributions/<string:contribution_public_id>/decision")
-def decide_contribution_route(public_id, contribution_public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "approve", project):
-        abort(403)
-    contribution = ContributionRecord.query.filter_by(public_id=contribution_public_id, project_id=project.id).first_or_404()
-    try:
-        decide_contribution(contribution, request.form.get("status"), g.user, expected_version=int(request.form.get("version") or contribution.version), reason=request.form.get("reason"))
-        flash("Contribution decision recorded.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "people")
+    message = f"Attendance saved \u2713 {len(present)} present."
+    if 0 < hours <= 24 and present:
+        message += f" {hours:g} hours given to each."
+    flash(message, "success")
+    target = (request.form.get("next") or "").strip()
+    if target.startswith("/") and not target.startswith("//"):
+        return redirect(target)
+    return redirect(url_for("erp.project_detail", public_id=project.public_id, card="schedule") + "#card-schedule")
 
 
 @erp_bp.post("/projects/<string:public_id>/buddy-assignments/<string:assignment_public_id>/logs")
 def log_buddy_interaction(public_id, assignment_public_id):
     project = _project(public_id)
     assignment = BuddyAssignment.query.filter_by(public_id=assignment_public_id, project_id=project.id).first_or_404()
-    if not has_permission(g.user, "contribute", project):
+    if not (has_permission(g.user, "contribute", project) or has_permission(g.user, "manage_people", project)):
         abort(403)
+    description = (request.form.get("description") or "").strip()
+    if not description:
+        flash("Write a line about what they did together.", "danger")
+        return _redirect_to_tab(project, "buddies")
     log = BuddyLog(
         buddy_assignment_id=assignment.id,
-        activity_date=datetime.strptime(request.form["activity_date"], "%Y-%m-%d").date(),
-        description=(request.form.get("description") or "").strip(),
+        activity_date=_form_date("activity_date", date.today()),
+        description=description,
         duration_hours=request.form.get("duration_hours") or 1,
+        status="Approved", verified_by_id=g.user.id, verified_at=datetime.now(timezone.utc),
     )
     db.session.add(log)
     record_audit("buddy_log.create", log, after={"assignment": assignment.public_id}, actor=g.user)
     db.session.commit()
-    flash("Buddy interaction logged for approval.", "success")
+    flash("Saved \u2713", "success")
     return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/buddy-logs/<string:log_public_id>/decision")
-def decide_buddy_log_route(public_id, log_public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "approve", project):
-        abort(403)
-    log = BuddyLog.query.join(BuddyAssignment).filter(BuddyLog.public_id == log_public_id, BuddyAssignment.project_id == project.id).first_or_404()
-    try:
-        decide_buddy_log(log, request.form.get("status"), g.user, expected_version=int(request.form.get("version") or log.version), reason=request.form.get("reason"))
-        flash("Buddy log decision recorded.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/operational-requests")
-def add_operational_request(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    try:
-        request_type = resolve_vocabulary_value(request.form.get("request_type") or "Other", request.form.get("request_type_other"), domain="operational_request_type")
-    except ValueError as error:
-        flash(str(error), "danger")
-        return _redirect_to_tab(project, "finance")
-    operational_request = OperationalRequest(
-        project_id=project.id, request_type=request_type,
-        title=(request.form.get("title") or "").strip() or "Operational request",
-        details=(request.form.get("details") or "").strip(), amount=request.form.get("amount") or None,
-        owner_person_id=g.user.person_id, created_by_id=g.user.id,
-    )
-    db.session.add(operational_request)
-    db.session.flush()
-    record_audit("operational_request.create", operational_request, after={"project": project.public_id}, actor=g.user)
-    db.session.commit()
-    flash("Operational request created in Draft.", "success")
-    return _redirect_to_tab(project, "finance", operational_request.public_id, reveal=True)
-
-
-@erp_bp.post("/projects/<string:public_id>/operational-requests/<string:request_public_id>/decision")
-def decide_operational_request_route(public_id, request_public_id):
-    project = _project(public_id)
-    operational_request = OperationalRequest.query.filter_by(public_id=request_public_id, project_id=project.id).first_or_404()
-    status = request.form.get("status")
-    try:
-        decide_operational_request(operational_request, status, g.user, expected_version=int(request.form.get("version") or operational_request.version), reason=request.form.get("reason"))
-        flash("Operational request updated.", "success")
-    except PermissionError:
-        abort(403)
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "finance")
-
-
-@erp_bp.post("/projects/<string:public_id>/budgets")
-def add_budget_line(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    try:
-        category = resolve_vocabulary_value(request.form.get("category") or "Other", request.form.get("category_other"), domain="budget_category")
-    except ValueError as error:
-        flash(str(error), "danger")
-        return _redirect_after_action(project, "finance")
-    line = BudgetLine(
-        project_id=project.id, category=category,
-        description=(request.form.get("description") or "").strip(),
-        estimated_amount=request.form.get("estimated_amount") or 0,
-    )
-    db.session.add(line)
-    record_audit("budget_line.create", line, after={"project": project.public_id}, actor=g.user)
-    db.session.commit()
-    flash("Budget line added in Draft.", "success")
-    return _redirect_after_action(project, "finance")
-
-
-@erp_bp.post("/projects/<string:public_id>/budgets/<string:line_public_id>/decision")
-def decide_budget_line_route(public_id, line_public_id):
-    project = _project(public_id)
-    line = BudgetLine.query.filter_by(public_id=line_public_id, project_id=project.id).first_or_404()
-    status = request.form.get("status")
-    if status in {"Approved", "Rejected", "Completed"} and not has_permission(g.user, "approve", project):
-        abort(403)
-    elif not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    try:
-        decide_budget_line(line, status, g.user, expected_version=int(request.form.get("version") or line.version), reason=request.form.get("reason"))
-        flash("Budget line updated.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "finance")
-
-
-@erp_bp.post("/projects/<string:public_id>/feedback-forms")
-def add_feedback_form(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    if FeedbackForm.query.filter_by(project_id=project.id, is_open=True).first():
-        flash("An open feedback form already exists for this project.", "warning")
-        return _redirect_to_tab(project, "people")
-    raw_questions = (request.form.get("questions") or "").splitlines()
-    labels = [line.strip() for line in raw_questions]
-    if any(not label for label in labels):
-        flash("Remove blank question lines; each question must contain text.", "danger")
-        return _redirect_to_tab(project, "people")
-    if len(labels) > 20:
-        flash("A feedback form may contain at most 20 additional questions.", "danger")
-        return _redirect_to_tab(project, "people")
-    if any(len(label) > 200 for label in labels):
-        flash("Each feedback question must be 200 characters or fewer.", "danger")
-        return _redirect_to_tab(project, "people")
-    questions = [{"key": "rating", "type": "scale", "min": 1, "max": 5, "label": "Overall rating"}]
-    questions.extend({"key": f"q_{index}", "type": "text", "label": label} for index, label in enumerate(labels, 1))
-    form = FeedbackForm(project_id=project.id, title=(request.form.get("title") or "Project Feedback").strip(), questions_json=questions, is_open=True)
-    db.session.add(form)
-    record_audit("feedback_form.create", form, after={"project": project.public_id}, actor=g.user)
-    db.session.commit()
-    flash("Feedback form opened.", "success")
-    return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/feedback-responses")
-def submit_feedback_response(public_id):
-    project = _project(public_id)
-    form = FeedbackForm.query.filter_by(project_id=project.id, is_open=True).order_by(FeedbackForm.id.desc()).first()
-    if not form:
-        flash("There is no open feedback form for this project.", "danger")
-        return _redirect_to_tab(project, "people")
-    try:
-        rating = int(request.form.get("rating", ""))
-    except ValueError:
-        rating = 0
-    if rating not in range(1, 6):
-        flash("Choose an overall rating from 1 to 5.", "danger")
-        return _redirect_to_tab(project, "people")
-    answers = {"rating": rating}
-    for question in form.questions_json or []:
-        if question.get("type") == "text":
-            answers[question["key"]] = (request.form.get(question["key"]) or "").strip()
-    response = FeedbackResponse(form_id=form.id, person_id=g.user.person_id, answers_json=answers)
-    db.session.add(response)
-    record_audit("feedback_response.submit", response, after={"form": form.public_id}, actor=g.user)
-    db.session.commit()
-    flash("Thank you — your feedback has been recorded.", "success")
-    return _redirect_to_tab(project, "people", response.public_id, reveal=True)
-
-
-@erp_bp.post("/projects/<string:public_id>/feedback-responses/<string:response_public_id>/moderate")
-def moderate_feedback_route(public_id, response_public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "report", project):
-        abort(403)
-    response = FeedbackResponse.query.join(FeedbackForm).filter(FeedbackResponse.public_id == response_public_id, FeedbackForm.project_id == project.id).first_or_404()
-    try:
-        moderate_feedback(response, request.form.get("status"), g.user, reason=request.form.get("reason"))
-        flash("Feedback moderation updated.", "success")
-    except ValueError as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/documents")
-def add_document(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    title = (request.form.get("title") or "").strip()
-    if not title:
-        flash("Document title is required.", "danger")
-        return _redirect_after_action(project, "documents")
-    classification = request.form.get("permission_classification") or "Internal"
-    try:
-        category = resolve_vocabulary_value(
-            request.form.get("category") or "Other",
-            request.form.get("category_other"),
-            domain="document_category",
-        )
-    except ValueError as error:
-        flash(str(error), "danger")
-        return _redirect_after_action(project, "documents")
-    drive_url = (request.form.get("drive_url") or "").strip() or None
-    document = DocumentRecord(
-        project_id=project.id, title=title, category=category,
-        status="Submitted", drive_url=drive_url, permission_classification=classification,
-        mandatory_for_closure=bool(request.form.get("mandatory_for_closure")),
-    )
-    db.session.add(document)
-    db.session.flush()
-    if drive_url:
-        try:
-            refresh_document_metadata(document)
-        except ValueError as error:
-            flash(f"Document added, but Drive validation failed: {error}", "warning")
-    record_audit("document.create", document, after={"project": project.public_id, "title": title}, actor=g.user)
-    db.session.commit()
-    flash("Document added.", "success")
-    return _redirect_after_action(project, "documents")
-
-
-@erp_bp.post("/projects/<string:public_id>/documents/<string:document_public_id>/decision")
-def decide_document_route(public_id, document_public_id):
-    project = _project(public_id)
-    document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id).first_or_404()
-    status = request.form.get("status")
-    waive = status == "Waived"
-    if waive and not has_permission(g.user, "waive", project):
-        abort(403)
-    elif not waive and not has_permission(g.user, "approve", project):
-        abort(403)
-    try:
-        decide_document(document, status, g.user, expected_version=int(request.form.get("version") or document.version), reason=request.form.get("reason"), waive=waive)
-        flash("Document decision recorded.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "documents")
-
-
-@erp_bp.post("/projects/<string:public_id>/closure-summary")
-def save_closure_summary(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "approve", project):
-        abort(403)
-    try:
-        if int(request.form.get("version")) != project.version:
-            raise ValueError("This project was changed by another user; refresh before retrying.")
-        summary = (request.form.get("closure_summary") or "").strip()
-        if not summary:
-            raise ValueError("Enter a closure summary before saving.")
-        if project.status in {"Completed", "Archived", "Cancelled"}:
-            raise ValueError("The closure summary cannot be edited after the project is settled.")
-        before = {"closure_summary": project.closure_summary, "version": project.version}
-        project.closure_summary = summary
-        project.version += 1
-        record_audit("project.closure_summary", project, before=before,
-                     after={"closure_summary": summary, "version": project.version}, actor=g.user)
-        db.session.commit()
-        flash("Closure summary saved. Review any remaining blockers before completing the project.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return redirect(url_for("erp.project_detail", public_id=project.public_id))
 
 
 @erp_bp.post("/projects/<string:public_id>/transition")
 def transition(public_id):
     project = _project(public_id)
-    if not has_permission(g.user, "approve", project):
+    # Running an event day to day is the event owner's call. Finishing it
+    # (Completed, then Archived) is the one sign-off, and only Faculty
+    # gives it.
+    sign_off = request.form.get("target_status") in {"Completed", "Archived"}
+    if not has_permission(g.user, "approve" if sign_off else "manage_projects", project):
         abort(403)
     try:
         transition_project(
@@ -1455,7 +624,7 @@ def transition(public_id):
             int(request.form.get("version")),
             request.form.get("reason"),
         )
-        flash(f"Project moved to {project.status}.", "success")
+        flash("Saved ✓", "success")
     except (ValueError, TypeError) as error:
         flash(str(error), "danger")
     return redirect(url_for("erp.project_detail", public_id=project.public_id))
@@ -1466,7 +635,7 @@ def submit_publication(public_id):
     project = _project(public_id)
     try:
         submit_project_publication(project, g.user, expected_version=int(request.form.get("version") or project.version))
-        flash("Publication requested; awaiting review.", "success")
+        flash("Sent to Faculty to show on the website.", "success")
     except PermissionError:
         abort(403)
     except (ValueError, TypeError) as error:
@@ -1483,7 +652,7 @@ def decide_publication(public_id):
             expected_version=int(request.form.get("version") or project.version),
             reason=request.form.get("reason"),
         )
-        flash(f"Publication moved to {project.publication_status}.", "success")
+        flash("Saved ✓ " + ("It is on the website now." if project.publication_status == "Published" else "It is not on the website."), "success")
     except PermissionError:
         abort(403)
     except (ValueError, TypeError) as error:
@@ -1493,170 +662,26 @@ def decide_publication(public_id):
 
 @erp_bp.post("/projects/<string:public_id>/tasks")
 def add_task(public_id):
+    """Add a to-do item: what, who (a person, a team or "me") and by when."""
     project = _project(public_id)
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
-    title = request.form.get("title", "").strip()
-    if not title:
-        flash("Task title is required.", "danger")
-    else:
-        task = WorkTask(
-            project_id=project.id,
-            title=title,
-            description=request.form.get("description", "").strip(),
-            status="Not Started",
-            priority=request.form.get("priority", "Medium"),
-            mandatory_for_closure=bool(request.form.get("mandatory_for_closure")),
+    due = _form_date("due")
+    try:
+        task = add_todo(
+            project, request.form.get("title"), g.user, who=request.form.get("who"),
+            due_at=to_utc(datetime.combine(due, datetime.min.time()).replace(hour=17)) if due else None,
         )
-        db.session.add(task)
-        record_audit("task.create", task, after={"title": title, "project": project.public_id})
-        db.session.commit()
-        flash("Task added.", "success")
-        return _redirect_to_tab(project, "logistics", task.public_id, reveal=True)
-    return _redirect_to_tab(project, "logistics")
-
-
-@erp_bp.post("/projects/<string:public_id>/tasks/<string:task_public_id>/status")
-def update_task(public_id, task_public_id):
-    project = _project(public_id)
-    task = WorkTask.query.filter_by(public_id=task_public_id, project_id=project.id).first_or_404()
-    owner_update = g.user.person_id and task.owner_person_id == g.user.person_id and has_permission(g.user, "contribute", project)
-    if not owner_update and not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    status = request.form.get("status")
-    comment = request.form.get("comment", "").strip()
-    if status in {"Approved", "Rejected"} and not has_permission(g.user, "approve", project):
-        abort(403)
-    if status == "Waived" and not has_permission(g.user, "waive", project):
-        abort(403)
-    try:
-        change_task_status(task, status, g.user, expected_version=int(request.form.get("version") or task.version), comment=comment, waive=status == "Waived")
-        flash("Task status updated.", "success")
-    except (ValueError, TypeError) as error:
+    except ValueError as error:
         flash(str(error), "danger")
-    return _redirect_to_tab(project, "logistics", task.public_id)
-
-
-def _checklist_item(project, item_public_id):
-    return (
-        ChecklistItemStatus.query.join(ChecklistItemStatus.checklist)
-        .filter(ChecklistItemStatus.public_id == item_public_id, ChecklistItemStatus.checklist.has(project_id=project.id))
-        .first_or_404()
-    )
-
-
-def _can_edit_checklist_item(project, item):
-    owner_update = g.user.person_id and item.owner_person_id == g.user.person_id and has_permission(g.user, "contribute", project)
-    return bool(owner_update or has_permission(g.user, "manage_projects", project))
-
-
-@erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/status")
-def update_checklist_item(public_id, item_public_id):
-    project = _project(public_id)
-    item = _checklist_item(project, item_public_id)
-    if not _can_edit_checklist_item(project, item):
-        abort(403)
-    status = request.form.get("status")
-    comment = request.form.get("comment", "").strip()
-    if status in {"Approved", "Rejected"} and not has_permission(g.user, "approve", project):
-        abort(403)
-    if status == "Waived" and not has_permission(g.user, "waive", project):
-        abort(403)
-    try:
-        change_checklist_status(item, status, g.user, expected_version=int(request.form.get("version") or item.version), comment=comment, waive=status == "Waived")
-        flash("Checklist requirement updated.", "success")
-    except (ValueError, TypeError) as error:
-        flash(str(error), "danger")
-    return _redirect_to_tab(project, "logistics", item.public_id)
-
-
-@erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents")
-def attach_checklist_document(public_id, item_public_id):
-    """Link an existing project document to a checklist requirement as
-    evidence. Neither this nor detach/upload bumps `item.version` or
-    `document.version` -- both are FK-only writes, deliberately, so
-    attaching evidence never makes an already-rendered status/decision form
-    go stale (409) for someone else. See
-    in-the-operation-checklists-crystalline-dongarra.md Step 3."""
-    project = _project(public_id)
-    item = _checklist_item(project, item_public_id)
-    if not _can_edit_checklist_item(project, item):
-        abort(403)
-    document_public_id = (request.form.get("document_public_id") or "").strip()
-    if not document_public_id:
-        flash("Choose a document to attach.", "danger")
-        return _redirect_to_tab(project, "logistics", item.public_id)
-    document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id).first_or_404()
-    # Restricted documents are masked with 404, not 403 -- a 403 would let a
-    # caller confirm a restricted document's public_id exists.
-    if document.permission_classification == "Restricted" and not has_permission(g.user, "sensitive_links", project, sensitive=True):
-        abort(404)
-    if document.checklist_status_id == item.id:
-        flash("That document is already linked to this requirement.", "info")
-        return _redirect_to_tab(project, "logistics", item.public_id)
-    if document.checklist_status_id is not None and not has_permission(g.user, "manage_projects", project):
-        flash("That document is linked to another requirement. Ask a coordinator to move it.", "danger")
-        return _redirect_to_tab(project, "logistics", item.public_id)
-    before = {"checklist_status_id": document.checklist_status_id}
-    document.checklist_status_id = item.id
-    record_audit("document.link_checklist", document, before=before, after={"checklist_status": item.public_id, "project": project.public_id}, actor=g.user)
+        return _redirect_to_tab(project, "todo")
+    if request.form.get("description"):
+        task.description = request.form["description"].strip()
+    if request.form.get("mandatory_for_closure"):
+        task.mandatory_for_closure = True
     db.session.commit()
-    flash("Document linked to the requirement.", "success")
-    return _redirect_to_tab(project, "logistics", item.public_id)
-
-
-@erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents/upload")
-def upload_checklist_document(public_id, item_public_id):
-    """Upload a new document and attach it to a checklist requirement in
-    one step, reusing the same single-shot pipeline as the Resources tab's
-    multi-file uploader (auto-classification, Drive storage, checksum
-    dedupe/supersession)."""
-    project = _project(public_id)
-    item = _checklist_item(project, item_public_id)
-    if not _can_edit_checklist_item(project, item):
-        abort(403)
-    uploaded = request.files.get("source_file")
-    if not uploaded or not uploaded.filename:
-        flash("Choose a file to upload.", "danger")
-        return _redirect_to_tab(project, "logistics", item.public_id)
-    category = None
-    if request.form.get("category"):
-        try:
-            category = resolve_vocabulary_value(request.form.get("category"), request.form.get("category_other"), domain="document_category")
-        except ValueError as error:
-            flash(str(error), "danger")
-            return _redirect_to_tab(project, "logistics", item.public_id)
-    classification = request.form.get("permission_classification") or None
-    try:
-        document = upload_file_single_shot(project, uploaded.filename, uploaded.read(), g.user, category=category, classification=classification)
-    except (UploadSessionError, ValueError) as error:
-        flash(str(error), "danger")
-        return _redirect_to_tab(project, "logistics", item.public_id)
-    if document.checklist_status_id in (None, item.id) or has_permission(g.user, "manage_projects", project):
-        document.checklist_status_id = item.id
-        record_audit("document.link_checklist", document, after={"checklist_status": item.public_id, "project": project.public_id, "via": "upload"}, actor=g.user)
-        db.session.commit()
-        flash("Document uploaded and linked to the requirement.", "success")
-    else:
-        flash("Document uploaded, but it is already linked to another requirement.", "warning")
-    return _redirect_to_tab(project, "logistics", item.public_id)
-
-
-@erp_bp.post("/projects/<string:public_id>/checklist-items/<string:item_public_id>/documents/<string:document_public_id>/detach")
-def detach_checklist_document(public_id, item_public_id, document_public_id):
-    """Unlink a document from a checklist requirement. This never deletes
-    the document, calls Drive, or changes its status -- the document simply
-    returns to the unlinked resources index."""
-    project = _project(public_id)
-    item = _checklist_item(project, item_public_id)
-    if not _can_edit_checklist_item(project, item):
-        abort(403)
-    document = DocumentRecord.query.filter_by(public_id=document_public_id, project_id=project.id, checklist_status_id=item.id).first_or_404()
-    document.checklist_status_id = None
-    record_audit("document.unlink_checklist", document, before={"checklist_status": item.public_id}, after={"checklist_status": None}, actor=g.user)
-    db.session.commit()
-    flash("Document unlinked.", "success")
-    return _redirect_to_tab(project, "logistics", item.public_id)
+    flash("Added \u2713", "success")
+    return _redirect_to_tab(project, "todo")
 
 
 @erp_bp.post("/projects/<string:public_id>/itinerary/upload")
@@ -1666,7 +691,7 @@ def upload_itinerary(public_id):
         abort(403)
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose an itinerary file to upload.", "danger")
+        flash("Choose the itinerary file first.", "danger")
         return _redirect_after_action(project, "logistics")
     try:
         batch = stage_itinerary_import(project, uploaded_file, g.user.public_id)
@@ -1677,7 +702,7 @@ def upload_itinerary(public_id):
             "success",
         )
     except (ItineraryParseError, ValueError) as error:
-        flash(f"Itinerary import failed: {error}", "danger")
+        flash(f"That itinerary could not be read: {error}", "danger")
     return _redirect_after_action(project, "logistics")
 
 
@@ -1688,7 +713,7 @@ def upload_buddy_allocation(public_id):
         abort(403)
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose a buddy allocation file to upload.", "danger")
+        flash("Choose the buddy sheet first.", "danger")
         return _redirect_after_action(project, "people")
     try:
         batch = stage_buddy_import(project, uploaded_file, g.user.public_id)
@@ -1698,56 +723,66 @@ def upload_buddy_allocation(public_id):
             message += f" {batch.error_count} row(s) need correction (see import batch for details)."
         flash(message, "success" if not batch.error_count else "warning")
     except (BuddyImportError, ValueError) as error:
-        flash(f"Buddy allocation import failed: {error}", "danger")
+        flash(f"That buddy sheet could not be read: {error}", "danger")
     return _redirect_after_action(project, "people")
 
 
 @erp_bp.post("/projects/<string:public_id>/reimbursements")
 def add_reimbursement(public_id):
+    """Ask for money: what for and how much. Who it is paid to, the date
+    (today) and a photo of the bill are all optional."""
     project = _project(public_id)
     if not has_permission(g.user, "manage_projects", project):
         abort(403)
+    what_for = (request.form.get("particular") or "").strip()
     try:
-        amount = Decimal(request.form.get("amount") or "")
+        amount = Decimal((request.form.get("amount") or "").replace(",", "").replace("\u20b9", "").strip())
         if amount < 0:
-            raise ValueError("Amount cannot be negative.")
-        entry_date = datetime.strptime(request.form.get("date"), "%Y-%m-%d").date()
-    except (InvalidOperation, ValueError, TypeError):
-        flash("A valid date and non-negative amount are required.", "danger")
-        return _redirect_after_action(project, "finance")
-    party_name = (request.form.get("party_name") or "").strip()
-    if not party_name:
-        flash("Party name is required.", "danger")
-        return _redirect_after_action(project, "finance")
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        flash("Type how much, as a number.", "danger")
+        return _redirect_after_action(project, "money")
+    if not what_for:
+        flash("Say what the money is for.", "danger")
+        return _redirect_after_action(project, "money")
     entry = ReimbursementEntry(
-        project_id=project.id, date=entry_date, party_name=party_name,
+        project_id=project.id, date=_form_date("date", date.today()),
+        party_name=(request.form.get("party_name") or "").strip(),
         bill_number=(request.form.get("bill_number") or "").strip() or None,
-        amount=amount, particular=(request.form.get("particular") or "").strip() or None,
-        status=(request.form.get("status") or "").strip() or "Pending",
-        created_by_id=g.user.id,
+        amount=amount, particular=what_for, status=MONEY_ASKED, created_by_id=g.user.id,
     )
     db.session.add(entry)
-    db.session.commit()
+    db.session.flush()
+    bill = request.files.get("bill")
+    if bill and bill.filename:
+        try:
+            document = upload_file_single_shot(project, bill.filename, bill.read(), g.user, category="Bills")
+            entry.bill_document_id = document.id
+        except UploadSessionError as error:
+            flash(f"The money was added, but the bill could not be: {error}", "warning")
     record_audit("reimbursement.create", entry, after={"project": project.public_id}, actor=g.user)
-    flash("Reimbursement entry added.", "success")
-    return _redirect_after_action(project, "finance")
+    db.session.commit()
+    flash("Added \u2713 Faculty will see it.", "success")
+    return _redirect_after_action(project, "money")
 
 
 @erp_bp.post("/projects/<string:public_id>/reimbursements/<string:entry_public_id>/status")
 def update_reimbursement_status(public_id, entry_public_id):
     project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
     entry = ReimbursementEntry.query.filter_by(public_id=entry_public_id, project_id=project.id).first_or_404()
     status = (request.form.get("status") or "").strip()
     if not status:
-        flash("Status cannot be blank.", "danger")
-        return _redirect_after_action(project, "finance")
-    entry.status = status
+        flash("Pick what happened to this money.", "danger")
+        return _redirect_after_action(project, "money")
+    try:
+        change_money_status(entry, status, g.user, request.form.get("comment"))
+    except MoneyDecisionError as error:
+        db.session.rollback()
+        flash(str(error), "danger")
+        return _redirect_after_action(project, "money")
     db.session.commit()
-    record_audit("reimbursement.status", entry, after={"status": status}, actor=g.user)
-    flash("Reimbursement status updated.", "success")
-    return _redirect_after_action(project, "finance")
+    flash(f"Marked {entry.status.lower()} \u2713", "success")
+    return _redirect_after_action(project, "money")
 
 
 @erp_bp.post("/projects/<string:public_id>/reimbursements/upload")
@@ -1757,14 +792,14 @@ def upload_reimbursements(public_id):
         abort(403)
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose a reimbursements file to upload.", "danger")
+        flash("Choose the money sheet first.", "danger")
         return _redirect_after_action(project, "finance")
     try:
         batch = stage_reimbursement_import(project, uploaded_file, g.user.public_id)
         commit_reimbursement_batch(batch, g.user)
-        flash(f"Reimbursements imported: {batch.committed_count} of {batch.staged_count} rows committed.", "success")
+        flash(f"Added {batch.committed_count} of {batch.staged_count} rows to the money list ✓", "success")
     except (ReimbursementImportError, ValueError) as error:
-        flash(f"Reimbursement import failed: {error}", "danger")
+        flash(f"That sheet could not be read: {error}", "danger")
     return _redirect_after_action(project, "finance")
 
 
@@ -1787,35 +822,15 @@ def upload_icc_attendance(public_id):
         abort(403)
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose a volunteer attendance file to upload.", "danger")
+        flash("Choose the attendance sheet first.", "danger")
         return _redirect_after_action(project, "people")
     try:
         batch = stage_icc_attendance_import(project, uploaded_file, g.user.public_id)
         commit_icc_attendance_batch(batch, g.user)
-        flash(f"Volunteer attendance imported: {batch.committed_count} of {batch.staged_count} rows committed.", "success")
+        flash(f"Added attendance for {batch.committed_count} of {batch.staged_count} rows ✓", "success")
     except ValueError as error:
-        flash(f"Attendance import failed: {error}", "danger")
+        flash(f"That attendance sheet could not be read: {error}", "danger")
     return _redirect_after_action(project, "people")
-
-
-@erp_bp.post("/projects/<string:public_id>/event-folder/upload")
-def upload_icc_event_folder(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    uploaded_files = [f for f in request.files.getlist("source_files") if f and f.filename]
-    if not uploaded_files:
-        flash("Choose one or more event-folder files to upload.", "danger")
-        return _redirect_after_action(project, "documents")
-    try:
-        results = stage_icc_event_folder_import(project, uploaded_files, g.user)
-        attached = sum(1 for r in results if r["status"] == "attached")
-        duplicates = sum(1 for r in results if r["status"] == "duplicate")
-        rejected = sum(1 for r in results if r["status"] == "rejected")
-        flash(f"Event folder import: {attached} attached, {duplicates} duplicate, {rejected} rejected.", "success")
-    except ValueError as error:
-        flash(f"Event folder import failed: {error}", "danger")
-    return _redirect_after_action(project, "documents")
 
 
 @erp_bp.get("/imports")
@@ -1825,7 +840,8 @@ def imports():
     batches = ImportBatch.query.order_by(ImportBatch.created_at.desc()).all()
     return render_template(
         "erp/imports.html",
-        batches=batches,
+        batches=batches if request.args.get("all") else batches[:5],
+        batch_total=len(batches),
         standard_import_types=sorted(STANDARD_IMPORTS),
         supplied_sources=available_supplied_sources(),
         # Committing a batch needs the global approval capability. Showing the
@@ -1835,30 +851,6 @@ def imports():
     )
 
 
-@erp_bp.post("/projects/<string:public_id>/documents/upload")
-def upload_documents(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "manage_projects", project):
-        abort(403)
-    uploaded_files = [f for f in request.files.getlist("source_files") if f and f.filename]
-    if not uploaded_files:
-        flash("Choose one or more files to upload.", "danger")
-        return _redirect_after_action(project, "documents")
-    attached, failed = 0, []
-    for uploaded_file in uploaded_files:
-        try:
-            content = uploaded_file.read()
-            upload_file_single_shot(project, uploaded_file.filename, content, g.user)
-            attached += 1
-        except UploadSessionError as error:
-            failed.append(f"{uploaded_file.filename}: {error}")
-    if attached:
-        flash(f"{attached} document(s) uploaded to Drive and indexed.", "success")
-    for message in failed:
-        flash(message, "danger")
-    return _redirect_after_action(project, "documents")
-
-
 @erp_bp.post("/imports/upload")
 def upload_import():
     if not has_permission(g.user, "manage_imports"):
@@ -1866,11 +858,11 @@ def upload_import():
     uploaded_file = request.files.get("source_file")
     import_type = request.form.get("import_type")
     if not uploaded_file or not uploaded_file.filename:
-        flash("Choose a file to upload.", "danger")
+        flash("Choose a file first.", "danger")
     else:
         try:
             batch = stage_uploaded_source(import_type, uploaded_file, g.user.public_id)
-            flash(f"Batch staged: {batch.staged_count} rows, {batch.error_count} errors.", "success")
+            flash(f"Checked: {batch.staged_count - batch.error_count} rows are fine, {batch.error_count} have problems. Nothing is saved yet.", "success")
         except (ValueError, KeyError) as error:
             flash(str(error), "danger")
     return redirect(url_for("erp.imports"))
@@ -1882,7 +874,7 @@ def stage_import():
         abort(403)
     try:
         batch = stage_supplied_source(request.form.get("import_type"))
-        flash(f"Batch staged: {batch.staged_count} rows, {batch.error_count} errors.", "success")
+        flash(f"Checked: {batch.staged_count - batch.error_count} rows are fine, {batch.error_count} have problems. Nothing is saved yet.", "success")
     except MissingSourceError as error:
         flash(str(error), "warning")
     except (ValueError, FileNotFoundError) as error:
@@ -1897,7 +889,7 @@ def commit_import(public_id):
     batch = ImportBatch.query.filter_by(public_id=public_id).first_or_404()
     try:
         commit_batch(batch, g.user)
-        flash(f"Batch committed with {batch.committed_count} records reconciled.", "success")
+        flash(f"Saved ✓ {batch.committed_count} rows added.", "success")
     except ValueError as error:
         flash(str(error), "danger")
     return redirect(url_for("erp.imports"))
@@ -1924,14 +916,6 @@ def complete_report_preview(public_id):
     return render_template("erp/complete_report_preview.html", project=project, preflight=preflight)
 
 
-@erp_bp.get("/projects/<string:public_id>/report/preflight")
-def report_preflight_route(public_id):
-    project = _project(public_id)
-    if not has_permission(g.user, "report", project):
-        abort(403)
-    return preflight_report(project)
-
-
 @erp_bp.get("/projects/<string:public_id>/report/complete.pdf")
 def download_complete_report(public_id):
     project = _project(public_id)
@@ -1941,10 +925,10 @@ def download_complete_report(public_id):
     try:
         pdf_bytes, snapshot = assemble_complete_report(project, g.user, allow_incomplete=allow_incomplete)
     except ReportIncompleteError:
-        flash("Some report dependencies are missing, inaccessible, or unsupported. Review them below before downloading.", "warning")
+        flash("Some files could not be opened. See which ones below, then download it anyway if that is fine.", "warning")
         return redirect(url_for("erp.complete_report_preview", public_id=project.public_id))
     except DriveStorageError as error:
-        flash(f"A source document could not be read from document storage: {error}", "danger")
+        flash(f"A file could not be opened: {error}", "danger")
         return redirect(url_for("erp.complete_report_preview", public_id=project.public_id))
     record_audit("report.download_complete_pdf", snapshot, after={"project": project.public_id, "allow_incomplete": allow_incomplete})
     db.session.commit()
@@ -1982,6 +966,11 @@ def audit():
     return render_template("erp/audit.html", events=events, actors=actors)
 
 
+#: The alerts a person may turn off. Anything else -- an account change, or
+#: something handed straight to them -- always arrives.
+OPTIONAL_ALERTS = ("task.deadline", "checklist.deadline", "task.status")
+
+
 @erp_bp.get("/notifications")
 def notifications():
     items = Notification.query.filter_by(user_id=g.user.id).order_by(Notification.created_at.desc()).limit(200).all()
@@ -1999,15 +988,25 @@ def notification_read(public_id):
 
 @erp_bp.post("/notification-preferences")
 def notification_preferences():
+    """One switch, "Email me when something needs me", which sets every alert
+    that can be switched off. A single ``event_type`` still sets just that
+    one, for anything that posted it before."""
     event_type = (request.form.get("event_type") or "").strip()
     if not event_type:
         abort(422)
-    preference = NotificationPreference.query.filter_by(user_id=g.user.id, event_type=event_type).first()
-    if not preference:
-        preference = NotificationPreference(user_id=g.user.id, event_type=event_type)
-        db.session.add(preference)
-    preference.email_enabled = bool(request.form.get("email_enabled"))
-    preference.in_app_enabled = bool(request.form.get("in_app_enabled"))
+    event_types = OPTIONAL_ALERTS if event_type == "all" else (event_type,)
+    for kind in event_types:
+        preference = NotificationPreference.query.filter_by(user_id=g.user.id, event_type=kind).first()
+        if not preference:
+            preference = NotificationPreference(user_id=g.user.id, event_type=kind)
+            db.session.add(preference)
+        preference.email_enabled = bool(request.form.get("email_enabled"))
+        preference.in_app_enabled = bool(request.form.get("in_app_enabled")) or event_type == "all"
     db.session.commit()
-    flash("Notification preference saved. Critical security and direct-assignment alerts remain enabled.", "success")
+    flash("Saved ✓", "success")
     return redirect(url_for("erp.notifications"))
+
+
+# The rebuilt event page's routes register on erp_bp; imported last so the
+# blueprint and the helpers they share already exist.
+from app.blueprints import erp_event  # noqa: E402,F401

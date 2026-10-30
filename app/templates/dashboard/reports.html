@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block screen_title %}Reports{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- One year at a glance, then the finished events with their reports.
+    Faculty and the USC only. -#}
+{% block content %}
+<div class="cv-page">
+  {% if years|length > 1 %}
+  <nav class="cv-chips cv-chips--links" aria-label="Pick a year">
+    {% for item in years %}
+    <a class="cv-chip-link{% if year and item.id == year.id %} is-on{% endif %}" href="{{ url_for('dashboard.reports', year=item.public_id) }}"{% if year and item.id == year.id %} aria-current="page"{% endif %}>{{ item.name }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <section class="cv-section" aria-labelledby="year-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="year-title">{{ year.name if year else 'All years' }} at a glance</h2></div>
+    <dl class="cv-stats">
+      {% for total in totals %}
+      <div class="cv-stat">
+        <dt>{{ total.label }}</dt>
+        <dd>{{ total.value|money if total.money else total.value }}{% if total.note %}<small>{{ total.note }}</small>{% endif %}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section class="cv-section" aria-labelledby="finished-title">
+    <div class="cv-section__head">
+      <h2 class="cv-section__title" id="finished-title">Finished events</h2>
+      <span class="cv-count">{{ finished_total }}</span>
+      <a class="cv-section__link" href="{{ url_for('erp.projects', show='finished') }}">Open in Events</a>
+    </div>
+    <ul class="cv-list">
+      {% for project in finished %}
+      <li class="cv-item">
+        <a class="cv-item__main cv-item__link" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
+          <span class="cv-item__title">{{ project.title }}</span>
+          <span class="cv-item__meta">{{ project.start_date|localdate('%d %b %Y') }}{% if project.venue %} · {{ project.venue }}{% endif %}</span>
+        </a>
+        <span class="cv-item__act"><a class="cv-btn" href="{{ url_for('erp.download_complete_report', public_id=project.public_id) }}">Report (PDF)<span class="visually-hidden"> for {{ project.title }}</span></a></span>
+      </li>
+      {% else %}
+      <li class="cv-empty">No event has been signed off this year yet.</li>
+      {% endfor %}
+    </ul>
+    {% if finished_total > finished|length %}<a class="cv-more" href="{{ url_for('dashboard.reports', year=year.public_id if year else None, all=1) }}">Show all {{ finished_total }}</a>{% endif %}
+  </section>
+</div>
+{% endblock %}

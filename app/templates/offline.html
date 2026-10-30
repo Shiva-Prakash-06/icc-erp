@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f2f2f3">
-  <title>Offline | OIA Project Intelligence</title>
+  <title>Offline | Christ University</title>
   {% for stylesheet in ui_styles('frontend/src/entries/aurora.tsx') %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
 </head>
 <body>
@@ -16,11 +16,11 @@
       <div class="auth-header">
         <div class="auth-logo">O</div>
         <h1 class="auth-title">You are offline</h1>
-        <p class="auth-subtitle">Command Portal | Office of International Affairs</p>
+        <p class="auth-subtitle">Office of International Affairs</p>
       </div>
       <p class="text-muted">
-        This device has no connection right now. Operational records are never
-        stored on the device, so there is nothing to show until you reconnect.
+        This phone or computer has no internet right now. Nothing is kept on
+        it, so there is nothing to show until you are back online.
       </p>
       {#- A link, not a button with an inline handler: script-src 'self' has no
           'unsafe-inline', so an onclick would be blocked by CSP and do nothing. -#}

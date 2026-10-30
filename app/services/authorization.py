@@ -9,32 +9,41 @@ from sqlalchemy import and_, or_
 from app.models.erp import RoleAssignment
 
 
+# Faculty is the only role that approves anything (money, finishing an event,
+# showing it on the public website). Students who run events -- the USC and
+# the Events and IGP heads -- create and edit, but never sign off their own
+# work. Media and Culturals heads own no events at all: they are contributors
+# who see and complete the to-do items handed to their team on any ICC or IGP
+# event (see app/services/teams.py). Everyone else signs up as a volunteer and
+# only views the activities they are listed on.
+_FACULTY_PERMISSIONS = {
+    "manage_users", "manage_governance", "manage_projects", "manage_people", "manage_imports",
+    "approve", "approve_operational_requests", "waive", "report", "audit", "sensitive_links",
+}
+_VIEW_ONLY = {"view_assigned"}
+
 ROLE_PERMISSIONS = {
+    # Technical operations only: no business approvals and no publication.
     "SYSTEM_ADMINISTRATOR": {
-        "platform_admin", "manage_users", "manage_governance", "manage_projects",
-        "manage_people", "manage_imports", "approve", "waive", "report", "audit",
+        "platform_admin", "manage_users", "manage_projects", "manage_people", "manage_imports", "report", "audit",
     },
-    "OIA_FACULTY_ADMINISTRATOR": {"manage_users", "manage_governance", "manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report", "audit", "sensitive_links"},
-    "FACULTY_COORDINATOR": {"manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report"},
-    "ICC_SECRETARY_USC": {"manage_governance", "manage_projects", "manage_people", "manage_imports", "report"},
-    "ICC_EVENTS_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
-    "ICC_MEDIA_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
-    "ICC_CULTURALS_HEAD": {"manage_projects", "manage_people", "approve", "approve_operational_requests", "report"},
-    "ICC_ASSOCIATE": {"contribute", "view_assigned"},
-    "IGP_HEAD": {"manage_projects", "manage_people", "manage_imports", "approve", "approve_operational_requests", "waive", "report", "sensitive_links"},
-    "IGP_PROGRAM_LEAD": {"manage_projects", "manage_people", "approve", "report"},
-    "VOLUNTEER": {"contribute", "view_assigned"},
-    "BUDDY": {"contribute", "view_assigned"},
-    "PARTICIPANT": {"view_personal"},
+    "OIA_FACULTY_ADMINISTRATOR": set(_FACULTY_PERMISSIONS),
+    # Merged into "Faculty": kept as a key so existing assignments still work.
+    "FACULTY_COORDINATOR": set(_FACULTY_PERMISSIONS),
+    "ICC_SECRETARY_USC": {"manage_projects", "manage_people", "manage_imports", "report"},
+    "ICC_EVENTS_HEAD": {"manage_projects", "manage_people", "report"},
+    "ICC_MEDIA_HEAD": {"contribute_team"},
+    "ICC_CULTURALS_HEAD": {"contribute_team"},
+    "IGP_HEAD": {"manage_projects", "manage_people", "manage_imports", "report", "sensitive_links"},
+    "VOLUNTEER": set(_VIEW_ONLY),
+    # Retired roles. Each now reads as a volunteer; the keys stay so that rows
+    # written before the simplification still resolve to something safe.
+    "ICC_ASSOCIATE": set(_VIEW_ONLY),
+    "IGP_PROGRAM_LEAD": set(_VIEW_ONLY),
+    "BUDDY": set(_VIEW_ONLY),
+    "PARTICIPANT": set(_VIEW_ONLY),
     "AUDITOR": {"report", "audit"},
 }
-
-# Business approval of operational (expenditure/logistics) requests is deliberately
-# narrower than the general "approve" permission: USC (ICC_SECRETARY_USC), IGP
-# Program Lead, and System Administrator hold "approve" for other workflows
-# (documents, reports, budgets) but must NOT be able to approve operational
-# requests on scope or technical-admin status alone -- see PLAN.md "USC operational
-# approvals" finding.
 
 # Permissions that are inherently platform-wide (not tied to any single project's
 # campus/wing/operating-unit scope). Only these may be granted by an assignment

@@ -1,99 +1,75 @@
 {% extends "base.html" %}
 
-{% block title %}Register - OIA Project Intelligence{% endblock %}
+{% block title %}Sign up{% endblock %}
+
+{% macro field_error(name) -%}
+{% if field_errors and field_errors[name] %}<div id="{{ name }}-error" class="text-danger small mt-2" role="alert">{{ field_errors[name] }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro invalid(name) -%}
+{% if field_errors and field_errors[name] %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}
+{%- endmacro %}
 
 {% block auth_content %}
-<div class="auth-card auth-card--wide mx-auto">
+<div class="auth-card mx-auto">
     <div class="auth-header">
         <div class="auth-logo">O</div>
-        <h1 class="auth-title">Create Command Account</h1>
-        <p class="auth-subtitle">Register for project tracking access</p>
+        <h1 class="auth-title">Sign up</h1>
+        <p class="auth-subtitle">Use your university email. You can start right away.</p>
     </div>
-    
-    <form action="{{ url_for('auth.register') }}" method="POST">
+
+    <form action="{{ url_for('auth.register') }}" method="POST" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row">
-            <div class="col-12">
+            <div class="col-md-6">
                 <div class="aurora-field">
-                    <label for="username" class="aurora-label">Username</label>
-                    <input type="text" id="username" name="username" class="aurora-input" placeholder="username" required>
+                    <label for="first_name" class="aurora-label">First name</label>
+                    <input type="text" id="first_name" name="first_name" class="aurora-input" value="{{ form.get('first_name', '') }}" autocomplete="given-name" required{{ invalid('first_name') }}>
+                    {{ field_error('first_name') }}
                 </div>
             </div>
-            <div class="col-12">
+            <div class="col-md-6">
                 <div class="aurora-field">
-                    <label for="email" class="aurora-label">Email</label>
-                    <input type="email" id="email" name="email" class="aurora-input" placeholder="email@christuniversity.in" required>
+                    <label for="last_name" class="aurora-label">Last name</label>
+                    <input type="text" id="last_name" name="last_name" class="aurora-input" value="{{ form.get('last_name', '') }}" autocomplete="family-name">
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="aurora-field">
-                    <label for="password" class="aurora-label">Password</label>
-                    <div class="d-flex gap-2">
-                        <input type="password" id="password" name="password" class="aurora-input" placeholder="At least 12 characters" minlength="12" required autocomplete="new-password" aria-describedby="password-requirements">
-                        <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="aurora-field">
-                    <label for="confirm_password" class="aurora-label">Confirm Password</label>
-                    <div class="d-flex gap-2">
-                        <input type="password" id="confirm_password" name="confirm_password" class="aurora-input" placeholder="Repeat password" required autocomplete="new-password">
-                        <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#confirm_password" aria-pressed="false">Show</button>
-                    </div>
-                </div>
-            </div>
-            <p id="password-requirements" class="small text-muted mb-3">Use at least 12 characters. A mix of words, numbers, and symbols makes it stronger.</p>
+        <div class="aurora-field">
+            <label for="email" class="aurora-label">University email</label>
+            <input type="email" id="email" name="email" class="aurora-input" value="{{ form.get('email', '') }}" placeholder="name@christuniversity.in" autocomplete="email" required{{ invalid('email') }}>
+            {{ field_error('email') }}
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="aurora-field">
-                    <label for="campus_id" class="aurora-label">Home Campus</label>
-                    <select id="campus_id" name="campus_id" class="aurora-input" required>
-                        <option value="" disabled selected>Select Campus</option>
-                        {% for campus in campuses %}
-                            <option value="{{ campus.id }}">{{ campus.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+        <div class="aurora-field">
+            <label for="password" class="aurora-label">Password</label>
+            <div class="d-flex gap-2">
+                <input type="password" id="password" name="password" class="aurora-input" placeholder="At least 12 characters" minlength="12" required autocomplete="new-password" aria-describedby="password-requirements{% if field_errors and field_errors.password %} password-error{% endif %}"{% if field_errors and field_errors.password %} aria-invalid="true"{% endif %}>
+                <button type="button" class="aurora-button--outline-info" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
             </div>
-            <div class="col-md-6">
-                <div class="aurora-field">
-                    <label for="preferred_role" class="aurora-label">Requested Role</label>
-                    <select id="preferred_role" name="preferred_role" class="aurora-input" required>
-                        <option value="" disabled selected>Select Role</option>
-                        <option value="Faculty">Faculty</option>
-                        <option value="ICC Core Committee">ICC Core Committee</option>
-                        <option value="Volunteer">Volunteer</option>
-                        <option value="Buddy">Buddy</option>
-                        <option value="Exchange Student">Exchange Student</option>
-                    </select>
-                </div>
-            </div>
+            <p id="password-requirements" class="small text-muted mt-2 mb-0">At least 12 letters, numbers or symbols. Tap Show to check it.</p>
+            {{ field_error('password') }}
         </div>
 
-        <!-- Optional Volunteer Fields (Toggled Dynamically) -->
-        <div id="volunteer_fields" data-volunteer-fields hidden class="aurora-card--padded mb-3">
-            <div class="aurora-field">
-                <label for="skills" class="aurora-label">Skills (e.g. Photography, Graphic Design, Social Media, Logistics)</label>
-                <input type="text" id="skills" name="skills" class="aurora-input" placeholder="Enter skills (comma separated)">
-            </div>
-            <div class="aurora-field mb-0">
-                <label for="interests" class="aurora-label">Interests / Motivation</label>
-                <textarea id="interests" name="interests" class="aurora-input" rows="2" placeholder="Tell us why you want to join..."></textarea>
-            </div>
+        {% if campuses|length > 1 %}
+        <div class="aurora-field">
+            <label for="campus_id" class="aurora-label">Your campus</label>
+            <select id="campus_id" name="campus_id" class="aurora-input" required{{ invalid('campus_id') }}>
+                {% for campus in campuses %}
+                    <option value="{{ campus.id }}" {% if form.get('campus_id') == campus.id|string or (not form.get('campus_id') and loop.first) %}selected{% endif %}>{{ campus.name }}</option>
+                {% endfor %}
+            </select>
+            {{ field_error('campus_id') }}
         </div>
-        
-        <button type="submit" class="aurora-button--primary w-100 mt-2 py-2.5">Submit Registration</button>
+        {% endif %}
+
+        <button type="submit" class="aurora-button--primary w-100 mt-2 py-2.5">Sign up</button>
     </form>
-    
+
     <div class="text-center mt-4">
-        <span class="text-muted small">Already registered?</span>
-        <a href="{{ url_for('auth.login') }}" class="text-info small fw-bold text-decoration-none ms-1">Sign In</a>
+        <span class="text-muted small">Already have an account?</span>
+        <a href="{{ url_for('auth.login') }}" class="text-info small fw-bold text-decoration-none ms-1">Sign in</a>
     </div>
 </div>
 

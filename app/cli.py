@@ -10,7 +10,7 @@ from flask import current_app
 
 from app.database import db
 from app.models.user import User
-from app.models.erp import BudgetLine, ChecklistTemplate, DocumentRecord, FeedbackForm, FeedbackResponse, ImportBatch, OperationalRequest, Person, ProjectSession, ReportSnapshot, RoleAssignment, TeamAssignment, WorkTask
+from app.models.erp import BudgetLine, ChecklistTemplate, DocumentRecord, FeedbackForm, FeedbackResponse, ImportBatch, OperationalRequest, Person, ProjectSession, ReimbursementEntry, ReportSnapshot, RoleAssignment, TeamAssignment, WorkTask
 from app.models.production import ContributionRecord, RecruitmentApplication
 from app.models.project import BuddyAssignment, BuddyLog, Project
 from app.services.imports import _reference_data
@@ -146,7 +146,9 @@ def register_cli(app):
             "e2e_faculty": ("OIA Faculty Administrator", "OIA_FACULTY_ADMINISTRATOR", {}),
             "e2e_usc": ("ICC Secretary / USC", "ICC_SECRETARY_USC", {"campus_id": campus.id, "operating_unit_id": icc.id, "academic_year_id": year.id}),
             "e2e_igp": ("IGP Head", "IGP_HEAD", {"campus_id": campus.id, "operating_unit_id": igp.id, "academic_year_id": year.id}),
-            "e2e_events": ("ICC Events Head", "ICC_EVENTS_HEAD", {"campus_id": campus.id, "operating_unit_id": icc.id, "wing_id": events_wing.id, "academic_year_id": year.id}),
+            "e2e_events": ("ICC Events Head", "ICC_EVENTS_HEAD", {"campus_id": campus.id, "operating_unit_id": icc.id, "academic_year_id": year.id}),
+            "e2e_media": ("ICC Media Head", "ICC_MEDIA_HEAD", {"campus_id": campus.id, "operating_unit_id": icc.id, "academic_year_id": year.id}),
+            "e2e_culturals": ("ICC Culturals Head", "ICC_CULTURALS_HEAD", {"campus_id": campus.id, "operating_unit_id": icc.id, "academic_year_id": year.id}),
             "e2e_volunteer": ("Volunteer", "VOLUNTEER", {}),
         }
         users = {}
@@ -223,6 +225,47 @@ def register_cli(app):
             db.session.add(pairing)
             db.session.flush()
             db.session.add(BuddyLog(buddy_assignment_id=pairing.id, activity_date=igp_project.start_date, description="Acceptance buddy orientation", duration_hours=1, status="Pending"))
+        # Media and Culturals own no events: their work is what is handed to
+        # their team, on ICC and IGP events alike.
+        for project, title, team in (
+            (event, "Make the event poster", "media"),
+            (igp_project, "Take welcome photos", "media"),
+            (event, "Plan the opening dance", "culturals"),
+            (igp_project, "Run the culture night", "culturals"),
+        ):
+            if not WorkTask.query.filter_by(project_id=project.id, title=title).first():
+                db.session.add(WorkTask(project_id=project.id, title=title, status="Not Started", assigned_team=team))
+        # What Faculty approves now: money, and events sent to be signed off.
+        if not ReimbursementEntry.query.filter_by(project_id=event.id, particular="Acceptance snacks").first():
+            db.session.add(ReimbursementEntry(project_id=event.id, date=event.start_date, party_name="Campus canteen",
+                                              amount=1500, particular="Acceptance snacks", status="Asked",
+                                              created_by_id=users["e2e_events"].id))
+        # An event on the day the suite runs, so "Take attendance" shows on
+        # the Events head's home. Seeded fresh with every server start.
+        today_event = Project.query.filter_by(code="E2E-ICC-TODAY").first()
+        if not today_event:
+            today = date.today()
+            today_event = Project(code="E2E-ICC-TODAY", title="Acceptance event today", campus_id=campus.id, program_type_id=icc_type.id,
+                                  academic_year_id=year.id, operating_unit_id=icc.id, project_type="ICC event", category="Operational",
+                                  status="Active", start_date=today, end_date=today, venue="Central Campus")
+            db.session.add(today_event)
+            db.session.flush()
+            from app.services.timeutil import to_utc
+            db.session.add(ProjectSession(project_id=today_event.id, code="MAIN", title="Main session", session_type="Event",
+                                          starts_at=to_utc(datetime.combine(today, datetime.min.time()).replace(hour=10)),
+                                          ends_at=to_utc(datetime.combine(today, datetime.min.time()).replace(hour=12)), venue=today_event.venue))
+            db.session.add(TeamAssignment(project_id=today_event.id, person_id=users["e2e_volunteer"].person_id, user_id=users["e2e_volunteer"].id,
+                                          assignment_type="Project Team", role_label="Usher"))
+        done = Project.query.filter_by(code="E2E-ICC-DONE").first()
+        if not done:
+            done = Project(code="E2E-ICC-DONE", title="Acceptance finished event", campus_id=campus.id, program_type_id=icc_type.id,
+                           academic_year_id=year.id, operating_unit_id=icc.id, project_type="ICC event", category="Operational",
+                           status="Active", start_date=date(2026, 7, 20), end_date=date(2026, 7, 20), venue="Central Campus",
+                           finish_requested_at=datetime(2026, 7, 21, 9, tzinfo=timezone.utc), finish_requested_by_id=users["e2e_events"].id,
+                           closure_summary="Ran on time; 40 came.")
+            db.session.add(done)
+            db.session.flush()
+            db.session.add(DocumentRecord(project_id=done.id, title="Event report", category="Event Report", status="Submitted"))
         db.session.commit()
         click.echo("Acceptance fixtures ready. Test password: 123")
 
@@ -257,7 +300,9 @@ def register_cli(app):
             "uat_faculty_admin": ("OIA Faculty Administrator", "OIA_FACULTY_ADMINISTRATOR", None, None, True),
             "uat_usc": ("ICC Secretary / USC", "ICC_SECRETARY_USC", icc, None, False),
             "uat_igp_head": ("IGP Head", "IGP_HEAD", igp, None, True),
-            "uat_icc_events_head": ("ICC Events Head", "ICC_EVENTS_HEAD", icc, events_wing, False),
+            "uat_icc_events_head": ("ICC Events Head", "ICC_EVENTS_HEAD", icc, None, False),
+            "uat_media_head": ("ICC Media Head", "ICC_MEDIA_HEAD", icc, None, False),
+            "uat_culturals_head": ("ICC Culturals Head", "ICC_CULTURALS_HEAD", icc, None, False),
             "uat_volunteer": ("Volunteer", "VOLUNTEER", None, None, False),
         }
         credentials = []

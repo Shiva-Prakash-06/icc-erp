@@ -29,8 +29,6 @@ from app.database import db
 from app.models.erp import OperatingUnit, Person, RoleAssignment
 from app.models.project import AcademicYear, BuddyAssignment, BuddyLog, Campus, ProgramType, Project
 from app.models.user import User
-from app.services.analytics import division_dashboard
-from app.services.hierarchy import DIVISIONS, event_state, matches_filter
 from app.services.status import review_state, status_of
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -234,46 +232,18 @@ class HomeRouteRateLimitTestCase(unittest.TestCase):
 
 
 class KpiDrilldownTestCase(AuditFixtureTestCase):
-    """P0-03 -- "Active programmes 1 of 1" opened a list reading "0 in scope"."""
+    """P0-03 -- "Active programmes 1 of 1" opened a list reading "0 in scope".
 
-    def test_every_linked_kpi_opens_a_list_containing_what_it_counted(self):
+    The analytics counters are gone. What has to stay true is that an event
+    still in flight -- here one stored as `Closing` -- is on the Events list
+    as it first opens, and that the old `?state=` links still open a list."""
+
+    def test_an_in_flight_programme_is_on_the_default_events_list(self):
         self.login()
-        for division in DIVISIONS.values():
-            dashboard = division_dashboard(self.user, division)
-            linked = [kpi for kpi in dashboard["kpis"] if kpi["href"]]
-            self.assertTrue(linked, f"{division['slug']} dashboard has no linked KPI to check")
-            for kpi in linked:
-                endpoint, params = kpi["href"]
-                with self.subTest(division=division["slug"], kpi=kpi["label"]):
-                    # A counter never links to `status`, which matches the
-                    # stored column, because no counter counts that column.
-                    self.assertNotIn("status", params, f"{kpi['label']} links to a stored-status filter")
-                    self.assertEqual(endpoint, "erp.projects")
+        body = self.client.get("/erp/projects").data.decode()
+        self.assertIn(self.closing.title, body)
 
-    def test_the_in_flight_count_and_its_destination_agree(self):
-        self.login()
-        dashboard = division_dashboard(self.user, DIVISIONS["igp"])
-        kpi = dashboard["kpis"][0]
-        self.assertEqual(kpi["value"], 1)
-
-        _, params = kpi["href"]
-        response = self.client.get("/erp/projects", query_string=params)
-        self.assertEqual(response.status_code, 200)
-        body = response.data.decode()
-        self.assertIn(self.closing.title, body,
-                      "the Closing programme the KPI counted is missing from the list it opens")
-
-    def test_the_old_stored_status_filter_would_still_have_missed_it(self):
-        """Proves the fixture reproduces the audit's defect: the record the
-        KPI counts is `Closing`, so the destination the audit found --
-        `?status=Active` -- genuinely excludes it."""
-        self.login()
-        response = self.client.get("/erp/projects", query_string={"status": "Active"})
-        self.assertNotIn(self.closing.title, response.data.decode())
-        self.assertEqual(event_state(self.closing), "active")
-        self.assertTrue(matches_filter(event_state(self.closing), "active"))
-
-    def test_the_state_filter_is_offered_for_every_reserved_state(self):
+    def test_the_old_state_links_still_open_a_list(self):
         self.login()
         for state in ("active", "upcoming", "complete"):
             with self.subTest(state=state):
@@ -338,12 +308,16 @@ class StatusContradictionTestCase(AuditFixtureTestCase):
         db.session.commit()
 
         self.login()
+        # The old section link still opens the Buddies card. A pair shows
+        # how often they met -- logs need no approval any more, so there is
+        # no status chip left to contradict anything.
         response = self.client.get(f"/erp/projects/{self.closing.public_id}", query_string={"tab": "people", "section": "buddies"})
         body = response.data.decode()
-        self.assertIn("Campus tour", body)
-        row = body[body.index("Campus tour") - 600:body.index("Campus tour") + 600]
-        self.assertNotIn("ds-row--overdue", row)
-        self.assertNotIn("ds-chip--overdue", row)
+        self.assertRegex(body, r'id="card-buddies"\s+open')
+        row = body[body.index(f'id="{assignment.public_id}"'):]
+        row = row[:row.index("</li>")]
+        self.assertIn("1 time met", row)
+        self.assertNotIn("cv-tag--no", row)
 
 
 class MobileActionClippingTestCase(AuditFixtureTestCase):

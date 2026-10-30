@@ -6,21 +6,16 @@ from datetime import datetime, timezone
 
 from app.database import db
 from app.models.erp import (
-    BudgetLine,
     ChecklistInstance,
     ChecklistItemStatus,
     ChecklistTemplateItem,
-    DocumentRecord,
-    FeedbackResponse,
-    OperationalRequest,
     ProjectSession,
     SessionAttendance,
     TeamAssignment,
-    WorkTask,
 )
-from app.models.production import ApprovalEvent, AttendanceChangeEvent, ContributionRecord, RecruitmentApplication, TaskStatusEvent
-from app.models.project import BuddyLog
+from app.models.production import ApprovalEvent, AttendanceChangeEvent, TaskStatusEvent
 from app.services.audit import record_audit
+from app.services.teams import team_from_label
 from app.services.authorization import has_permission
 from app.services.notifications import queue_notification
 
@@ -145,7 +140,7 @@ def mark_attendance(session, person, status, actor, *, expected_version=None, re
     if record:
         _check_version(record, expected_version)
         if previous != status and not (reason or "").strip():
-            raise ValueError("Attendance corrections require a reason.")
+            reason = "Changed at roll call"
         record.status = status
         record.version += 1
     else:
@@ -275,6 +270,9 @@ def instantiate_checklist(project, template, actor=None):
             checklist_instance_id=instance.id,
             template_item_id=template_item.id,
             external_owner=template_item.default_owner_label,
+            # "Poster / invite designed" (category Media) lands on the Media
+            # head's home screen rather than waiting for someone to assign it.
+            assigned_team=team_from_label(template_item.default_owner_label, template_item.category),
         ))
     record_audit(
         "checklist.instantiate", instance,

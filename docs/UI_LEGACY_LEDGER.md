@@ -315,3 +315,170 @@ Fixed in passing, found because it blocked the audit:
 Implementation evidence: Python `380 passed` (60 subtests), `npm run
 typecheck`, `build:ui` and `check:assets` pass (application CSS 81,988 B).
 No route added, removed or renamed.
+
+## 2026-10-29 — Simplification phase 1: roles, teams, money, sign-up
+
+Plan: `/Users/Shiva_1/.claude/plans/scrutinise-the-ui-and-swift-wren.md`
+(task-first simplification). This slice changes rules, not layout.
+
+| Change | Before | After |
+| --- | --- | --- |
+| Who approves | Faculty, every ICC wing head, the IGP head (and USC for publication) | Faculty only. Heads and the USC create and edit; finishing an event (Completed/Archived) and money are Faculty's sign-off |
+| ICC head scope | Pinned to one wing; unwinged ICC events invisible | Events head runs every ICC event in their year. Media and Culturals heads own no events: they reach an event only through items handed to their team (`app/services/teams.py`), across wings and ICC/IGP |
+| Retired roles | Associate, buddy, participant, IGP programme lead, auditor assignable | Not offered. Existing rows become Volunteer (programme leads flagged for Faculty to re-promote) |
+| Volunteers | Could log hours and buddy logs | View only. Heads record hours and buddy logs |
+| Sign-up | Username, email, two passwords, campus, requested role; waits for approval | First name, last name, university email, one password; active immediately as a volunteer. Frozen form names for `/register` updated in `tests/ui_contract/baseline.json` |
+| Money | Reimbursements (IGP only, free-text status) | The money list on every event, with Asked → Approved → Paid / Not approved. Faculty approves from the queue ("Money" kind) and never their own ask |
+
+Migration `d4a7c3e91b52` adds `assigned_team` to tasks and checklist items,
+the approval columns to `reimbursement_entries`, and maps the data above.
+No route added, removed or renamed.
+
+## 2026-10-29 — Simplification phase 2: the event page and data entry
+
+The five-tab workspace (section strips, pagers, 16 `:target` dialogs, ten
+row-level approve/reject widgets) is replaced by one page per event:
+
+- **To do** first and open: one press ticks an item (`POST …/todos/done`),
+  "⋯" folds away Skip (with a reason), Add file (ticks it too) and Remove
+  (with a ten-second Undo). Tasks and checklist items are one list
+  (`app/services/todo.py`); an item can be for a person or a team.
+- **Folded cards** below, each one line until opened: Schedule, People,
+  Money, Files, Buddies (IGP), Feedback, Applications, Event details,
+  Finish. Lists show five rows, then "Show all".
+- **Finish** replaces lifecycle moves, the closure summary and Public
+  disclosure: the owner sends the event to Faculty once the event report
+  file is there and attendance was taken; Faculty signs it off (and puts it
+  on the website if asked) in one click. Risks, open requests and open
+  to-do items no longer block it.
+- **Entry shortcuts**: new event is a name and a date (a main session and
+  the standard to-do list are made for you, or a past event is copied);
+  people are pasted as a list; roll call starts with everyone ticked and
+  takes walk-ins and hours; money is "what for / how much" with an
+  optional bill photo; files take one "What is this?" answer; feedback is a
+  link anyone can answer without signing in (`/public/feedback/<token>`).
+- **Volunteers** listed on an event see only their job, their buddy and the
+  times (`erp/event_volunteer.html`). Contributors (Media/Culturals) see
+  only their team's items and the files they add.
+
+Old links still land: `?tab=`, `?section=` and `?focus=` resolve to the
+card holding the record (`app/services/event_page.py`), and
+`/projects/<id>/setup?step=…` redirects to the matching card.
+
+Removed: `erp/project_detail.html`, `erp/_project_modals.html`,
+`erp/project_setup.html`, `app/services/paging.py` and
+`tests/workspace_paging_test.py`. Routes added for the to-do list,
+removing/restoring, pasting people, templates, files, the feedback link and
+finishing; the baseline (`tests/ui_contract/baseline.json`) was
+regenerated (171 rules) and its frozen forms now name the new forms.
+
+Migration `e5b8d2f40a63` adds the finish columns, copies budget lines and
+requests onto the money list, maps old statuses to Active, and settles the
+approvals that no longer exist.
+
+Fixed in passing: `decide_recruitment_route` called `decide_recruitment`
+without importing it, so deciding an application crashed; the decision
+queue's Approve posted `return_to`, which nothing read, so approving
+bounced Faculty out of their queue.
+
+## 2026-10-29 — Simplification phase 3: My work, the rail, Reports
+
+- **My work** (`/`, `app/services/home.py`, `dashboard/home.html`) replaces
+  the four campus tiles. One sentence ("You have 3 things to do today, and
+  1 needs your OK"), then — each only when it has something in it — Needs
+  your OK (Faculty: money, finishing, website; Approve is one press), To do
+  (Today / This week / Later, only the first group open, five rows then
+  "Show all"; the circle ticks an item, and an item about a poster, photos,
+  a report or a bill shows **Add file**, which sends the file and ticks the
+  item as soon as it is picked), Today's event (a **Take attendance**
+  button), and Your events (three at most, with how much is left).
+- **Whose item is whose**: one for a named person is theirs; one for a team
+  goes to whoever holds that team's role; one for nobody in particular goes
+  to the team that runs that kind of event (Events for ICC, IGP for IGP).
+  So Faculty's list holds only what is handed to Faculty, and the Media and
+  Culturals heads get their team's items from every ICC and IGP event.
+- **Volunteers** open on **My activities** (`dashboard/activities.html`):
+  each event they are on with the next time, the place, their job and their
+  buddy; past events fold into one line. Nothing else.
+- **The rail** (`app/services/navigation.py`) is four places and a Menu: My
+  work, Events, + New event, and Reports (Faculty, USC) or Account
+  (everyone else). People, Upload a sheet, Who changed what, Alerts and
+  Account sit lower down the rail on a laptop and in the Menu on a phone,
+  with "Show me around again". Volunteers see My activities and Account.
+- **Events** (`erp/projects.html`) is a search box, three chips (Now and
+  next · Finished · All) and one list of names, dates and stages — no
+  codes. A campus picker shows only to people who can see more than one
+  campus. Contributors see the events their team has items on.
+- **Reports** (`/reports`, `app/services/year_report.py`) replaces
+  Analytics: five numbers for a year (events, people, volunteer hours,
+  money paid, feedback replies) and the finished events with their PDFs.
+- **People** (`/admin/users`, Faculty) replaces Administration: find
+  someone, then "Make them" one of the seven roles; the campus is asked
+  only when there is more than one. The year now defaults to the current
+  one, so a head is made in one choice.
+- **Needs your OK** (`/queue`) is the full OK list for Faculty; anyone else
+  is sent back to My work.
+- **First run**: each role's tour is at most three steps on My work (the
+  list, the circle, then + New event or Add file); the getting-started
+  list is two or three things and disappears once they are done. Plain role
+  names in the shell ("Faculty", "Events head", "USC").
+
+Old links still land: `/erp/campuses…` redirects to Events (with the
+campus as a filter), `/erp/analytics…` to Reports for Faculty and the USC
+and to Events for everyone else, and the Events list still reads the old
+`?state=` filter.
+
+Removed: `erp/campuses.html`, `erp/campus_detail.html`, `erp/division.html`,
+`erp/analytics.html`, `erp/analytics_division.html`; `build_home` and
+`build_campus_home`. Added `/reports`. The baseline was regenerated (172
+rules); the account-approval form now posts only `role`.
+
+The acceptance seed gains `e2e_media` and `e2e_culturals` with team items on
+the ICC event and the IGP programme, and `E2E-ICC-TODAY`, an event on the
+day the suite runs. `e2e/click-budget.spec.ts` measures every click budget
+in the plan from My work.
+
+## 2026-10-30 — Simplification phase 4: plain words and cleanup
+
+- **Plain words.** `app/services/glossary.py` now holds `PLAIN_WORDS`: each
+  word a screen used to say and what it says now ("waive" → "skip",
+  "evidence" → "file", "stage"/"commit" → "check"/"save", "reimbursement" →
+  "money", "publication" → "website", …). `tests/plain_language_test.py`
+  reads the text every template actually puts on screen (and every flash
+  message) and fails, naming the file and the replacement, if one comes
+  back. The history page reads as sentences from the rewritten
+  `AUDIT_ACTIONS` / `AUDIT_ENTITIES`.
+- **Rewritten in plain words and the calm layout:** Upload a sheet (three
+  steps; "Check the sheet", then Faculty's "Save N rows"), Account (who you
+  are, what you can see, your events and hours, password), Alerts (newest
+  five, one "Email me when something needs me" switch — `event_type=all`),
+  Who changed what, the report and report-draft pages, sign-in ("Sign in",
+  not "Access Platform"), sign-up, password pages, the error and offline
+  pages, and every save/error message.
+- **The role badge** shows an event's name, never its code.
+- **Removed routes** (26; nothing linked to them after phases 2–3): the old
+  full-create form (`POST /erp/projects`), `quick-create-with-documents`,
+  budgets and operational requests with their decisions, contribution,
+  buddy-log, document and feedback decisions, report approval, the
+  eight-status task and checklist routes, checklist evidence
+  attach/upload/detach, the closure summary, the internal feedback form and
+  response, single enrol and create-and-enrol (People is a pasted list now),
+  event-folder upload, the old document add/upload and the report preflight
+  JSON. `transition` stays for cancelling; old campus, analytics, `/erp`
+  and `/erp/oversight` addresses keep redirecting. The baseline was
+  regenerated: 146 rules.
+- **Removed code:** `app/services/analytics.py`, `app/services/hierarchy.py`,
+  `build_oversight_metrics`, the `event_state`/`STATE_LABELS` template
+  globals, and the `tile_art`, `progress_bar`, `empty_cell`,
+  `section_tiles`, `pager`, `modal_open`, `modal` and `fact` macros. With
+  their screens gone, PurgeCSS drops their rules: the application stylesheet
+  went from 75 KB to 56 KB.
+- **Tests removed with their routes:** 16, in `checklist_evidence_test`,
+  `controlled_vocabulary_test`, `erp_test`, `igp_enrollment_test`,
+  `production_completion_test`, `project_quickcreate_test` and
+  `report_routes_test`. The rest were reworded to the new copy.
+- **Docs:** `design-system/icc-erp/MASTER.md` and its four page notes now
+  describe the calm, task-first system (the eight rules, the click budget,
+  the `cv-*` building blocks); `USER_ACCEPTANCE_GUIDE.md` has one journey per
+  role, including the new `uat_media_head` and `uat_culturals_head`
+  accounts that `flask provision-uat` now makes.

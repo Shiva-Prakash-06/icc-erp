@@ -1,84 +1,61 @@
 {% extends "base.html" %}
-{% from "_tiles.html" import state_chip, progress_bar %}
 {% block title %}Events{% endblock %}
-{#- Audit: the title said "Every event" while the route, the template and
-    the IGP screens call the same record a project or a programme. The
-    glossary settles it -- "event" covers both divisions in interface copy,
-    and the model, the routes and the enums are untouched. -#}
 {% block screen_title %}Events{% endblock %}
-{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Events</span>{% endblock %}
-{% block body_class %}ds-screen__body--filter{% endblock %}
-{% block tools %}{% if can_create %}<a class="ds-btn ds-btn--primary" href="{{ url_for('erp.new_project') }}"><i class="ph ph-plus" aria-hidden="true"></i>New event</a>{% endif %}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+{% block tools %}{% if can_create %}<a class="cv-btn cv-btn--primary" href="{{ url_for('erp.new_project') }}">+ New event</a>{% endif %}{% endblock %}
+
+{#- Every event you can open. What is on now and next comes first; finished
+    ones are one press away. Plain links and a GET form, so it all works
+    without JavaScript and every view is a link you can share. -#}
+{% macro view_url(key) -%}
+  {{ url_for('erp.projects', show=key if key != 'now' else None, q=search_query or None, campus=campus_filter or None) }}
+{%- endmacro %}
+
 {% block content %}
-
-{#- One filter bar: state segments, then the search control, then the count
-    of what is actually on screen. The segments carry counts for the whole
-    scope and do not move as you filter; the result count describes this
-    view and does. Both are plain links and a GET form, so the screen works
-    with JavaScript disabled and every state is a shareable URL. -#}
-<div class="ds-filter">
-  <div class="ds-filter__set" role="group" aria-label="Filter by state">
-    {% for facet in state_facets %}
-    <a class="ds-filter__seg"
-       href="{{ url_for('erp.projects', q=search_query or None, state=facet.key if facet.key != 'all' else None) }}"
-       {% if state_filter == facet.key %}aria-current="page"{% endif %}>{{ facet.label }} <span class="ds-filter__count">{{ state_counts[facet.key] }}</span></a>
-    {% endfor %}
-  </div>
-
-  {#- Search is one control, not a field marooned from a distant button.
-      The submit sits inside the same bordered group and Enter submits, as
-      it always did for a single-field GET form. -#}
-  <form method="GET" class="ds-search" role="search">
-    <label class="visually-hidden" for="project_search">Search events by title or code</label>
-    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-    <input id="project_search" class="ds-search__input" name="q" value="{{ search_query }}" placeholder="Title or code…">
-    {% if state_filter and state_filter != 'all' %}<input type="hidden" name="state" value="{{ state_filter }}">{% endif %}
-    {% if status_filter and status_filter != 'All' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-    <button class="ds-search__go" type="submit">Search</button>
-    {% if search_query %}<a class="ds-search__clear" href="{{ url_for('erp.projects', state=state_filter if state_filter != 'all' else None) }}">Clear<span class="visually-hidden"> the search</span></a>{% endif %}
+<div class="cv-page">
+  <form method="GET" class="cv-form cv-search" role="search">
+    <label class="visually-hidden" for="project_search">Find an event by name</label>
+    <input type="text" id="project_search" name="q" value="{{ search_query }}" placeholder="Find an event by name">
+    {% if show != 'now' %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
+    {% if campuses %}
+    <label class="visually-hidden" for="project_campus">Campus</label>
+    <select id="project_campus" name="campus">
+      <option value="">Every campus</option>
+      {% for campus in campuses %}<option value="{{ campus.public_id }}"{% if campus.public_id == campus_filter %} selected{% endif %}>{{ campus.name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <button class="cv-btn" type="submit">Find</button>
   </form>
 
-  <span class="ds-filter__result">{{ projects|length|pluralise('event') }}</span>
-</div>
-
-<div class="ds-scroll">
-  {% if projects %}
-  <div class="ds-cardgrid">
-    {% for project in projects %}
-    {% set state = event_state(project) %}
-    <a class="ds-event ds-event--{{ state }}" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
-      {#- The title wraps. It is the only visible copy of the record's
-          name, and truncating it was what made two rows of the directory
-          indistinguishable. Audit P1-03. -#}
-      <h2 class="ds-event__title">{{ project.title }}</h2>
-      <p class="ds-event__meta">
-        <span>{{ project.code or 'No code yet' }}</span>
-        <span>{{ project.start_date|localdate('%d %b %Y') }} – {{ project.end_date|localdate('%d %b %Y') }}</span>
-      </p>
-      <p class="ds-event__meta">
-        <span>{{ division_name(project.program_type) }}</span>
-        <span>{{ project.campus.name }}</span>
-      </p>
-      <div class="ds-event__foot">
-        {{ state_chip(state, STATE_LABELS[state], 'Lifecycle') }}
-        <span class="ds-event__note">{{ project.status }}</span>
-      </div>
-    </a>
+  <nav class="cv-chips cv-chips--links" aria-label="Which events">
+    {% for key, label in [('now', 'Now and next'), ('finished', 'Finished'), ('all', 'All')] %}
+    <a class="cv-chip-link{% if show == key %} is-on{% endif %}" href="{{ view_url(key) }}"{% if show == key %} aria-current="page"{% endif %}>{{ label }} {{ counts[key] }}</a>
     {% endfor %}
-  </div>
-  {% else %}
-  <div class="ds-empty ds-empty--block">
-    <i class="ph ph-folder-open" aria-hidden="true"></i>
-    <div>
-      <h2 class="ds-empty__title">No events match</h2>
-      <p class="ds-empty__body">{% if search_query or state_filter != 'all' or status_filter != 'All' %}Nothing in your scope matches this search and filter.{% else %}Events appear here once you are assigned to one.{% endif %}</p>
-    </div>
-    {% if search_query or state_filter != 'all' or status_filter != 'All' %}
-    <a class="ds-btn" href="{{ url_for('erp.projects') }}">Clear filters</a>
-    {% elif can_create %}
-    <a class="ds-btn ds-btn--primary" href="{{ url_for('erp.new_project') }}">Create the first event</a>
-    {% endif %}
-  </div>
-  {% endif %}
+  </nav>
+
+  <section class="cv-section" aria-label="Events">
+    <ul class="cv-list">
+      {% for project in projects %}
+      {% set stage = stages[project.id] %}
+      <li class="cv-item">
+        <a class="cv-item__main cv-item__link" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
+          <span class="cv-item__title">{{ project.title }}</span>
+          <span class="cv-item__meta">
+            <span class="cv-stage cv-stage--{{ stage }}">{{ stage_labels[stage] }}</span>
+            · {{ project.start_date|localdate('%a %d %b %Y') }}{% if project.end_date and project.end_date != project.start_date %} – {{ project.end_date|localdate('%a %d %b') }}{% endif %}
+            {%- if project.venue %} · {{ project.venue }}{% endif %}
+          </span>
+        </a>
+      </li>
+      {% else %}
+      <li class="cv-empty">
+        {% if search_query %}No event is called anything like “{{ search_query }}”.
+        {% elif show == 'finished' %}No event has been signed off yet.
+        {% else %}Nothing is on right now.{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if total > projects|length %}<a class="cv-more" href="{{ url_for('erp.projects', show=show if show != 'now' else None, campus=campus_filter or None, all=1) }}">Show all {{ total }}</a>{% endif %}
+  </section>
 </div>
 {% endblock %}

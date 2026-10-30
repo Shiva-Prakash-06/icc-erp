@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sign in - OIA Project Intelligence{% endblock %}
+{% block title %}Sign in{% endblock %}
 
 {% block auth_content %}
 <div class="auth-card">
@@ -12,27 +12,24 @@
     <form action="{{ url_for('auth.login') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="aurora-field">
-            <label for="username" class="aurora-label">Username or Email</label>
-            <input type="text" id="username" name="username" class="aurora-input" placeholder="Enter username/email" required autocomplete="username">
+            <label for="username" class="aurora-label">Username or email</label>
+            <input type="text" id="username" name="username" class="aurora-input" placeholder="e.g. name@christuniversity.in" required autocomplete="username">
         </div>
 
         <div class="aurora-field">
             <label for="password" class="aurora-label">Password</label>
             <div class="d-flex gap-2">
-                <input type="password" id="password" name="password" class="aurora-input" placeholder="Enter password" required autocomplete="current-password">
+                <input type="password" id="password" name="password" class="aurora-input" required autocomplete="current-password">
                 <button type="button" class="aurora-button--secondary" data-ui-toggle="password-reveal" data-ui-target="#password" aria-pressed="false">Show</button>
             </div>
         </div>
 
-        {#- "Access Platform" is the accessible name every e2e suite signs in
-            with; the label stays put even though the heading above it now
-            reads "Sign in". -#}
-        <button type="submit" class="aurora-button--primary aurora-button--large w-100 mt-2 blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Access Platform</button>
+        <button type="submit" class="aurora-button--primary aurora-button--large w-100 mt-2 blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Sign in</button>
     </form>
 
     <div class="d-flex justify-content-between mt-3">
         <a href="{{ url_for('auth.forgot_password') }}" class="small">Forgot password</a>
-        <a href="{{ url_for('auth.register') }}" class="small">Request access</a>
+        <a href="{{ url_for('auth.register') }}" class="small">New here? Sign up</a>
     </div>
 </div>
 {% endblock %}

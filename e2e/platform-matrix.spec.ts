@@ -2,21 +2,21 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { acceptancePassword, openProject, signIn } from "./helpers";
 
-test("registration enters pending approval and cannot access authenticated data", async ({ page }, testInfo) => {
+test("sign-up makes a volunteer straight away, with no approval step", async ({ page }, testInfo) => {
   const suffix = testInfo.project.name.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  const username = `candidate_${suffix}`;
+  const name = `candidate${suffix}`;
   await page.goto("/register");
-  await page.getByLabel("Username").fill(username);
-  await page.getByLabel("Email").fill(`${username}@example.test`);
+  await page.getByLabel("First name").fill("Candidate");
+  await page.getByLabel("Last name").fill(suffix);
+  await page.getByLabel("University email").fill(`${name}@christuniversity.in`);
   await page.getByLabel("Password", { exact: true }).fill("Acceptance-only-2026!");
-  await page.getByLabel("Confirm Password").fill("Acceptance-only-2026!");
-  await page.getByLabel("Home Campus").selectOption({ index: 1 });
-  await page.getByLabel("Requested Role").selectOption("Volunteer");
-  await page.getByRole("button", { name: /submit registration/i }).click();
-  await expect(page).toHaveURL(/pending-approval/);
-  const protectedResponse = await page.request.get("/api/v1/me", { maxRedirects: 0 });
-  expect(protectedResponse.status()).toBe(302);
-  expect(protectedResponse.headers().location).toContain("pending-approval");
+  await page.getByRole("button", { name: /^sign up$/i }).click();
+  await expect(page).not.toHaveURL(/pending-approval|register/);
+  const me = await page.request.get("/api/v1/me", { maxRedirects: 0 });
+  expect(me.status()).toBe(200);
+  // A volunteer only views: no event can be edited from this account.
+  const events = await page.request.get("/erp/projects", { maxRedirects: 0 });
+  expect(events.status()).toBe(200);
 });
 
 test("all operational roles are isolated at navigation and API entry points", async ({ browser }) => {
@@ -34,7 +34,8 @@ test("all operational roles are isolated at navigation and API entry points", as
     expect((await page.request.get("/api/v1/attendance")).status()).toBe(attendanceStatus);
     expect((await page.request.get("/api/v1/checklist-items")).status()).toBe(checklistStatus);
     const oversight = await page.request.get("/erp/oversight");
-    expect(oversight.status(), username).toBe(["e2e_faculty", "e2e_igp", "e2e_events"].includes(username) ? 200 : 403);
+    // Only Faculty approves, so only Faculty has a decision queue to open.
+    expect(oversight.status(), username).toBe(username === "e2e_faculty" ? 200 : 403);
     await context.close();
   }
 });
@@ -59,35 +60,32 @@ test("protected workflow resources reject generic PATCH and return RFC 7807 erro
   expect(problem).toMatchObject({ status: 405, title: expect.any(String) });
 });
 
-test("home decision queue includes every pending category and each review link resolves to its exact item", async ({ page }) => {
-  // /erp/oversight redirects into the full decision queue at /queue -- see
-  // in-the-operation-checklists-crystalline-dongarra.md Step 2 and the Tile
-  // System entry in UI_LEGACY_LEDGER.md. This is also the regression net
-  // for the summary-first workspace restructure (Step 8): every kind here
-  // must resolve to a row rendered outside any collapsed disclosure.
-  //
-  // The open-record link is named for what it does ("Send back", "Query",
-  // "Hold") rather than the old generic "Review", so it is located by its
-  // position in the row's action cell.
+test("Faculty's queue holds only money and sign-offs, and each link opens the item", async ({ page }) => {
+  // Only three things still need an OK: money, finishing an event and
+  // putting it on the website. Each queue row links to the card on the
+  // event page that holds it.
   await signIn(page, "e2e_faculty");
   await page.goto("/queue");
-  const expectedKinds = ["Task", "Checklist", "Document", "Contribution", "Operational request", "Budget line", "Buddy log", "Feedback moderation", "Recruitment", "Report approval"];
-  for (const kind of expectedKinds) {
-    const row = page.locator(".ds-row").filter({ has: page.getByText(kind, { exact: true }) }).first();
+  const rowOf = (kind: string) => page.locator("li.cv-item").filter({ has: page.locator(".cv-item__meta", { hasText: new RegExp(`^${kind} ·`) }) });
+  for (const kind of ["Money", "Finish event"]) {
+    const row = rowOf(kind).first();
     await expect(row, kind).toBeVisible();
-    const href = await row.locator(".ds-row__act a").first().getAttribute("href");
-    expect(href, kind).toMatch(/#[0-9a-f-]{36}$/);
+    const href = await row.locator(".cv-item__act a").first().getAttribute("href");
+    expect(href, kind).toMatch(/#[\w-]+$/);
     await page.goto(href!);
     const anchor = new URL(page.url()).hash.slice(1);
     await expect(page.locator(`[id="${anchor}"]`), kind).toBeVisible();
     await page.goto("/queue");
+  }
+  for (const gone of ["Task", "Checklist", "Document", "Contribution", "Budget line", "Buddy log"]) {
+    await expect(rowOf(gone), gone).toHaveCount(0);
   }
 });
 
 test("authenticated and public page-state matrix meets structural and axe gates", async ({ page }, testInfo) => {
   const javascriptDisabled = testInfo.project.name === "javascript-disabled";
   await signIn(page, "e2e_faculty");
-  const routes = ["/", "/queue", "/erp/analytics", "/erp/analytics/icc", "/erp/projects", "/erp/imports", "/erp/notifications", "/erp/audit", "/profile", "/admin/users"];
+  const routes = ["/", "/queue", "/reports", "/erp/projects", "/erp/projects?show=finished", "/erp/projects/new", "/erp/imports", "/erp/notifications", "/erp/audit", "/profile", "/admin/users"];
   for (const route of routes) {
     const response = await page.goto(route);
     expect(response?.status(), route).toBe(200);
@@ -99,8 +97,8 @@ test("authenticated and public page-state matrix meets structural and axe gates"
   }
   await openProject(page, "E2E-ICC-EVENT");
   const base = page.url().split("?")[0];
-  for (const tab of ["logistics", "finance", "documents", "people", "analytics"]) {
-    await page.goto(`${base}?tab=${tab}`);
+  for (const tab of ["todo", "schedule", "people", "money", "files", "feedback", "details", "finish"]) {
+    await page.goto(`${base}?card=${tab}`);
     await expect(page.locator("h1")).toHaveCount(1);
     if (!javascriptDisabled) {
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).disableRules(["color-contrast"]).analyze();

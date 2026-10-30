@@ -58,7 +58,7 @@ def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path, mon
         assert result.exit_code == 0, result.output
         assert stat.S_IMODE(output.stat().st_mode) == 0o600
         contents = output.read_text()
-        for username in ("uat_faculty_admin", "uat_usc", "uat_igp_head", "uat_icc_events_head", "uat_volunteer"):
+        for username in ("uat_faculty_admin", "uat_usc", "uat_igp_head", "uat_icc_events_head", "uat_media_head", "uat_culturals_head", "uat_volunteer"):
             assert username in contents
             user = User.query.filter_by(username=username).one()
             # The sheet calls these one-time passwords; that must be true.
@@ -67,8 +67,8 @@ def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path, mon
         assert "123" not in contents
         # Every password is distinct and random, not one shared literal.
         passwords = [line.split("\t")[1] for line in contents.strip().splitlines() if "\t" in line and not line.startswith("Username")]
-        assert len(passwords) == 5
-        assert len(set(passwords)) == 5
+        assert len(passwords) == 7
+        assert len(set(passwords)) == 7
         assert all(len(pw) >= 20 for pw in passwords)
         db.session.remove()
         db.drop_all()

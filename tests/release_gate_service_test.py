@@ -215,8 +215,9 @@ class ReleaseAuthorizationGateTestCase(unittest.TestCase):
         self.assertTrue(has_permission(self.target, "view_assigned", self.icc_project))
 
     def test_role_specific_scope_requirements_fail_closed(self):
-        with self.assertRaisesRegex(ValueError, "academic year"):
-            replace_scoped_assignment(self.target, "ICC Events Head", {}, self.actor)
+        # A head is made for this year without anyone having to say so.
+        assignment = replace_scoped_assignment(self.target, "ICC Events Head", {}, self.actor)
+        self.assertIsNotNone(assignment.academic_year_id)
         with self.assertRaisesRegex(ValueError, "require a wing"):
             replace_scoped_assignment(
                 self.target, "ICC Associate",
@@ -224,19 +225,22 @@ class ReleaseAuthorizationGateTestCase(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "specific program"):
             replace_scoped_assignment(self.target, "IGP Program Lead", {}, self.actor)
-        with self.assertRaisesRegex(ValueError, "specific project"):
-            replace_scoped_assignment(self.target, "Volunteer", {}, self.actor)
+        # A volunteer needs no project: they see the events they are listed on.
+        volunteer = replace_scoped_assignment(self.target, "Volunteer", {}, self.actor)
+        self.assertEqual(volunteer.role_code, "VOLUNTEER")
+        self.assertIsNone(volunteer.project_id)
 
-    def test_cross_unit_and_fixed_wing_scopes_are_rejected(self):
-        with self.assertRaisesRegex(ValueError, "designated wing"):
-            replace_scoped_assignment(
-                self.target, "ICC Events Head",
-                {
-                    "academic_year_public_id": self.year.public_id,
-                    "wing_public_id": self.media.public_id,
-                },
-                self.actor,
-            )
+    def test_heads_are_not_pinned_to_a_wing_and_cross_unit_scopes_are_rejected(self):
+        # The Events head runs every ICC event, so a wing in the form is ignored.
+        assignment = replace_scoped_assignment(
+            self.target, "ICC Events Head",
+            {
+                "academic_year_public_id": self.year.public_id,
+                "wing_public_id": self.media.public_id,
+            },
+            self.actor,
+        )
+        self.assertIsNone(assignment.wing_id)
         with self.assertRaisesRegex(ValueError, "operating unit"):
             replace_scoped_assignment(
                 self.target, "IGP Program Lead",
@@ -284,7 +288,7 @@ class ReleaseAuthorizationGateTestCase(unittest.TestCase):
         self.assertFalse(old.is_active)
         self.assertEqual(assignment.role_code, "ICC_EVENTS_HEAD")
         self.assertEqual(assignment.operating_unit_id, self.icc.id)
-        self.assertEqual(assignment.wing_id, self.events.id)
+        self.assertIsNone(assignment.wing_id)
         self.assertEqual(assignment.academic_year_id, self.year.id)
         self.assertEqual(assignment.campus_id, self.campus.id)
 

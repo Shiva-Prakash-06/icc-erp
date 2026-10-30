@@ -73,6 +73,12 @@ class Project(db.Model):
     publication_requested_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     publication_approved_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     published_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    # "Finish event": whoever runs the event sends it to Faculty, Faculty
+    # signs it off (status -> Completed) or says "not now" with a note. See
+    # app/services/finish.py.
+    finish_requested_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    finish_requested_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    finish_note = db.Column(db.Text, nullable=True)
     withdrawn_at = db.Column(db.DateTime(timezone=True), nullable=True)
     version = db.Column(db.Integer, default=1, nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())

@@ -8,9 +8,7 @@ os.environ["TESTING"] = "true"
 from app import create_app
 from app.database import db
 from app.models.erp import (
-    ChecklistInstance,
     ChecklistItemStatus,
-    ChecklistTemplate,
     ChecklistTemplateItem,
     DocumentRecord,
     FeedbackForm,
@@ -91,8 +89,11 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         with self.client.session_transaction() as session:
             session["user_id"] = self.user.id
 
-    def test_scoped_icc_head_cannot_approve_igp(self):
-        self.assertTrue(has_permission(self.user, "approve", self.icc_project))
+    def test_scoped_icc_head_runs_icc_but_not_igp_and_approves_nothing(self):
+        self.assertTrue(has_permission(self.user, "manage_projects", self.icc_project))
+        self.assertFalse(has_permission(self.user, "manage_projects", self.igp_project))
+        # Only Faculty approves, so a head holds no approval anywhere.
+        self.assertFalse(has_permission(self.user, "approve", self.icc_project))
         self.assertFalse(has_permission(self.user, "approve", self.igp_project))
 
     def test_person_can_attend_without_account(self):
@@ -111,51 +112,75 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         self.assertIsNone(person.user_account)
         self.assertEqual(SessionAttendance.query.count(), 1)
 
-    def test_closure_is_blocked_until_requirements_are_resolved(self):
-        self.icc_project.status = "Closing"
-        self.icc_project.closure_summary = "Reviewed closure narrative."
-        task = WorkTask(project_id=self.icc_project.id, title="Final approvals", status="In Progress", mandatory_for_closure=True)
-        document = DocumentRecord(project_id=self.icc_project.id, category="Report", title="Final report", status="Missing", mandatory_for_closure=True)
-        db.session.add_all([task, document])
+    def test_only_the_report_and_attendance_stop_an_event_finishing(self):
+        """Open to-do items, waivers and summaries no longer block anything.
+        What the final report is built from does: the event report file and,
+        for an event with sessions, attendance."""
+        session = ProjectSession(
+            project_id=self.icc_project.id, code="S1", title="Main session",
+            starts_at=datetime(2026, 7, 1, 9, tzinfo=timezone.utc), ends_at=datetime(2026, 7, 1, 10, tzinfo=timezone.utc),
+        )
+        db.session.add_all([session, WorkTask(project_id=self.icc_project.id, title="Still open", status="In Progress", mandatory_for_closure=True)])
         db.session.commit()
-        self.assertEqual(len(closure_blockers(self.icc_project)), 2)
+        self.assertEqual({b.kind for b in closure_blockers(self.icc_project)}, {"Document", "Attendance"})
         with self.assertRaises(ValueError):
             transition_project(self.icc_project, "Completed", self.user)
-        task.waived = True
-        task.waiver_reason = "Faculty-approved exception"
-        document.status = "Approved"
+        person = Person(first_name="Guest")
+        db.session.add_all([person, DocumentRecord(project_id=self.icc_project.id, category="Event Report", title="Report", status="Submitted")])
+        db.session.flush()
+        db.session.add(SessionAttendance(session_id=session.id, person_id=person.id, status="Present"))
         db.session.commit()
+        self.assertEqual(closure_blockers(self.icc_project), [])
         transition_project(self.icc_project, "Completed", self.user)
         self.assertEqual(self.icc_project.status, "Completed")
 
-    def test_browser_closure_summary_unblocks_completion(self):
+    def test_head_sends_an_event_to_faculty_who_signs_it_off(self):
         self.login()
-        self.icc_project.status = "Closing"
-        db.session.commit()
         path = f"/erp/projects/{self.icc_project.public_id}"
-        # Closure moved to the Documents tab with the rest of the paperwork
-        # when the Tile System deleted Overview.
-        self.assertIn(b"Save closure summary", self.client.get(path + "?tab=documents&section=disclosure").data)
-        response = self.client.post(path + "/closure-summary", data={
-            "version": self.icc_project.version, "closure_summary": "Synthetic delivery completed.",
-        }, follow_redirects=True)
-        self.assertIn(b"Closure summary saved", response.data)
-        self.assertEqual(closure_blockers(self.icc_project), [])
-        response = self.client.post(path + "/transition", data={
-            "version": self.icc_project.version, "target_status": "Completed",
-        }, follow_redirects=True)
-        self.assertIn(b"Project moved to Completed", response.data)
-        self.assertEqual(self.icc_project.closure_summary, "Synthetic delivery completed.")
-
-    def test_stale_closure_summary_does_not_overwrite(self):
-        self.login()
-        self.icc_project.closure_summary = "Existing notes"
+        # Without the event report the head is told what is missing.
+        response = self.client.post(path + "/finish", data={"summary": "Went well."}, follow_redirects=True)
+        self.assertIn(b"event report", response.data)
+        self.assertIsNone(self.icc_project.finish_requested_at)
+        db.session.add(DocumentRecord(project_id=self.icc_project.id, category="Event Report", title="Report", status="Submitted"))
         db.session.commit()
-        response = self.client.post(f"/erp/projects/{self.icc_project.public_id}/closure-summary", data={
-            "version": self.icc_project.version - 1, "closure_summary": "Stale notes",
-        }, follow_redirects=True)
-        self.assertIn(b"changed by another user", response.data)
-        self.assertEqual(self.icc_project.closure_summary, "Existing notes")
+        response = self.client.post(path + "/finish", data={"summary": "Went well.", "show_on_website": "yes"}, follow_redirects=True)
+        self.assertIn("Sent to Faculty".encode(), response.data)
+        self.assertIsNotNone(self.icc_project.finish_requested_at)
+        self.assertEqual(self.icc_project.publication_status, "Pending")
+        # The head cannot sign off their own event.
+        self.assertEqual(self.client.post(path + "/finish/decision", data={"decision": "approve"}).status_code, 403)
+        faculty = User(username="faculty.signoff", email="faculty.signoff@example.com", role="Faculty", status="Approved", needs_password_reset=False)
+        faculty.set_password("A-secure-test-password-2026")
+        db.session.add(faculty)
+        db.session.flush()
+        db.session.add(RoleAssignment(user_id=faculty.id, role_code="OIA_FACULTY_ADMINISTRATOR"))
+        db.session.commit()
+        with self.client.session_transaction() as session:
+            session["user_id"] = faculty.id
+        response = self.client.post(path + "/finish/decision", data={"decision": "approve"}, follow_redirects=True)
+        self.assertIn("Signed off".encode(), response.data)
+        self.assertEqual(self.icc_project.status, "Completed")
+        self.assertEqual(self.icc_project.publication_status, "Published")
+        self.assertEqual(self.icc_project.closure_summary, "Went well.")
+
+    def test_faculty_can_send_an_event_back_with_a_note(self):
+        db.session.add(DocumentRecord(project_id=self.icc_project.id, category="Event Report", title="Report", status="Submitted"))
+        db.session.commit()
+        from app.services.finish import decide_finish, request_finish
+
+        request_finish(self.icc_project, self.user)
+        faculty = User(username="faculty.note", email="faculty.note@example.com", role="Faculty", status="Approved", needs_password_reset=False)
+        faculty.set_password("A-secure-test-password-2026")
+        db.session.add(faculty)
+        db.session.flush()
+        db.session.add(RoleAssignment(user_id=faculty.id, role_code="OIA_FACULTY_ADMINISTRATOR"))
+        db.session.commit()
+        with self.assertRaises(ValueError):
+            decide_finish(self.icc_project, faculty, approve=False)
+        decide_finish(self.icc_project, faculty, approve=False, note="Add the photos first.")
+        self.assertIsNone(self.icc_project.finish_requested_at)
+        self.assertEqual(self.icc_project.finish_note, "Add the photos first.")
+        self.assertEqual(self.icc_project.status, "Draft")
 
     def test_concurrent_project_update_returns_conflict(self):
         self.login()
@@ -224,15 +249,8 @@ class ERPProductionShapeTestCase(unittest.TestCase):
             response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab={tab}")
             self.assertEqual(response.status_code, 200, tab)
 
-    def test_people_tab_renders_for_a_project_with_recruitment(self):
-        """The Recruitment section only exists when there are applications.
-
-        `test_every_new_project_tab_renders` uses a project that has none, so
-        the branch that builds the Recruitment section tile was never
-        executed by the suite and shipped reading `application.status` -- a
-        field `RecruitmentApplication` does not have. Every People tab on
-        every project with an applicant answered 500.
-        """
+    def test_people_link_renders_for_a_project_with_recruitment(self):
+        """Applications get their own card, shown only when there are some."""
         person = Person(first_name="Applicant", primary_email="applicant@example.com", person_type="Participant")
         db.session.add(person)
         db.session.flush()
@@ -245,48 +263,26 @@ class ERPProductionShapeTestCase(unittest.TestCase):
         self.login()
         response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab=people")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Recruitment", response.get_data(as_text=True))
+        html = response.get_data(as_text=True)
+        self.assertIn('id="card-applications"', html)
+        self.assertRegex(html, r'id="card-people"\s+open')
 
     def test_legacy_tab_names_still_resolve(self):
-        """Every tab name this workspace has ever had lands somewhere real.
-
-        `operations` predates the seven-tab set; `delivery`, `overview`,
-        `contributions`, `resources` and `insights` are the seven-tab names
-        the Tile System replaced with five. Bookmarks, emailed links and
-        notification rows written before either change must not silently
-        drop the reader on the default tab.
-        """
+        """Every tab name this page has ever had opens the card that now
+        holds that work, so old bookmarks and notifications still land."""
         self.login()
-        for legacy, panel in [
-            ("operations", "logistics"), ("delivery", "logistics"), ("overview", "logistics"),
-            ("contributions", "people"), ("resources", "documents"), ("insights", "analytics"),
+        for legacy, card in [
+            ("operations", "todo"), ("delivery", "todo"), ("overview", "todo"), ("logistics", "todo"),
+            ("contributions", "people"), ("people", "people"), ("finance", "money"),
+            ("resources", "files"), ("documents", "files"), ("insights", "finish"), ("analytics", "finish"),
         ]:
             with self.subTest(tab=legacy):
                 response = self.client.get(f"/erp/projects/{self.icc_project.public_id}?tab={legacy}")
                 self.assertEqual(response.status_code, 200)
                 html = response.get_data(as_text=True)
-                self.assertIn(f'id="panel-{panel}"', html)
-                # Exactly one tab is marked active, and it is the resolved one.
-                active = re.findall(r'href="([^"]*)"[^>]*class="ds-tab[^"]*is-active', html)
-                self.assertEqual(len(active), 1, f"{legacy}: {len(active)} active tabs")
-                self.assertIn(f"tab={panel}", active[0])
-
-    def test_saving_task_or_checklist_status_returns_to_logistics(self):
-        # Pre-existing bug: these three handlers used to redirect to the
-        # bare project URL with no `tab`, throwing the user back to
-        # Overview after every save. The tab they return to is now
-        # Logistics, which is where tasks and checklists live.
-        task = WorkTask(project_id=self.icc_project.id, title="Book venue", status="Not Started", version=1)
-        db.session.add(task)
-        db.session.commit()
-        self.login()
-        response = self.client.post(
-            f"/erp/projects/{self.icc_project.public_id}/tasks/{task.public_id}/status",
-            data={"version": 1, "status": "In Progress"},
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("tab=logistics", response.headers["Location"])
-
+                if card != "todo":
+                    self.assertRegex(html, rf'id="card-{card}"\s+open')
+                self.assertEqual(len(re.findall(r'class="cv-card"[^>]*\sopen>', html)), 0 if card == "todo" else 1)
 
 class SuppliedImportTestCase(unittest.TestCase):
     def setUp(self):

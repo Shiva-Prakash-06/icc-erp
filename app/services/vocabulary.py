@@ -28,7 +28,7 @@ DEFAULT_VOCABULARY = {
         "Screen Banner", "Lamppost", "Welcome Notes", "Participant Certificates", "Buddy Certificates",
         "Daywise Buddy Allocation", "Inauguration Schedule", "Valedictory Schedule", "Attendance Claim",
         "Buddy Allocation Source", "Operational Checklist", "Event Poster", "Stage Backdrop",
-        "Program Details", "Images/Photos", "Event Report", "Script", "Testimonial",
+        "Program Details", "Images/Photos", "Event Report", "Script", "Testimonial", "Bills",
     ],
 }
 

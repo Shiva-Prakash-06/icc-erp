@@ -58,8 +58,8 @@ class ReimbursementImportTestCase(unittest.TestCase):
         commit_reimbursement_batch(batch, self.user)
         entries = ReimbursementEntry.query.order_by(ReimbursementEntry.date).all()
         self.assertEqual(len(entries), 2)
-        self.assertEqual(entries[0].status, "Pending")  # blank defaults to Pending
-        self.assertEqual(entries[1].status, "Reimbursed")  # supplied status preserved
+        self.assertEqual(entries[0].status, "Asked")  # blank defaults to Asked
+        self.assertEqual(entries[1].status, "Paid")  # "Reimbursed" reads as Paid
         self.assertEqual(entries[0].amount, Decimal("1500.50"))
         self.assertFalse(hasattr(entries[0], "s_no"))
 

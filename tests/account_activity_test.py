@@ -56,21 +56,20 @@ class AccountActivityTestCase(unittest.TestCase):
             session["user_id"] = user.id
             session["session_version"] = user.session_version
 
-    def test_usc_sees_role_scope_and_own_request(self):
+    def test_usc_sees_role_and_events(self):
         self.login(self.usc)
         response = self.client.get("/profile")
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn("My Account", html)
-        self.assertIn("Icc Secretary Usc", html)
+        self.assertIn("<h1 class=\"ds-screen__title\">Account</h1>", html)
+        self.assertIn("ICC Secretary / USC", html)
         self.assertIn("Account activity project", html)
-        self.assertIn("Campus shuttle", html)
 
     def test_user_with_no_activity_sees_empty_state_not_an_error(self):
         self.login(self.empty_user)
         response = self.client.get("/profile")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("No activity recorded yet", response.get_data(as_text=True))
+        self.assertIn("Nothing here yet", response.get_data(as_text=True))
 
 
 if __name__ == "__main__":

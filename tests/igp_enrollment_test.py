@@ -56,60 +56,6 @@ class IgpEnrollmentTestCase(unittest.TestCase):
             session["user_id"] = self.manager.id
             session["session_version"] = self.manager.session_version
 
-    def test_create_and_enroll_participant_with_only_first_name(self):
-        self.login()
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/team/create-and-enroll",
-            data={"first_name": "Jamie"},
-        )
-        self.assertEqual(response.status_code, 302)
-        person = Person.query.filter_by(first_name="Jamie").one()
-        self.assertIsNone(person.registration_number)
-        self.assertIsNone(person.primary_email)
-        assignment = TeamAssignment.query.filter_by(person_id=person.id, project_id=self.project.id).one()
-        self.assertEqual(assignment.assignment_type, "Project Team")
-
-    def test_create_and_enroll_requires_first_name(self):
-        self.login()
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/team/create-and-enroll",
-            data={"first_name": "  "},
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Person.query.count(), 0)
-
-    def test_create_and_enroll_dedupes_on_email(self):
-        existing = Person(first_name="Existing", primary_email="dup@example.com", person_type="Student")
-        db.session.add(existing)
-        db.session.commit()
-        self.login()
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/team/create-and-enroll",
-            data={"first_name": "Different Name", "email": "DUP@example.com"},
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Person.query.count(), 1)
-        assignment = TeamAssignment.query.filter_by(project_id=self.project.id).one()
-        self.assertEqual(assignment.person_id, existing.id)
-
-    def test_conflicting_email_and_registration_identifiers_are_rejected(self):
-        email_owner = Person(first_name="EmailOwner", primary_email="conflict@example.com")
-        registration_owner = Person(first_name="RegistrationOwner", registration_number="CONFLICT-1")
-        db.session.add_all([email_owner, registration_owner])
-        db.session.commit()
-        self.login()
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/team/create-and-enroll",
-            data={
-                "first_name": "Conflicting",
-                "email": "conflict@example.com",
-                "registration_number": "CONFLICT-1",
-            },
-            follow_redirects=True,
-        )
-        self.assertIn(b"belong to different people", response.data)
-        self.assertEqual(TeamAssignment.query.filter_by(project_id=self.project.id).count(), 0)
-
     def test_api_creates_registrationless_participant_with_version_check(self):
         self.login()
         response = self.client.post(
@@ -144,7 +90,7 @@ class IgpEnrollmentTestCase(unittest.TestCase):
             },
             follow_redirects=True,
         )
-        self.assertIn(b"must be active participants", response.data)
+        self.assertIn(b"need to be on this event first", response.data)
 
     def test_buddy_pairing_rejects_cross_project_participant(self):
         cross_project_person = Person(first_name="CrossProject", person_type="Student")
@@ -163,7 +109,7 @@ class IgpEnrollmentTestCase(unittest.TestCase):
             },
             follow_redirects=True,
         )
-        self.assertIn(b"must be active participants", response.data)
+        self.assertIn(b"need to be on this event first", response.data)
 
     def test_buddy_pairing_rejects_self_pairing(self):
         member = Person(first_name="SoloMember", person_type="Student")

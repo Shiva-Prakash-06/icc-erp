@@ -59,62 +59,41 @@ class CampusScreensTestCase(unittest.TestCase):
             session["user_id"] = self.user.id
             session["session_version"] = self.user.session_version
 
-    def test_project_basics_card_shows_campus_program_year_wing(self):
-        # The two "Project Basics" / "Project record" definition lists were
-        # merged into one "Record" facts panel in the blueprint redesign,
-        # and the Tile System moved that panel to the Logistics tab when it
-        # deleted Overview. The facts it must carry are unchanged.
+    def test_event_details_card_holds_what_people_edit(self):
+        # Campus, programme, year and wing are worked out from who created
+        # the event and are no longer shown: the details card carries only
+        # what a person might change -- name, days, place, audience.
         self.login()
-        response = self.client.get(f"/erp/projects/{self.project.public_id}?tab=logistics")
+        response = self.client.get(f"/erp/projects/{self.project.public_id}?card=details")
         html = response.get_data(as_text=True)
-        self.assertIn("Academic year", html)
-        self.assertIn("Central", html)
-        self.assertIn("ICC", html)
-        self.assertIn("2026-2027", html)
-        self.assertIn("Not set", html)  # no wing assigned
+        self.assertRegex(html, r'id="card-details"\s+open')
+        for label in ("Name", "First day", "Last day", "Where", "Who is it for?"):
+            self.assertIn(label, html)
+        self.assertIn(self.project.title, html)
+        self.assertNotIn("Academic year", html)
 
-    def test_campuses_list_only_shows_scoped_campus(self):
+    def test_old_campus_and_division_addresses_land_on_the_events_list(self):
+        # The campus tiles and division screens are gone; a bookmark to one
+        # still opens the Events list.
         self.login()
-        response = self.client.get("/erp/campuses")
-        html = response.get_data(as_text=True)
-        self.assertIn("Central", html)
-        self.assertNotIn("Other", html)
+        for path in ("/erp/campuses", f"/erp/campuses/{self.campus.public_id}", f"/erp/campuses/{self.campus.public_id}/icc"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/erp/projects", response.headers["Location"])
 
-    def test_campus_detail_denies_out_of_scope_campus(self):
+    def test_events_list_shows_only_events_in_scope(self):
         self.login()
-        response = self.client.get(f"/erp/campuses/{self.other_campus.public_id}")
-        self.assertEqual(response.status_code, 404)
-
-    def test_campus_detail_offers_both_divisions(self):
-        """Level two of the drill-down is divisions, not a project list.
-
-        The campus screen used to be a flat list of every project on the
-        campus; the Tile System puts IGP and ICC between the campus and its
-        events, so what this screen must show is the two divisions and a
-        live count for each.
-        """
-        self.login()
-        response = self.client.get(f"/erp/campuses/{self.campus.public_id}")
-        html = response.get_data(as_text=True)
-        self.assertIn("India Gateway Program", html)
-        self.assertIn("International Christite Community", html)
-        self.assertIn(f"/erp/campuses/{self.campus.public_id}/icc", html)
-        self.assertIn(f"/erp/campuses/{self.campus.public_id}/igp", html)
-
-    def test_division_screen_lists_that_divisions_events_only(self):
-        self.login()
-        response = self.client.get(f"/erp/campuses/{self.campus.public_id}/icc")
-        html = response.get_data(as_text=True)
+        html = self.client.get("/erp/projects").get_data(as_text=True)
         self.assertIn("Basics scoped project", html)
         self.assertNotIn("Other campus project", html)
+        # One campus in reach: no campus picker.
+        self.assertNotIn('name="campus"', html)
 
-    def test_division_screen_rejects_an_unknown_division(self):
+    def test_a_campus_filter_for_an_unreachable_campus_shows_nothing_extra(self):
         self.login()
-        self.assertEqual(self.client.get(f"/erp/campuses/{self.campus.public_id}/xyz").status_code, 404)
-
-    def test_division_screen_denies_out_of_scope_campus(self):
-        self.login()
-        self.assertEqual(self.client.get(f"/erp/campuses/{self.other_campus.public_id}/icc").status_code, 404)
+        html = self.client.get("/erp/projects", query_string={"campus": self.other_campus.public_id}).get_data(as_text=True)
+        self.assertNotIn("Other campus project", html)
 
 
 if __name__ == "__main__":

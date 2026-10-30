@@ -1,6 +1,9 @@
-"""Lightweight, project-scoped reimbursement entries: bulk import/export and
-manual CRUD. Deliberately not a governance/payment-ledger workflow -- no
-approval routing, just a status string. See PLAN.md "Reimbursements"."""
+"""An event's money list: bulk import/export and manual entry.
+
+Every line is in one of four plain states (see MONEY_STATUSES). Only
+Faculty moves a line from Asked to Approved or Not approved; whoever asked
+marks it Paid. Free-text statuses from older sheets are read through
+:func:`normalize_money_status`."""
 
 from __future__ import annotations
 
@@ -21,8 +24,69 @@ from app.services.audit import record_audit
 IMPORTER_VERSION = "1"
 
 
+MONEY_ASKED = "Asked"
+MONEY_APPROVED = "Approved"
+MONEY_PAID = "Paid"
+MONEY_NOT_APPROVED = "Not approved"
+MONEY_STATUSES = (MONEY_ASKED, MONEY_APPROVED, MONEY_PAID, MONEY_NOT_APPROVED)
+
+_STATUS_WORDS = {
+    MONEY_PAID: ("paid", "settled", "reimbursed", "completed", "closed", "done"),
+    MONEY_NOT_APPROVED: ("reject", "not approved", "declined", "cancel"),
+    MONEY_APPROVED: ("approved", "sanctioned", "committed"),
+}
+
+
+def normalize_money_status(value):
+    """Map any status text (old sheets said "Pending", "Reimbursed", ...) to
+    one of the four money states. Anything unrecognised is still Asked."""
+    text = str(value or "").strip().lower()
+    for status, words in _STATUS_WORDS.items():
+        if any(word in text for word in words):
+            return status
+    return MONEY_ASKED
+
+
 class ReimbursementImportError(ValueError):
     pass
+
+
+class MoneyDecisionError(ValueError):
+    pass
+
+
+def change_money_status(entry, new_status, actor, comment=None):
+    """Move one money line to ``new_status``, enforcing who may do it.
+
+    Approving or turning down is Faculty only, and never on a line you asked
+    for yourself. Marking Paid needs the line to be Approved first. Moving a
+    line back to Asked (to ask again after a "Not approved") is open to
+    anyone who can edit the event.
+    """
+    from datetime import timezone
+
+    from app.services.authorization import has_permission
+
+    new_status = normalize_money_status(new_status) if new_status not in MONEY_STATUSES else new_status
+    project = entry.project
+    if not has_permission(actor, "manage_projects", project) and not has_permission(actor, "approve_operational_requests", project):
+        raise MoneyDecisionError("You cannot change money on this event.")
+    if new_status in {MONEY_APPROVED, MONEY_NOT_APPROVED}:
+        if not has_permission(actor, "approve_operational_requests", project):
+            raise MoneyDecisionError("Only Faculty can approve money.")
+        if entry.created_by_id and entry.created_by_id == actor.id:
+            raise MoneyDecisionError("Someone else has to approve money you asked for.")
+        if new_status == MONEY_NOT_APPROVED and not (comment or "").strip():
+            raise MoneyDecisionError("Say why, so they know what to fix.")
+        entry.approved_by_id = actor.id
+        entry.approved_at = datetime.now(timezone.utc)
+        entry.decision_comment = (comment or "").strip() or None
+    elif new_status == MONEY_PAID and entry.status != MONEY_APPROVED:
+        raise MoneyDecisionError("Money has to be approved before it is paid.")
+    before = entry.status
+    entry.status = new_status
+    record_audit("reimbursement.status", entry, before={"status": before}, after={"status": new_status}, actor=actor)
+    return entry
 
 
 def _parse_date(value) -> datetime.date | None:
@@ -93,7 +157,7 @@ def stage_reimbursement_import(project, uploaded_file, operator_key):
         party_name = str(raw_row.get("party name") or "").strip()
         bill_number = str(raw_row.get("bill number") or "").strip() or None
         particular = str(raw_row.get("particular") or "").strip() or None
-        status = str(raw_row.get("status") or "").strip() or "Pending"
+        status = normalize_money_status(raw_row.get("status"))
 
         parsed_date = _parse_date(raw_date)
         parsed_amount = _parse_amount(raw_amount)

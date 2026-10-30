@@ -1,0 +1,38 @@
+{% extends "public_site/base.html" %}
+{% block title %}Feedback{% endblock %}
+{% block content %}
+<div class="aurora-card mx-auto public-narrow">
+  <div class="aurora-card__body">
+    <h1 class="page-title mb-2">{{ title }}</h1>
+    {% if thanks %}
+      <p class="mb-0">Thank you! Your answer has been saved.</p>
+    {% elif closed %}
+      <p class="mb-0">This feedback link is closed. Thank you for coming!</p>
+    {% else %}
+      <p class="text-muted">Tell us how it went. It takes one minute. Your name is not asked.</p>
+      <form method="POST" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for question in form.questions_json %}
+          {% if question.type == 'scale' %}
+          <fieldset class="aurora-fieldset mb-4">
+            <legend class="aurora-label">{{ question.label }}</legend>
+            <div class="d-flex gap-2 flex-wrap">
+              {% for value in range(1, 6) %}
+              <label class="aurora-button--secondary"><input type="radio" name="rating" value="{{ value }}" required> {{ value }}</label>
+              {% endfor %}
+            </div>
+            {% if errors and errors.rating %}<p class="text-danger small mt-2" role="alert">{{ errors.rating }}</p>{% endif %}
+          </fieldset>
+          {% else %}
+          <div class="aurora-field mb-3">
+            <label class="aurora-label" for="{{ question.key }}">{{ question.label }}</label>
+            <textarea class="aurora-input" id="{{ question.key }}" name="{{ question.key }}" rows="3"></textarea>
+          </div>
+          {% endif %}
+        {% endfor %}
+        <button class="aurora-button--primary w-100" type="submit">Send</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

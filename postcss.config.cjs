@@ -40,6 +40,7 @@ module.exports = {
           /^ds-kpi__value--/,
           /^ds-section--/,
           /^ds-fact--/,
+          /^cv-tag--/, /^cv-stage--/,
         ],
       },
       variables: true,

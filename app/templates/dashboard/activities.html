@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}My activities{% endblock %}
+{% block screen_title %}My activities{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- A volunteer's home: the events they are on, soonest first. For each one
+    only what they need to turn up -- when, where, their job, their buddy.
+    Past events fold into one line. -#}
+{% block content %}
+<div class="cv-page">
+  <section class="cv-section" aria-labelledby="activities-title" data-tour="activities">
+    <div class="cv-section__head">
+      <h2 class="cv-section__title" id="activities-title">Coming up</h2>
+      <span class="cv-count">{{ activities|length }}</span>
+    </div>
+    {% if activities %}
+    <ul class="cv-list">
+      {% for entry in activities %}
+      {% set project = entry.project %}
+      <li class="cv-item">
+        <a class="cv-item__main cv-item__link" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">
+          <span class="cv-item__title">{{ project.title }}</span>
+          <span class="cv-item__meta">
+            {%- if entry.next_session %}{{ entry.next_session.starts_at|localdate('%a %d %b') }} · {{ entry.next_session.starts_at|localtime('%I:%M %p', label=False) }}
+            {%- else %}{{ project.start_date|localdate('%a %d %b') }}{% if project.end_date and project.end_date != project.start_date %} – {{ project.end_date|localdate('%a %d %b') }}{% endif %}{% endif -%}
+            {%- if entry.venue %} · {{ entry.venue }}{% endif -%}
+          </span>
+          <span class="cv-item__meta">Your job: <strong>{{ entry.job or 'Volunteer' }}</strong>{% if entry.buddies %} · Your buddy: <strong>{{ entry.buddies|join(', ') }}</strong>{% endif %}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="cv-empty">You are not on any event yet. When someone adds you to one, it shows here.</p>
+    {% endif %}
+  </section>
+
+  {% if past_activities %}
+  <details class="cv-card">
+    <summary><span class="cv-card__title">Past</span><span class="cv-card__sum">{{ past_activities|length }} {{ 'event' if past_activities|length == 1 else 'events' }}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for entry in past_activities %}
+        <li class="cv-item"><a class="cv-item__main cv-item__link" href="{{ url_for('erp.project_detail', public_id=entry.project.public_id) }}">
+          <span class="cv-item__title">{{ entry.project.title }}</span>
+          <span class="cv-item__meta">{{ entry.project.start_date|localdate('%d %b %Y') }} · {{ entry.job or 'Volunteer' }}</span>
+        </a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}

@@ -7,24 +7,10 @@ os.environ["TESTING"] = "true"
 
 from app import create_app
 from app.database import db
-from app.models.erp import DocumentRecord, OperatingUnit, RoleAssignment, Wing
+from app.models.erp import OperatingUnit, RoleAssignment, Wing
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.user import User
-from app.services.project_quickcreate import create_minimal_project, infer_status_from_dates
-
-
-class InferStatusFromDatesTestCase(unittest.TestCase):
-    def test_future_dates_are_planned(self):
-        today = date(2026, 8, 12)
-        self.assertEqual(infer_status_from_dates(date(2026, 9, 1), date(2026, 9, 2), today), "Planned")
-
-    def test_current_window_is_active(self):
-        today = date(2026, 8, 12)
-        self.assertEqual(infer_status_from_dates(date(2026, 8, 1), date(2026, 8, 20), today), "Active")
-
-    def test_past_dates_are_completed(self):
-        today = date(2026, 8, 12)
-        self.assertEqual(infer_status_from_dates(date(2026, 7, 1), date(2026, 7, 2), today), "Completed")
+from app.services.project_quickcreate import create_minimal_project
 
 
 class CreateMinimalProjectTestCase(unittest.TestCase):
@@ -67,7 +53,9 @@ class CreateMinimalProjectTestCase(unittest.TestCase):
         self.assertEqual(project.academic_year_id, self.year.id)
         self.assertEqual(project.category, "Operational")
         self.assertIsNotNone(project.code)
-        self.assertEqual(project.status, "Planned")
+        # Where an event is in its life comes from its dates now; the stored
+        # status only says it is not finished.
+        self.assertEqual(project.status, "Active")
         self.assertIsNone(project.venue)
         self.assertIsNone(project.target_audience)
 
@@ -95,8 +83,58 @@ class CreateMinimalProjectTestCase(unittest.TestCase):
         self._login()
         response = self.client.get("/erp/projects/new")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Create IGP from itinerary", response.data)
-        self.assertIn(b"Import ICC event summary", response.data)
+        self.assertIn(b"What is the event?", response.data)
+        self.assertIn(b"Have an IGP itinerary file?", response.data)
+
+    def test_a_time_makes_the_main_session_and_the_standard_list_is_added(self):
+        from app.models.erp import ChecklistTemplate, ChecklistTemplateItem
+        from app.services.todo import todos_for_project
+
+        template = ChecklistTemplate(code="ICC-EVENT-STANDARD", name="Standard", project_type="ICC event", version=1)
+        db.session.add(template)
+        db.session.flush()
+        db.session.add_all([
+            ChecklistTemplateItem(template_id=template.id, code="VENUE", title="Venue booking confirmed", category="Logistics", sequence=1, mandatory=True),
+            ChecklistTemplateItem(template_id=template.id, code="POSTER", title="Poster / invite designed", category="Media", sequence=2, mandatory=True),
+        ])
+        db.session.commit()
+        self._login()
+        response = self.client.post("/erp/projects/quick-create", data={
+            "title": "One form event", "program_type_name": "ICC", "start_date": "2026-09-20",
+            "start_time": "10:00", "end_time": "12:00", "venue": "Auditorium",
+        })
+        project = Project.query.filter_by(title="One form event").one()
+        self.assertIn("card=todo", response.location)
+        self.assertEqual(project.end_date, project.start_date)  # one day unless told otherwise
+        [session] = project.sessions
+        self.assertEqual((session.title, session.venue), ("Main session", "Auditorium"))
+        items = todos_for_project(project)
+        self.assertEqual([item.title for item in items], ["Venue booking confirmed", "Poster / invite designed"])
+        self.assertEqual(items[1].team, "media")
+
+    def test_starting_from_a_past_event_copies_its_list_and_times(self):
+        from datetime import datetime, timezone
+        from app.models.erp import ProjectSession, WorkTask
+
+        past = create_minimal_project(program_type_name="ICC", title="Last year", start_date=date(2025, 9, 10),
+                                      end_date=date(2025, 9, 10), actor=self.user)
+        db.session.add_all([
+            WorkTask(project_id=past.id, title="Order coffee", status="Completed", assigned_team="events",
+                     due_at=datetime(2025, 9, 8, 12, tzinfo=timezone.utc)),
+            ProjectSession(project_id=past.id, code="S1", title="Mixer", starts_at=datetime(2025, 9, 10, 4, 30),
+                           ends_at=datetime(2025, 9, 10, 6, 30)),
+        ])
+        db.session.commit()
+        self._login()
+        self.client.post("/erp/projects/quick-create", data={
+            "title": "This year", "program_type_name": "ICC", "start_date": "2026-09-10", "copy_from": past.public_id,
+        })
+        project = Project.query.filter_by(title="This year").one()
+        [task] = project.work_tasks
+        self.assertEqual((task.title, task.status, task.assigned_team), ("Order coffee", "Not Started", "events"))
+        self.assertEqual(task.due_at.date(), date(2026, 9, 8))
+        [session] = project.sessions
+        self.assertEqual((session.title, session.starts_at.date()), ("Mixer", date(2026, 9, 10)))
 
     def test_quick_create_route_creates_project_and_redirects(self):
         self._login()
@@ -148,20 +186,6 @@ class CreateMinimalProjectTestCase(unittest.TestCase):
         project = Project.query.filter_by(program_type_id=self.igp.id).one()
         self.assertEqual(project.title, "International Summer School 2026")
         self.assertEqual(len(project.sessions), 71)
-
-    def test_quick_create_with_documents_route(self):
-        self._login()
-        response = self.client.post(
-            "/erp/projects/quick-create-with-documents",
-            data={
-                "program_type_name": "ICC", "title": "Doc Route", "start_date": "2026-09-05", "end_date": "2026-09-05",
-                "source_files": (io.BytesIO(b"poster-bytes"), "UC Screen Flyer.pdf"),
-            },
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(response.status_code, 302)
-        project = Project.query.filter_by(title="Doc Route").one()
-        self.assertEqual(DocumentRecord.query.filter_by(project_id=project.id).count(), 1)
 
     def test_quick_create_rejects_missing_title(self):
         self._login()

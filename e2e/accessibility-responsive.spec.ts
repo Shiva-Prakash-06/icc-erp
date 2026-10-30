@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { openProject, openSection, signIn } from "./helpers";
+import { openProject, signIn } from "./helpers";
 
 test("authenticated project state has no automatically detectable WCAG A/AA violations", async ({ page }, testInfo) => {
   await signIn(page, "e2e_events");
@@ -28,9 +28,9 @@ test("keyboard command palette restores focus; no-JavaScript navigation remains 
   await signIn(page, "e2e_faculty");
   if (testInfo.project.name === "javascript-disabled") {
     await page.goto("/erp/projects/new");
-    await expect(page.getByRole("heading", { name: /create a project/i })).toBeVisible();
-    await page.getByRole("link", { name: /published reports/i }).first().click();
-    await expect(page).toHaveURL(/\/reports/);
+    await expect(page.getByRole("heading", { name: /what is the event\?/i })).toBeVisible();
+    await page.getByRole("link", { name: /^reports$/i }).first().click();
+    await expect(page).toHaveURL(/\/reports$/);
     return;
   }
   // The Tile System deleted the drawer: the rail is always visible (down
@@ -40,7 +40,7 @@ test("keyboard command palette restores focus; no-JavaScript navigation remains 
   if (viewport && viewport.width < 1024) {
     const rail = page.getByRole("navigation", { name: "Sections" });
     await expect(rail).toBeVisible();
-    await expect(rail.getByRole("link", { name: "Campuses" })).toBeVisible();
+    await expect(rail.getByRole("link", { name: "My work" })).toBeVisible();
     await expect(rail.getByRole("link", { name: "Events" })).toBeVisible();
     return;
   }
@@ -62,7 +62,7 @@ test("all required portrait and landscape widths avoid page overflow", async ({ 
   ];
   for (const [width, height] of viewports) {
     await page.setViewportSize({ width, height });
-    await page.goto("/queue");
+    await page.goto("/");
     const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
     expect(dimensions.scrollWidth, `${width}x${height}`).toBeLessThanOrEqual(dimensions.clientWidth + 1);
   }
@@ -73,7 +73,7 @@ test("reduced-motion preference suppresses meaningful CSS motion", async ({ page
     await page.emulateMedia({ reducedMotion: "reduce" });
   }
   await signIn(page, "e2e_faculty");
-  await page.goto("/queue");
+  await page.goto("/");
   if (testInfo.project.name !== "reduced-motion") {
     await expect(page.locator("h1")).toBeVisible();
     return;
@@ -92,45 +92,14 @@ test("reduced-motion preference suppresses meaningful CSS motion", async ({ page
    laid the page out. Their computable halves are asserted in
    tests/ui_audit_regression_test.py. */
 
-test("P1-06 — every dark tile heading meets WCAG AA against its own ground", async ({ page }) => {
-  await signIn(page, "e2e_faculty");
-  await page.goto("/erp/analytics");
-
-  const measured = await page.locator(".ds-tile").evaluateAll((tiles) => {
-    const parse = (value: string) => {
-      const [r, g, b, a = "1"] = value.replace(/rgba?\(|\)/g, "").split(/[,\s/]+/).filter(Boolean);
-      return [Number(r), Number(g), Number(b), Number(a)] as const;
-    };
-    const channel = (value: number) => {
-      const v = value / 255;
-      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-    };
-    const luminance = ([r, g, b]: readonly number[]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-    const ratio = (fg: readonly number[], bg: readonly number[]) => {
-      // Composite a translucent foreground over its own ground first, or
-      // the figure is optimistic by exactly the alpha.
-      const [fr, fg2, fb, fa] = fg;
-      const solid = [fr * fa + bg[0] * (1 - fa), fg2 * fa + bg[1] * (1 - fa), fb * fa + bg[2] * (1 - fa)];
-      const [hi, lo] = [luminance(solid), luminance(bg)].sort((a, b) => b - a);
-      return (hi + 0.05) / (lo + 0.05);
-    };
-    return tiles.flatMap((tile) => {
-      const background = parse(getComputedStyle(tile).backgroundColor);
-      return [".ds-tile__title", ".ds-tile__stat", ".ds-tile__note", ".ds-tile__go", ".ds-tile__code"]
-        .map((selector) => tile.querySelector(selector))
-        .filter((element): element is Element => Boolean(element))
-        .map((element) => ({
-          tile: tile.className,
-          part: element.className,
-          text: (element.textContent || "").trim().slice(0, 30),
-          ratio: Number(ratio(parse(getComputedStyle(element).color), background).toFixed(2)),
-        }));
-    });
-  });
-
-  expect(measured.length, "no tiles were rendered to measure").toBeGreaterThan(0);
-  // The audit measured rgb(29, 31, 32) on rgb(44, 69, 93) — 1.67:1.
-  expect(measured.filter((entry) => entry.ratio < 4.5)).toEqual([]);
+test("My work, Reports and People have no detectable WCAG A/AA violations", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "javascript-disabled", "axe needs JavaScript");
+  for (const [user, path] of [["e2e_faculty", "/"], ["e2e_faculty", "/reports"], ["e2e_faculty", "/admin/users"], ["e2e_media", "/"], ["e2e_volunteer", "/"]] as const) {
+    await signIn(page, user);
+    await page.goto(path);
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).disableRules(["color-contrast"]).analyze();
+    expect(results.violations, `${user} ${path}`).toEqual([]);
+  }
 });
 
 test("P0-02 — no row action is clipped or off-canvas on a phone", async ({ page }) => {
@@ -138,7 +107,7 @@ test("P0-02 — no row action is clipped or off-canvas on a phone", async ({ pag
   await signIn(page, "e2e_faculty");
   await openProject(page, "E2E-ICC-EVENT", "Logistics");
 
-  const strayed = await page.locator(".ds-row__act, .ds-review__trigger, .ds-row__title").evaluateAll((nodes) =>
+  const strayed = await page.locator(".cv-item__act, .cv-tick, .cv-item__title, .cv-menu > summary").evaluateAll((nodes) =>
     nodes
       .filter((node) => (node as HTMLElement).offsetParent !== null)
       .map((node) => {
@@ -177,7 +146,7 @@ test("P0-05 — the phone bar holds four destinations plus Menu, and covers noth
 
   // The last interactive element scrolls clear of the bar and the banner.
   const clearance = await page.evaluate(() => {
-    const scroller = document.querySelector(".ds-scroll") as HTMLElement | null;
+    const scroller = document.querySelector(".cv-body, .ds-scroll") as HTMLElement | null;
     if (!scroller) return { ok: true };
     scroller.scrollTop = scroller.scrollHeight;
     const nav = document.querySelector(".ds-rail")!.getBoundingClientRect();
@@ -188,53 +157,41 @@ test("P0-05 — the phone bar holds four destinations plus Menu, and covers noth
   expect(clearance.ok, JSON.stringify(clearance)).toBe(true);
 });
 
-test("P1-04 — a row decision opens in place and keeps its exact payload", async ({ page }) => {
-  await signIn(page, "e2e_faculty");
-  await openProject(page, "E2E-ICC-EVENT", "Logistics");
-  // Logistics opens on Details, a panel of facts with no decisions on it.
-  await openSection(page, "Tasks");
-
-  const review = page.locator("details.ds-review").first();
-  await expect(review).toBeVisible();
-  // Read-first: the form is not on the row until it is asked for.
-  await expect(review.locator(".ds-review__panel")).toBeHidden();
-  await review.locator("summary").click();
-  await expect(review.locator(".ds-review__panel")).toBeVisible();
-
-  const contract = await review.locator("form").evaluate((form: HTMLFormElement) => ({
-    method: form.method,
-    action: new URL(form.action).pathname,
-    names: [...form.elements].map((element) => (element as HTMLInputElement).name).filter(Boolean),
+test("one press ticks a to-do item, and the rarely used actions stay folded", async ({ page }) => {
+  await signIn(page, "e2e_events");
+  await openProject(page, "E2E-ICC-EVENT");
+  const item = page.locator("#card-todo li.cv-item").first();
+  await expect(item).toBeVisible();
+  // The tick is a submit button in the list's own form: one press, no page
+  // in between, works with JavaScript off.
+  const contract = await item.locator("button.cv-tick").evaluate((button: HTMLButtonElement) => ({
+    name: button.name,
+    value: button.value,
+    action: new URL(button.form!.action).pathname,
+    method: button.form!.method,
+    names: [...button.form!.elements].map((element) => (element as HTMLInputElement).name).filter(Boolean),
   }));
   expect(contract.method).toBe("post");
+  expect(contract.name).toBe("done");
+  expect(contract.value).toMatch(/^[tc]-[0-9a-f-]{36}$/);
+  expect(contract.action).toMatch(/\/todos\/done$/);
   expect(contract.names).toContain("csrf_token");
-  expect(contract.names).toContain("version");
-  expect(contract.names).toContain("status");
-  expect(contract.action).toMatch(/\/status$/);
+  // Skip and remove are behind the row's "⋯" until asked for.
+  await expect(item.locator(".cv-menu__panel")).toBeHidden();
+  await item.locator(".cv-menu > summary").click();
+  await expect(item.locator(".cv-menu__panel")).toBeVisible();
 });
 
-test("P0-03 — every linked analytics counter opens a list containing its records", async ({ page }) => {
+test("P0-03 — old analytics links land somewhere that lists what they counted", async ({ page }) => {
+  // The analytics counters are gone. Faculty's year numbers are on Reports;
+  // anyone else's old link opens the Events list.
+  await signIn(page, "e2e_faculty");
+  await page.goto("/erp/analytics/igp");
+  await expect(page).toHaveURL(/\/reports$/);
   await signIn(page, "e2e_igp");
   await page.goto("/erp/analytics/igp");
-
-  const tiles = page.locator("a.ds-kpi");
-  const count = await tiles.count();
-  expect(count, "the IGP dashboard should link at least one counter").toBeGreaterThan(0);
-
-  for (let index = 0; index < count; index += 1) {
-    const tile = tiles.nth(index);
-    const label = (await tile.locator(".ds-kpi__label").innerText()).trim();
-    const value = Number((await tile.locator(".ds-kpi__value").innerText()).replace(/\D/g, ""));
-    const href = await tile.getAttribute("href");
-    // A counter never links to the stored-status filter, which is what
-    // produced "1 of 1 this year" opening on "0 in scope".
-    expect(href, `${label} links to a stored-status filter`).not.toMatch(/[?&]status=/);
-    await page.goto(href!);
-    if (value > 0) {
-      await expect(page.locator(".ds-event"), `${label} counted ${value} but its list is empty`).toHaveCount(value);
-    }
-    await page.goBack();
-  }
+  await expect(page).toHaveURL(/\/erp\/projects$/);
+  await expect(page.getByText("Acceptance IGP programme")).toBeVisible();
 });
 
 test("P0-04 — no record shows two contradictory states without naming the dimensions", async ({ page }) => {

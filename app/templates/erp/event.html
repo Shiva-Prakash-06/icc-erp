@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ project.title }}</span>{% endblock %}
+{% block back_url %}{{ url_for('erp.projects') }}{% endblock %}
+{% block screen_title %}{{ project.title }}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{% block tools %}
+  {% if can_finish %}
+  <a class="cv-btn cv-btn--primary" href="{{ url_for('erp.project_detail', public_id=project.public_id, card='finish') }}#card-finish">Finish event</a>
+  {% elif can_sign_off %}
+  <a class="cv-btn cv-btn--primary" href="{{ url_for('erp.project_detail', public_id=project.public_id, card='finish') }}#card-finish">Sign off</a>
+  {% elif can_manage and stage in ['coming_up', 'happening'] %}
+  <a class="cv-btn cv-btn--primary" href="#todo-add">Add to-do</a>
+  {% endif %}
+{% endblock %}
+
+{#- Small shared pieces. `csrf` and `nxt` go in every form; `nxt` brings the
+    reader back to exactly this card after saving. -#}
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+{% macro nxt(card, anchor=None) %}<input type="hidden" name="next" value="{{ url_for('erp.project_detail', public_id=project.public_id, card=card) }}#{{ anchor or ('card-' ~ card) }}">{% endmacro %}
+{% macro more_link(card, total) -%}
+  {%- if total > show and not (show_all and card == open_card) -%}
+  <a class="cv-more" href="{{ url_for('erp.project_detail', public_id=project.public_id, card=card, all=1) }}#card-{{ card }}">Show all {{ total }}</a>
+  {%- endif -%}
+{%- endmacro %}
+{% set open_card = card %}
+
+{% block content %}
+<div class="cv-page">
+
+  {#- One line that says where the event is and what is left. -#}
+  <p class="cv-lede">
+    <strong>{{ stage_label }}</strong>
+    · {{ project.start_date|localdate('%a %d %b') }}{% if project.end_date != project.start_date %} – {{ project.end_date|localdate('%a %d %b') }}{% endif %}
+    {% if project.venue %} · {{ project.venue }}{% endif %}
+    {% if open_todos %} · <strong>{{ open_todos|length }} {{ 'thing' if open_todos|length == 1 else 'things' }} left</strong>{% elif can_manage %} · nothing left to do{% endif %}
+  </p>
+  {% if project.finish_note and not project.finish_requested_at %}
+  <div class="alert alert-warning" role="status"><span><strong>Faculty said:</strong> {{ project.finish_note }}</span></div>
+  {% endif %}
+
+  {# ───────────────────────────────────────── To do ────────────── #}
+  <section class="cv-section" id="card-todo" aria-labelledby="todo-title" data-tour="blockers">
+    <div class="cv-section__head">
+      <h2 class="cv-section__title" id="todo-title">To do</h2>
+      <span class="cv-count">{{ open_todos|length }} left{% if done_todos %} · {{ done_todos|length }} done{% endif %}</span>
+    </div>
+
+    {% set visible_todos = open_todos if (show_all and open_card == 'todo') else open_todos[:show] %}
+    {% if open_todos %}
+    <form method="POST" action="{{ url_for('erp.todos_done', public_id=project.public_id) }}" id="todo-form">
+      {{ csrf() }}{{ nxt('todo') }}
+      <ul class="cv-list">
+        {% for item in visible_todos %}
+        <li class="cv-item" id="{{ item.ref }}">
+          {% if item.ref in tickable %}
+          <button class="cv-tick" type="submit" name="done" value="{{ item.ref }}"><span class="visually-hidden">Mark “{{ item.title }}” done</span></button>
+          {% endif %}
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ item.title }}</span>
+            <span class="cv-item__meta{% if item.overdue() %} cv-item__meta--late{% endif %}">
+              {%- if item.who %}{{ item.who }}{% endif -%}
+              {%- if item.due_at %}{% if item.who %} · {% endif %}{% if item.overdue() %}Late — was due {% else %}By {% endif %}{{ item.due_at|localdate('%a %d %b') }}{% endif -%}
+              {%- if not item.is_task and item.project.id != project.id %} · {{ item.project.title }}{% endif -%}
+            </span>
+          </span>
+          {% if item.ref in tickable %}
+          <span class="cv-item__act">
+            <details class="cv-menu">
+              <summary aria-label="More for “{{ item.title }}”">⋯</summary>
+              <div class="cv-menu__panel">
+                <div class="cv-field">
+                  <label for="file-{{ item.ref }}">Add the file it needs, and tick it</label>
+                  <input type="file" id="file-{{ item.ref }}" name="file" form="file-form-{{ item.ref }}" accept="image/*,.pdf,.docx,.pptx,.xlsx">
+                </div>
+                <button class="cv-btn" type="submit" form="file-form-{{ item.ref }}">Add file</button>
+                <div class="cv-field">
+                  <label for="skip-{{ item.ref }}">Can't do it? Say why</label>
+                  <input type="text" id="skip-{{ item.ref }}" name="reason" form="skip-form-{{ item.ref }}" class="cv-input">
+                </div>
+                <button class="cv-btn" type="submit" form="skip-form-{{ item.ref }}">Skip it</button>
+                {% if can_manage %}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit" form="remove-form-{{ item.ref }}">Remove from list</button>{% endif %}
+              </div>
+            </details>
+          </span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </form>
+    {{ more_link('todo', open_todos|length) }}
+
+    {#- The rarely used forms live outside the list form (forms cannot nest)
+        and are reached through each row's `form=` attributes. -#}
+    {% for item in visible_todos if item.ref in tickable %}
+    <form method="POST" id="file-form-{{ item.ref }}" action="{{ url_for('erp.todo_file', public_id=project.public_id, ref=item.ref) }}" enctype="multipart/form-data" hidden>{{ csrf() }}{{ nxt('todo') }}</form>
+    <form method="POST" id="skip-form-{{ item.ref }}" action="{{ url_for('erp.todo_skip', public_id=project.public_id, ref=item.ref) }}" hidden>{{ csrf() }}{{ nxt('todo') }}</form>
+    {% if can_manage %}<form method="POST" id="remove-form-{{ item.ref }}" action="{{ url_for('erp.todo_remove', public_id=project.public_id, ref=item.ref) }}" hidden>{{ csrf() }}{{ nxt('todo') }}</form>{% endif %}
+    {% endfor %}
+
+    {% if tickable|length > 1 and open_todos|length > 1 %}
+    <details class="cv-done">
+      <summary>Tick several at once</summary>
+      <form method="POST" action="{{ url_for('erp.todos_done', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('todo') }}
+        <ul class="cv-roll">
+          {% for item in open_todos if item.ref in tickable %}
+          <li><label><input type="checkbox" name="items" value="{{ item.ref }}">{{ item.title }}</label></li>
+          {% endfor %}
+        </ul>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Mark these done</button></div>
+      </form>
+    </details>
+    {% endif %}
+    {% else %}
+    <p class="cv-empty">{% if done_todos %}Everything is done. Nice work.{% else %}Nothing on the list yet.{% endif %}</p>
+    {% endif %}
+
+    {% if can_manage %}
+    <form method="POST" action="{{ url_for('erp.add_task', public_id=project.public_id) }}" class="cv-form cv-form--inline mt-4" id="todo-add">
+      {{ csrf() }}{{ nxt('todo') }}
+      <div class="cv-field"><label for="todo-title-input">What needs doing?</label><input type="text" id="todo-title-input" name="title" required maxlength="220" placeholder="e.g. Book the hall"></div>
+      <div class="cv-field"><label for="todo-who">Who?</label>
+        <select id="todo-who" name="who">
+          <option value="me">Me</option>
+          <optgroup label="A team">{% for key, label in who.teams %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</optgroup>
+          {% if who.people %}<optgroup label="Someone on this event">{% for key, label in who.people %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</optgroup>{% endif %}
+        </select></div>
+      <div class="cv-field"><label for="todo-due">By when <span class="cv-optional">(optional)</span></label><input type="date" id="todo-due" name="due"></div>
+      <div><button class="cv-btn cv-btn--primary" type="submit">Add</button></div>
+    </form>
+    {% endif %}
+
+    {% if done_todos %}
+    <details class="cv-done mt-4">
+      <summary>✓ {{ done_todos|length }} done</summary>
+      <ul class="cv-list">
+        {% for item in done_todos %}
+        <li class="cv-item cv-item--done" id="{{ item.ref }}">
+          <span class="cv-tick cv-tick--done" aria-hidden="true"></span>
+          <span class="cv-item__main"><span class="cv-item__title">{{ item.title }}</span>
+            <span class="cv-item__meta">{% if item.skipped %}Skipped: {{ item.skip_reason }}{% else %}{{ item.who }}{% endif %}</span></span>
+          {% if item.ref in tickable %}
+          <form method="POST" action="{{ url_for('erp.todo_reopen', public_id=project.public_id, ref=item.ref) }}" class="cv-item__act">{{ csrf() }}{{ nxt('todo') }}<button class="cv-btn cv-btn--quiet" type="submit">Not done</button></form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </section>
+
+  {# ───────────────────────────────────────── Schedule ─────────── #}
+  {% if can_manage %}
+  <details class="cv-card" id="card-schedule" {% if open_card == 'schedule' %}open{% endif %}>
+    <summary><span class="cv-card__title">Schedule</span>
+      <span class="cv-card__sum">{% if sessions %}{{ sessions|length }} {{ 'session' if sessions|length == 1 else 'sessions' }}{% if next_session %} · next {{ next_session.starts_at|localdate('%a %d %b') }} {{ next_session.starts_at|localtime('%I:%M %p', label=False) }}{% endif %}{% else %}Nothing added yet{% endif %}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for item in (sessions if (show_all and open_card == 'schedule') else sessions[:show]) %}
+        <li class="cv-item" id="{{ item.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ item.title }}</span>
+            <span class="cv-item__meta">{{ item.starts_at|localdate('%a %d %b') }} · {{ item.starts_at|localtime('%I:%M %p', label=False) }}–{{ item.ends_at|localtime('%I:%M %p', label=False) }}{% if item.venue %} · {{ item.venue }}{% endif %}{% if marked[item.id] %} · {{ marked[item.id] }} came{% endif %}</span>
+          </span>
+          <span class="cv-item__act">
+            <a class="cv-btn" href="{{ url_for('erp.attendance_roll_call', public_id=project.public_id, session_public_id=item.public_id) }}">Take attendance</a>
+            <details class="cv-menu">
+              <summary aria-label="Change “{{ item.title }}”">⋯</summary>
+              <div class="cv-menu__panel">
+                <form method="POST" action="{{ url_for('erp.edit_session', public_id=project.public_id, session_public_id=item.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('schedule', item.public_id) }}
+                  <div class="cv-field"><label for="s-title-{{ item.public_id }}">Name</label><input type="text" id="s-title-{{ item.public_id }}" name="title" value="{{ item.title }}"></div>
+                  <div class="cv-field"><label for="s-day-{{ item.public_id }}">Day</label><input type="date" id="s-day-{{ item.public_id }}" name="day" value="{{ item.starts_at|localdate('%Y-%m-%d') }}"></div>
+                  <div class="cv-row">
+                    <div class="cv-field"><label for="s-start-{{ item.public_id }}">Starts</label><input type="time" id="s-start-{{ item.public_id }}" name="start_time" value="{{ item.starts_at|localtime('%H:%M', label=False) }}"></div>
+                    <div class="cv-field"><label for="s-end-{{ item.public_id }}">Ends</label><input type="time" id="s-end-{{ item.public_id }}" name="end_time" value="{{ item.ends_at|localtime('%H:%M', label=False) }}"></div>
+                  </div>
+                  <div class="cv-field"><label for="s-venue-{{ item.public_id }}">Where</label><input type="text" id="s-venue-{{ item.public_id }}" name="venue" value="{{ item.venue or '' }}"></div>
+                  <button class="cv-btn cv-btn--primary" type="submit">Save</button>
+                </form>
+                <form method="POST" action="{{ url_for('erp.remove_session', public_id=project.public_id, session_public_id=item.public_id) }}">{{ csrf() }}{{ nxt('schedule') }}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit">Remove</button></form>
+              </div>
+            </details>
+          </span>
+        </li>
+        {% else %}
+        <li class="cv-empty">No sessions yet. Add one below.</li>
+        {% endfor %}
+      </ul>
+      {{ more_link('schedule', sessions|length) }}
+
+      <h3 class="cv-label mt-4">Add a session</h3>
+      <form method="POST" action="{{ url_for('erp.add_session', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('schedule') }}
+        <div class="cv-row">
+          <div class="cv-field"><label for="new-s-title">Name <span class="cv-optional">(optional)</span></label><input type="text" id="new-s-title" name="title" placeholder="{{ 'Main session' if not sessions else 'Session ' ~ (sessions|length + 1) }}"></div>
+          <div class="cv-field"><label for="new-s-day">Day</label><input type="date" id="new-s-day" name="day" value="{{ project.start_date.isoformat() }}" required></div>
+        </div>
+        <div class="cv-row">
+          <div class="cv-field"><label for="new-s-start">Starts</label><input type="time" id="new-s-start" name="start_time" required></div>
+          <div class="cv-field"><label for="new-s-end">Ends</label><input type="time" id="new-s-end" name="end_time" required></div>
+          <div class="cv-field"><label for="new-s-venue">Where <span class="cv-optional">(optional)</span></label><input type="text" id="new-s-venue" name="venue" placeholder="{{ project.venue or '' }}"></div>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Add session</button></div>
+      </form>
+      {% if is_igp %}
+      <details class="cv-done mt-4">
+        <summary>Have an itinerary file? Add every session at once</summary>
+        <form method="POST" action="{{ url_for('erp.upload_itinerary', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+          {{ csrf() }}{{ nxt('schedule') }}
+          <div class="cv-field"><label for="itinerary-file">Itinerary file (.xlsx or .csv)</label><input type="file" id="itinerary-file" name="source_file" accept=".xlsx,.csv" required></div>
+          <div><button class="cv-btn" type="submit">Add from file</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </details>
+
+  {# ───────────────────────────────────────── People ───────────── #}
+  <details class="cv-card" id="card-people" {% if open_card == 'people' %}open{% endif %}>
+    <summary><span class="cv-card__title">People</span>
+      <span class="cv-card__sum">{{ team|length }} {{ 'person' if team|length == 1 else 'people' }}{% if attended %} · {{ attended }} came{% endif %}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for assignment in (team if (show_all and open_card == 'people') else team[:show]) %}
+        {% set person = assignment.person %}
+        <li class="cv-item" id="{{ assignment.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ person.display_name }}</span>
+            <span class="cv-item__meta">{{ assignment.role_label or 'Volunteer' }}{% if person.registration_number %} · {{ person.registration_number }}{% endif %}{% if hours[person.id] %} · {{ '%g'|format(hours[person.id]) }} hours{% endif %}</span>
+          </span>
+          <span class="cv-item__act">
+            <details class="cv-menu">
+              <summary aria-label="Change {{ person.display_name }}">⋯</summary>
+              <div class="cv-menu__panel">
+                <form method="POST" action="{{ url_for('erp.change_job', public_id=project.public_id, assignment_public_id=assignment.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('people', assignment.public_id) }}
+                  <div class="cv-field"><label for="job-{{ assignment.public_id }}">Their job</label>
+                    <select id="job-{{ assignment.public_id }}" name="job">{% for job in jobs %}<option {% if job == assignment.role_label %}selected{% endif %}>{{ job }}</option>{% endfor %}</select></div>
+                  <button class="cv-btn" type="submit">Save job</button>
+                </form>
+                <form method="POST" action="{{ url_for('erp.add_hours', public_id=project.public_id, assignment_public_id=assignment.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('people', assignment.public_id) }}
+                  <div class="cv-field"><label for="hours-{{ assignment.public_id }}">Add hours they worked</label><input type="number" id="hours-{{ assignment.public_id }}" name="hours" min="0.5" max="24" step="0.5" value="1"></div>
+                  <button class="cv-btn" type="submit">Add hours</button>
+                </form>
+                <form method="POST" action="{{ url_for('erp.remove_team_member', public_id=project.public_id, assignment_public_id=assignment.public_id) }}">{{ csrf() }}{{ nxt('people') }}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit">Remove from event</button></form>
+              </div>
+            </details>
+          </span>
+        </li>
+        {% else %}
+        <li class="cv-empty">Nobody added yet.</li>
+        {% endfor %}
+      </ul>
+      {{ more_link('people', team|length) }}
+
+      <h3 class="cv-label mt-4">Add people</h3>
+      <form method="POST" action="{{ url_for('erp.paste_people', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('people') }}
+        <div class="cv-field">
+          <label for="people-list">Type or paste names, one per line</label>
+          <textarea id="people-list" name="people" rows="5" placeholder="Asha Rao&#10;Rahul Dsouza, rahul.d@christuniversity.in&#10;Zoya Khan	2312345	Buddy"></textarea>
+          <p class="cv-note">You can paste rows straight from Excel. An email, a register number or a job on the same line is picked up too.</p>
+        </div>
+        <div class="cv-row">
+          <div class="cv-field"><label for="people-job">Their job</label><select id="people-job" name="job">{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></div>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Add these people</button></div>
+      </form>
+      <p class="cv-note">Filling a sheet offline? <a href="{{ url_for('erp.download_template', public_id=project.public_id, kind='people') }}">Get a blank sheet</a>, fill it in, then copy and paste the rows above.</p>
+      {% if not is_igp %}
+      <details class="cv-done">
+        <summary>Have the ICC volunteer attendance sheet? Add it here</summary>
+        <form method="POST" action="{{ url_for('erp.upload_icc_attendance', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+          {{ csrf() }}{{ nxt('people') }}
+          <div class="cv-field"><label for="icc-attendance-file">Volunteer sheet (.xlsx)</label><input type="file" id="icc-attendance-file" name="source_file" accept=".xlsx" required></div>
+          <div><button class="cv-btn" type="submit">Add from sheet</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </details>
+
+  {# ───────────────────────────────────────── Money ────────────── #}
+  <details class="cv-card" id="card-money" {% if open_card == 'money' %}open{% endif %}>
+    <summary><span class="cv-card__title">Money</span>
+      <span class="cv-card__sum">{% if money %}{{ money_totals.asked|money }} asked · {{ money_totals.approved|money }} approved{% if money_totals.paid %} · {{ money_totals.paid|money }} paid{% endif %}{% else %}Nothing asked for{% endif %}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for entry in (money if (show_all and open_card == 'money') else money[:show]) %}
+        <li class="cv-item" id="{{ entry.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ entry.particular or 'Money' }} · <strong>{{ entry.amount|money }}</strong></span>
+            <span class="cv-item__meta"><span class="cv-tag cv-tag--{{ {'Asked': 'asked', 'Approved': 'approved', 'Paid': 'paid', 'Not approved': 'no'}.get(entry.status, 'asked') }}">{{ entry.status }}</span>
+              {% if entry.party_name %} · to {{ entry.party_name }}{% endif %} · {{ entry.date|localdate('%d %b') }}
+              {% if entry.bill_document_id %} · <a href="{{ url_for('erp.project_detail', public_id=project.public_id, card='files') }}#card-files">bill added</a>{% endif %}
+              {% if entry.status == 'Not approved' and entry.decision_comment %} · “{{ entry.decision_comment }}”{% endif %}</span>
+          </span>
+          {% set can_decide = can_approve and entry.status == 'Asked' and entry.created_by_id != g.user.id %}
+          {% if can_decide or (can_manage and entry.status != 'Paid') %}
+          <span class="cv-item__act">
+            {% if can_decide %}
+            <form method="POST" action="{{ url_for('erp.update_reimbursement_status', public_id=project.public_id, entry_public_id=entry.public_id) }}">{{ csrf() }}{{ nxt('money', entry.public_id) }}<input type="hidden" name="status" value="Approved"><button class="cv-btn cv-btn--primary" type="submit">Approve</button></form>
+            <details class="cv-menu">
+              <summary aria-label="Not now">⋯</summary>
+              <div class="cv-menu__panel">
+                <form method="POST" action="{{ url_for('erp.update_reimbursement_status', public_id=project.public_id, entry_public_id=entry.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('money', entry.public_id) }}<input type="hidden" name="status" value="Not approved">
+                  <div class="cv-field"><label for="no-{{ entry.public_id }}">Not now — say why</label><input type="text" id="no-{{ entry.public_id }}" name="comment" required></div>
+                  <button class="cv-btn" type="submit">Send back</button>
+                </form>
+              </div>
+            </details>
+            {% elif can_manage and entry.status == 'Approved' %}
+            <form method="POST" action="{{ url_for('erp.update_reimbursement_status', public_id=project.public_id, entry_public_id=entry.public_id) }}">{{ csrf() }}{{ nxt('money', entry.public_id) }}<input type="hidden" name="status" value="Paid"><button class="cv-btn" type="submit">Mark paid</button></form>
+            {% elif can_manage and entry.status == 'Not approved' %}
+            <form method="POST" action="{{ url_for('erp.update_reimbursement_status', public_id=project.public_id, entry_public_id=entry.public_id) }}">{{ csrf() }}{{ nxt('money', entry.public_id) }}<input type="hidden" name="status" value="Asked"><button class="cv-btn cv-btn--quiet" type="submit">Ask again</button></form>
+            {% elif can_manage and entry.status == 'Asked' %}
+            <form method="POST" action="{{ url_for('erp.remove_money', public_id=project.public_id, entry_public_id=entry.public_id) }}">{{ csrf() }}{{ nxt('money') }}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit">Remove</button></form>
+            {% endif %}
+          </span>
+          {% endif %}
+        </li>
+        {% else %}
+        <li class="cv-empty">No money asked for yet.</li>
+        {% endfor %}
+      </ul>
+      {{ more_link('money', money|length) }}
+
+      {% if can_manage %}
+      <h3 class="cv-label mt-4">Ask for money</h3>
+      <form method="POST" action="{{ url_for('erp.add_reimbursement', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+        {{ csrf() }}{{ nxt('money') }}
+        <div class="cv-row">
+          <div class="cv-field"><label for="money-for">What for?</label><input type="text" id="money-for" name="particular" required placeholder="e.g. Snacks for volunteers"></div>
+          <div class="cv-field"><label for="money-amount">How much (₹)?</label><input type="number" id="money-amount" name="amount" min="0" step="1" inputmode="numeric" required></div>
+        </div>
+        <div class="cv-row">
+          <div class="cv-field"><label for="money-to">Paid to <span class="cv-optional">(optional)</span></label><input type="text" id="money-to" name="party_name" placeholder="Shop or person"></div>
+          <div class="cv-field"><label for="money-bill">Photo of the bill <span class="cv-optional">(optional)</span></label><input type="file" id="money-bill" name="bill" accept="image/*,.pdf" capture="environment"></div>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Ask</button></div>
+      </form>
+      <details class="cv-done mt-4">
+        <summary>Many at once, from a sheet</summary>
+        <p class="cv-note"><a href="{{ url_for('erp.download_template', public_id=project.public_id, kind='money') }}">Get a blank sheet</a>, fill one line per bill, then add it here.</p>
+        <form method="POST" action="{{ url_for('erp.upload_reimbursements', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+          {{ csrf() }}{{ nxt('money') }}
+          <div class="cv-field"><label for="money-sheet">Filled sheet (.xlsx or .csv)</label><input type="file" id="money-sheet" name="source_file" accept=".xlsx,.csv" required></div>
+          <div><button class="cv-btn" type="submit">Add from sheet</button></div>
+        </form>
+        {% if money %}<p class="cv-note">Download the list: <a href="{{ url_for('erp.export_reimbursements_route', public_id=project.public_id, output_format='xlsx') }}">Excel</a> · <a href="{{ url_for('erp.export_reimbursements_route', public_id=project.public_id, output_format='csv') }}">CSV</a></p>{% endif %}
+      </details>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {# ───────────────────────────────────────── Files ────────────── #}
+  <details class="cv-card" id="card-files" {% if open_card == 'files' %}open{% endif %}>
+    <summary><span class="cv-card__title">Files</span>
+      <span class="cv-card__sum">{{ files|length }} {{ 'file' if files|length == 1 else 'files' }} · {% if has_report %}event report added ✓{% else %}event report missing{% endif %}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for document in (files if (show_all and open_card == 'files') else files[:show]) %}
+        <li class="cv-item" id="{{ document.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{% if document.drive_url and (document.permission_classification != 'Restricted' or has_permission(g.user, 'sensitive_links', project, sensitive=True)) %}<a href="{{ url_for('erp.open_document', public_id=document.public_id) }}" target="_blank" rel="noopener noreferrer">{{ document.title }}</a>{% else %}{{ document.title }}{% endif %}</span>
+            <span class="cv-item__meta">{{ file_kind_label(document.category) }}</span>
+          </span>
+          {% if can_manage %}
+          <span class="cv-item__act">
+            <details class="cv-menu">
+              <summary aria-label="Change {{ document.title }}">⋯</summary>
+              <div class="cv-menu__panel">
+                <form method="POST" action="{{ url_for('erp.change_file_kind', public_id=project.public_id, document_public_id=document.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('files', document.public_id) }}
+                  <div class="cv-field"><label for="kind-{{ document.public_id }}">What is this?</label>
+                    <select id="kind-{{ document.public_id }}" name="kind">{% for key, label, category in file_kinds if category %}<option value="{{ key }}" {% if category == document.category %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+                  <button class="cv-btn" type="submit">Save</button>
+                </form>
+                <form method="POST" action="{{ url_for('erp.remove_file', public_id=project.public_id, document_public_id=document.public_id) }}">{{ csrf() }}{{ nxt('files') }}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit">Remove</button></form>
+              </div>
+            </details>
+          </span>
+          {% endif %}
+        </li>
+        {% else %}
+        <li class="cv-empty">No files yet.</li>
+        {% endfor %}
+      </ul>
+      {{ more_link('files', files|length) }}
+
+      {% if can_manage or can_contribute %}
+      <h3 class="cv-label mt-4">Add files</h3>
+      <form method="POST" action="{{ url_for('erp.add_files', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+        {{ csrf() }}{{ nxt('files') }}
+        <div class="cv-field"><label for="files-input">Choose files or take a photo</label><input type="file" id="files-input" name="files" multiple accept="image/*,.pdf,.docx,.pptx,.xlsx,.csv"></div>
+        <fieldset class="cv-chips">
+          <legend>What is this?</legend>
+          {% for key, label, category in file_kinds %}
+          <label class="cv-chip"><input type="radio" name="kind" value="{{ key }}" {% if (key == 'report' and not has_report) or (key == 'other' and has_report) %}checked{% endif %}><span>{{ label }}</span></label>
+          {% endfor %}
+        </fieldset>
+        <div class="cv-field"><label for="files-link">…or paste a Google Drive link <span class="cv-optional">(optional)</span></label><input type="url" id="files-link" name="drive_url" placeholder="https://drive.google.com/…"></div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Add</button></div>
+      </form>
+      {% endif %}
+    </div>
+  </details>
+
+  {% if can_manage %}
+  {# ───────────────────────────────────────── Buddies (IGP) ────── #}
+  {% if is_igp %}
+  <details class="cv-card" id="card-buddies" {% if open_card == 'buddies' %}open{% endif %}>
+    <summary><span class="cv-card__title">Buddies</span>
+      <span class="cv-card__sum">{{ buddy_pairs|length }} {{ 'pair' if buddy_pairs|length == 1 else 'pairs' }}</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for pair in (buddy_pairs if (show_all and open_card == 'buddies') else buddy_pairs[:show]) %}
+        <li class="cv-item" id="{{ pair.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ pair.buddy_person.display_name if pair.buddy_person else (pair.buddy.username if pair.buddy else '—') }} ↔ {{ pair.exchange_student_person.display_name if pair.exchange_student_person else (pair.exchange_student.username if pair.exchange_student else '—') }}</span>
+            <span class="cv-item__meta">{{ pair.logs|length }} {{ 'time' if pair.logs|length == 1 else 'times' }} met{% if pair.logs %} · last on {{ (pair.logs|sort(attribute='activity_date')|last).activity_date|localdate('%d %b') }}{% endif %}</span>
+            {% for log in pair.logs %}<span id="{{ log.public_id }}"></span>{% endfor %}
+          </span>
+          <span class="cv-item__act">
+            <details class="cv-menu">
+              <summary aria-label="Write down a meeting">⋯</summary>
+              <div class="cv-menu__panel">
+                <form method="POST" action="{{ url_for('erp.log_buddy_interaction', public_id=project.public_id, assignment_public_id=pair.public_id) }}" class="cv-form">
+                  {{ csrf() }}{{ nxt('buddies', pair.public_id) }}
+                  <div class="cv-field"><label for="log-{{ pair.public_id }}">What did they do together?</label><input type="text" id="log-{{ pair.public_id }}" name="description" required></div>
+                  <div class="cv-row">
+                    <div class="cv-field"><label for="log-day-{{ pair.public_id }}">When</label><input type="date" id="log-day-{{ pair.public_id }}" name="activity_date" value="{{ today_iso }}"></div>
+                    <div class="cv-field"><label for="log-h-{{ pair.public_id }}">Hours</label><input type="number" id="log-h-{{ pair.public_id }}" name="duration_hours" value="1" min="0.5" max="24" step="0.5"></div>
+                  </div>
+                  <button class="cv-btn cv-btn--primary" type="submit">Save</button>
+                </form>
+              </div>
+            </details>
+          </span>
+        </li>
+        {% else %}
+        <li class="cv-empty">No pairs yet.</li>
+        {% endfor %}
+      </ul>
+      {{ more_link('buddies', buddy_pairs|length) }}
+      {% if team|length >= 2 %}
+      <h3 class="cv-label mt-4">Pair two people</h3>
+      <form method="POST" action="{{ url_for('erp.add_buddy_assignment', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('buddies') }}
+        <div class="cv-row">
+          <div class="cv-field"><label for="pair-buddy">Buddy</label><select id="pair-buddy" name="buddy_person_public_id" required>{% for a in team %}<option value="{{ a.person.public_id }}" {% if a.role_label == 'Buddy' and loop.first %}selected{% endif %}>{{ a.person.display_name }}</option>{% endfor %}</select></div>
+          <div class="cv-field"><label for="pair-student">Visiting student</label><select id="pair-student" name="exchange_student_person_public_id" required>{% for a in team %}<option value="{{ a.person.public_id }}">{{ a.person.display_name }}</option>{% endfor %}</select></div>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Pair them</button></div>
+      </form>
+      {% endif %}
+      <details class="cv-done mt-4">
+        <summary>Have the buddy list as a sheet? Add it here</summary>
+        <form method="POST" action="{{ url_for('erp.upload_buddy_allocation', public_id=project.public_id) }}" enctype="multipart/form-data" class="cv-form">
+          {{ csrf() }}{{ nxt('buddies') }}
+          <div class="cv-field"><label for="buddy-sheet">Buddy list (.csv or .xlsx)</label><input type="file" id="buddy-sheet" name="source_file" accept=".csv,.xlsx" required></div>
+          <div><button class="cv-btn" type="submit">Add from sheet</button></div>
+        </form>
+      </details>
+    </div>
+  </details>
+  {% endif %}
+
+  {# ───────────────────────────────────────── Feedback ─────────── #}
+  <details class="cv-card" id="card-feedback" {% if open_card == 'feedback' %}open{% endif %}>
+    <summary><span class="cv-card__title">Feedback</span>
+      <span class="cv-card__sum">{% if feedback_form and feedback_form.is_open and feedback_form.public_token %}Link ready{% elif feedback_form %}Closed{% else %}No link yet{% endif %} · {{ responses|length }} {{ 'answer' if responses|length == 1 else 'answers' }}</span></summary>
+    <div class="cv-card__body">
+      {% if feedback_form and feedback_form.is_open and feedback_form.public_token %}
+      <div class="cv-field">
+        <label for="feedback-link">Share this link. Anyone can answer, no sign-in needed.</label>
+        <div class="cv-link-box"><input type="text" id="feedback-link" readonly value="{{ url_for('public.feedback_answer', token=feedback_form.public_token, _external=True) }}" class="cv-input"></div>
+      </div>
+      <form method="POST" action="{{ url_for('erp.close_feedback_link', public_id=project.public_id) }}" class="mt-2">{{ csrf() }}{{ nxt('feedback') }}<button class="cv-btn cv-btn--quiet" type="submit">Stop taking answers</button></form>
+      {% else %}
+      <form method="POST" action="{{ url_for('erp.make_feedback_link', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('feedback') }}
+        <div class="cv-field">
+          <label for="feedback-questions">Questions, one per line</label>
+          <textarea id="feedback-questions" name="questions" rows="3">What did you like most?
+What could be better next time?</textarea>
+          <p class="cv-note">Everyone is also asked for a score from 1 to 5.</p>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Make feedback link</button></div>
+      </form>
+      {% endif %}
+      {% if responses %}
+      <ul class="cv-list mt-4">
+        {% for response in (responses if (show_all and open_card == 'feedback') else responses[:show]) %}
+        <li class="cv-item" id="{{ response.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ response.answers_json.get('rating', '—') }} out of 5</span>
+            <span class="cv-item__meta">{% for question in response.form.questions_json if question.type == 'text' and response.answers_json.get(question.key) %}{{ response.answers_json.get(question.key) }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {{ more_link('feedback', responses|length) }}
+      {% endif %}
+    </div>
+  </details>
+
+  {# ───────────────────────────────────────── Applications ─────── #}
+  {% if applications %}
+  <details class="cv-card" id="card-applications" {% if open_card == 'applications' %}open{% endif %}>
+    <summary><span class="cv-card__title">Applications</span>
+      <span class="cv-card__sum">{{ applications|selectattr('decision', 'in', ['Submitted', 'Interview Scheduled'])|list|length }} to decide · {{ applications|length }} in all</span></summary>
+    <div class="cv-card__body">
+      <ul class="cv-list">
+        {% for application in (applications if (show_all and open_card == 'applications') else applications[:show]) %}
+        <li class="cv-item" id="{{ application.public_id }}">
+          <span class="cv-item__main">
+            <span class="cv-item__title">{{ application.person.display_name }}</span>
+            <span class="cv-item__meta">Wants to be: {{ application.desired_role }}{% if application.decision == 'Selected' %} · <span class="cv-tag cv-tag--good">Picked</span>{% elif application.decision == 'Rejected' %} · <span class="cv-tag">Not picked</span>{% endif %}</span>
+          </span>
+          {% if application.decision in ['Submitted', 'Interview Scheduled', 'Waitlisted'] %}
+          <span class="cv-item__act">
+            <form method="POST" action="{{ url_for('erp.decide_recruitment_route', public_id=project.public_id, application_public_id=application.public_id) }}">{{ csrf() }}{{ nxt('applications', application.public_id) }}<input type="hidden" name="version" value="{{ application.version }}"><input type="hidden" name="decision" value="Selected"><button class="cv-btn cv-btn--primary" type="submit">Pick</button></form>
+            <form method="POST" action="{{ url_for('erp.decide_recruitment_route', public_id=project.public_id, application_public_id=application.public_id) }}">{{ csrf() }}{{ nxt('applications', application.public_id) }}<input type="hidden" name="version" value="{{ application.version }}"><input type="hidden" name="decision" value="Rejected"><button class="cv-btn cv-btn--quiet" type="submit">Not this time</button></form>
+          </span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {{ more_link('applications', applications|length) }}
+    </div>
+  </details>
+  {% endif %}
+
+  {# ───────────────────────────────────────── Event details ────── #}
+  <details class="cv-card" id="card-details" {% if open_card == 'details' %}open{% endif %}>
+    <summary><span class="cv-card__title">Event details</span><span class="cv-card__sum">Name, dates, place</span></summary>
+    <div class="cv-card__body">
+      <form method="POST" action="{{ url_for('erp.update_project_basics', public_id=project.public_id) }}" class="cv-form">
+        {{ csrf() }}{{ nxt('details') }}
+        <div class="cv-field"><label for="d-title">Name</label><input type="text" id="d-title" name="title" value="{{ project.title }}" required maxlength="150"></div>
+        <div class="cv-row">
+          <div class="cv-field"><label for="d-start">First day</label><input type="date" id="d-start" name="start_date" value="{{ project.start_date.isoformat() }}" required></div>
+          <div class="cv-field"><label for="d-end">Last day</label><input type="date" id="d-end" name="end_date" value="{{ project.end_date.isoformat() }}"></div>
+        </div>
+        <div class="cv-row">
+          <div class="cv-field"><label for="d-venue">Where</label><input type="text" id="d-venue" name="venue" value="{{ project.venue or '' }}"></div>
+          <div class="cv-field"><label for="d-audience">Who is it for?</label><input type="text" id="d-audience" name="target_audience" value="{{ project.target_audience or '' }}"></div>
+        </div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Save</button></div>
+      </form>
+    </div>
+  </details>
+  {% endif %}
+
+  {# ───────────────────────────────────────── Finish ───────────── #}
+  {% if can_manage or can_approve %}
+  <details class="cv-card" id="card-finish" {% if open_card == 'finish' or can_sign_off %}open{% endif %}>
+    <summary><span class="cv-card__title">Finish</span><span class="cv-card__sum">{{ stage_label }}</span></summary>
+    <div class="cv-card__body" id="publication"><div id="finish">
+      {% if stage == 'finished' %}
+        <p>This event is finished ✓{% if project.publication_status == 'Published' %} It is on the public website.{% elif project.publication_status == 'Pending' %} Waiting to go on the public website.{% endif %}</p>
+        <p><a class="cv-btn" href="{{ url_for('erp.complete_report_preview', public_id=project.public_id) }}">See the report</a></p>
+        {% if can_manage and project.publication_status in ['Private', 'Withdrawn'] %}
+        <form method="POST" action="{{ url_for('erp.submit_publication', public_id=project.public_id) }}">{{ csrf() }}{{ nxt('finish') }}<input type="hidden" name="version" value="{{ project.version }}"><button class="cv-btn cv-btn--quiet" type="submit">Ask to show it on the public website</button></form>
+        {% endif %}
+        {% if can_approve and project.publication_status == 'Pending' and project.publication_requested_by_id != g.user.id %}
+        <form method="POST" action="{{ url_for('erp.decide_publication', public_id=project.public_id) }}" class="mt-2">{{ csrf() }}{{ nxt('finish') }}<input type="hidden" name="version" value="{{ project.version }}"><input type="hidden" name="decision" value="Published"><button class="cv-btn cv-btn--primary" type="submit">Show it on the website</button></form>
+        {% endif %}
+      {% elif stage == 'cancelled' %}
+        <p>This event was cancelled.</p>
+      {% elif stage == 'waiting' %}
+        <p>Sent to Faculty to sign off{% if project.publication_status == 'Pending' %}, and to show on the public website{% endif %}.</p>
+        {% if project.closure_summary %}<p class="cv-note">“{{ project.closure_summary }}”</p>{% endif %}
+        {% if can_sign_off %}
+        <div class="cv-row">
+          <form method="POST" action="{{ url_for('erp.decide_finish_route', public_id=project.public_id) }}">{{ csrf() }}{{ nxt('finish') }}<input type="hidden" name="decision" value="approve"><button class="cv-btn cv-btn--primary cv-btn--full" type="submit">Sign off</button></form>
+        </div>
+        <form method="POST" action="{{ url_for('erp.decide_finish_route', public_id=project.public_id) }}" class="cv-form mt-4">
+          {{ csrf() }}{{ nxt('finish') }}<input type="hidden" name="decision" value="not_now">
+          <div class="cv-field"><label for="finish-note">Not ready? Say what to fix</label><input type="text" id="finish-note" name="note" required></div>
+          <div><button class="cv-btn" type="submit">Send back</button></div>
+        </form>
+        {% endif %}
+      {% elif can_finish %}
+        <ul class="cv-checks">
+          <li class="{{ 'is-ok' if finish.has_report else 'is-missing' }}">Event report file {{ 'added' if finish.has_report else 'missing — add it in Files' }}</li>
+          {% if finish.needs_attendance %}<li class="{{ 'is-ok' if finish.attendance_taken else 'is-missing' }}">Attendance {{ 'taken' if finish.attendance_taken else 'not taken yet — use Take attendance in Schedule' }}</li>{% endif %}
+          {% if finish.open_todos %}<li class="is-warn">{{ finish.open_todos }} {{ 'thing' if finish.open_todos == 1 else 'things' }} still on the to-do list (you can still finish)</li>{% endif %}
+        </ul>
+        <form method="POST" action="{{ url_for('erp.finish_route', public_id=project.public_id) }}" class="cv-form">
+          {{ csrf() }}{{ nxt('finish') }}
+          <div class="cv-field"><label for="finish-summary">Anything to add? <span class="cv-optional">(optional)</span></label><textarea id="finish-summary" name="summary" rows="3" placeholder="How did it go?">{{ project.closure_summary or '' }}</textarea></div>
+          <label class="cv-check"><input type="checkbox" name="show_on_website" value="yes"> Also show it on the public website</label>
+          <div><button class="cv-btn cv-btn--primary cv-btn--big" type="submit" {% if not finish.ready %}disabled aria-describedby="finish-why"{% endif %}>Send to Faculty</button></div>
+          {% if not finish.ready %}<p class="cv-note" id="finish-why">Add what is marked ✕ above first.</p>{% endif %}
+        </form>
+      {% else %}
+        <p>You can finish this event from its last day, {{ project.end_date|localdate('%a %d %b') }}.</p>
+      {% endif %}
+    </div></div>
+  </details>
+  {% endif %}
+
+</div>
+{% endblock %}

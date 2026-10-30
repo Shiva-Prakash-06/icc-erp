@@ -1,238 +1,82 @@
 {% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block screen_title %}People{% endblock %}
+{% block body_class %}cv-body{% endblock %}
 
-{% block title %}User Management & Approvals - OIA Project Intelligence{% endblock %}
-{% block screen_title %}User management{% endblock %}
-{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Administration</span>{% endblock %}
+{#- Find someone, then make them a head, the USC or Faculty. Anyone with a
+    university email signs up as a volunteer on their own, so this page only
+    ever changes what someone is. Year and wing follow from the role; the
+    campus is asked only when there is more than one. -#}
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+{% macro role_fields(account, prefix) %}
+  <div class="cv-field">
+    <label for="{{ prefix }}-role-{{ account.id }}">Make them</label>
+    <select id="{{ prefix }}-role-{{ account.id }}" name="role" required>
+      {% for role in role_options %}<option value="{{ role }}"{% if role_of.get(account.id) == role or account.role == role %} selected{% endif %}>{{ role }}</option>{% endfor %}
+    </select>
+  </div>
+  {% if campuses|length > 1 %}
+  <div class="cv-field">
+    <label for="{{ prefix }}-campus-{{ account.id }}">Campus</label>
+    <select id="{{ prefix }}-campus-{{ account.id }}" name="campus_public_id">
+      {% for campus in campuses %}<option value="{{ campus.public_id }}"{% if account.campus_id == campus.id %} selected{% endif %}>{{ campus.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+{% endmacro %}
 
 {% block content %}
-<div class="ds-scroll ds-scroll--plain ds-scroll--page">
-{% macro assignment_fields(user, id_suffix='') %}
-<select name="role" class="aurora-select aurora-select--small" aria-label="Role for {{ user.username }}" required>
-  {% if user.role and user.role not in role_options and user.role != 'Pending' %}<option value="{{ user.role }}" selected>{{ user.role }} (legacy label)</option>{% endif %}
-  {% if user.role == 'Pending' and user.preferred_role and user.preferred_role not in role_options %}<option value="{{ user.preferred_role }}" selected>{{ user.preferred_role }} (requested legacy label)</option>{% endif %}
-  {% for role in role_options %}<option value="{{ role }}"{% if user.role == role or user.preferred_role == role %} selected{% endif %}>{{ role }}</option>{% endfor %}
-</select>
-<select name="campus_public_id" class="aurora-select aurora-select--small" aria-label="Campus scope for {{ user.username }}">
-  <option value="">Home campus</option>{% for campus in campuses %}<option value="{{ campus.public_id }}"{% if user.campus_id == campus.id %} selected{% endif %}>{{ campus.name }}</option>{% endfor %}
-</select>
-<select name="academic_year_public_id" class="aurora-select aurora-select--small" aria-label="Academic year scope for {{ user.username }}">
-  <option value="">No year scope</option>{% for year in academic_years %}<option value="{{ year.public_id }}">{{ year.name }}</option>{% endfor %}
-</select>
-<select name="wing_public_id" class="aurora-select aurora-select--small" aria-label="Wing scope for {{ user.username }}">
-  <option value="">No wing</option>{% for wing in wings %}<option value="{{ wing.public_id }}">{{ wing.name }}</option>{% endfor %}
-</select>
-<select name="project_public_id" class="aurora-select aurora-select--small" aria-label="Project scope for {{ user.username }}">
-  <option value="">No project scope</option>{% for project in scope_projects %}<option value="{{ project.public_id }}">{{ project.code }} · {{ project.title }}</option>{% endfor %}
-</select>
-<div class="aurora-choice"><input class="aurora-choice__input" type="checkbox" name="platform_scope" id="platform-{{ user.public_id }}{{ id_suffix }}"><label class="aurora-choice__label small" for="platform-{{ user.public_id }}{{ id_suffix }}">Platform scope</label></div>
-<div class="aurora-choice"><input class="aurora-choice__input" type="checkbox" name="can_view_sensitive_links" id="sensitive-{{ user.public_id }}{{ id_suffix }}"><label class="aurora-choice__label small" for="sensitive-{{ user.public_id }}{{ id_suffix }}">Restricted references</label></div>
-{% endmacro %}
+<div class="cv-page">
+  {% if pending_users %}
+  <section class="cv-section" aria-labelledby="waiting-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="waiting-title">Waiting to get in</h2><span class="cv-count">{{ pending_users|length }}</span></div>
+    <ul class="cv-list">
+      {% for account in pending_users %}
+      <li class="cv-item">
+        <span class="cv-item__main"><span class="cv-item__title">{{ account.username }}</span><span class="cv-item__meta">{{ account.email }}</span></span>
+        <span class="cv-item__act">
+          <form method="POST" action="{{ url_for('dashboard.approve_user', user_id=account.id) }}">{{ csrf() }}<input type="hidden" name="role" value="Volunteer"><button class="cv-btn cv-btn--primary" type="submit">Let them in<span class="visually-hidden"> — {{ account.username }}</span></button></form>
+          <form method="POST" action="{{ url_for('dashboard.reject_user', user_id=account.id) }}">{{ csrf() }}<button class="cv-btn cv-btn--quiet cv-btn--danger" type="submit">Turn away<span class="visually-hidden"> {{ account.username }}</span></button></form>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
 
-{% macro volunteer_summary(u) %}
-{% if u.volunteer_profile %}
-<dl class="row small mb-0">
-  <dt class="col-4">Skills</dt><dd class="col-8">{{ u.volunteer_profile.skills or 'None' }}</dd>
-  <dt class="col-4">Interests</dt><dd class="col-8">{{ u.volunteer_profile.interests or 'None' }}</dd>
-</dl>
-{% else %}
-<p class="text-muted small mb-0">No volunteer profile.</p>
-{% endif %}
-{% endmacro %}
-
-<!-- Pending Registrations Panel -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="aurora-card--padded">
-            <div class="aurora-card__heading-row">
-                <div>
-                    <h2 class="aurora-card__heading"><i class="ph ph-clock-counter-clockwise text-warning" aria-hidden="true"></i> Pending registrations</h2>
-                    <p class="page-section__hint">Review the requested role, home campus, and volunteer profile before granting or rejecting access.</p>
-                </div>
-                <span class="aurora-badge">{{ pending_users | length }} pending</span>
+  <section class="cv-section" aria-labelledby="people-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="people-title">Everyone</h2><span class="cv-count">{{ accounts_total }}</span></div>
+    <form method="GET" class="cv-form cv-search" role="search">
+      <label class="visually-hidden" for="people-search">Find someone by name or email</label>
+      <input type="text" id="people-search" name="q" value="{{ search }}" placeholder="Find someone by name or email">
+      <button class="cv-btn" type="submit">Find</button>
+      {% if search %}<a class="cv-btn cv-btn--quiet" href="{{ url_for('dashboard.admin_users') }}">Clear</a>{% endif %}
+    </form>
+    <ul class="cv-list">
+      {% for account in accounts %}
+      <li class="cv-item" id="person-{{ account.public_id }}">
+        <span class="cv-item__main">
+          <span class="cv-item__title">{{ account.person.display_name if account.person else account.username }}</span>
+          <span class="cv-item__meta">{{ role_of.get(account.id, 'Volunteer') }} · {{ account.email }}</span>
+        </span>
+        <span class="cv-item__act">
+          <details class="cv-menu">
+            <summary class="cv-btn" aria-label="Change what {{ account.username }} is">Change</summary>
+            <div class="cv-menu__panel">
+              <form method="POST" action="{{ url_for('dashboard.modify_user_role', user_id=account.id) }}" class="cv-form">
+                {{ csrf() }}
+                {{ role_fields(account, 'change') }}
+                <button class="cv-btn cv-btn--primary" type="submit">Save</button>
+              </form>
             </div>
-
-            {% if pending_users %}
-                <!-- Desktop: compact summary table with a per-row disclosure holding the decision forms. -->
-                <div class="aurora-table-scroll d-none d-md-block" tabindex="0">
-                    <table class="aurora-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Requested Role</th>
-                                <th>Home Campus</th>
-                                <th>Decision</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for u in pending_users %}
-                                <tr>
-                                    <td class="fw-bold">{{ u.username }}</td>
-                                    <td>{{ u.email }}</td>
-                                    <td><span class="aurora-badge bg-secondary font-monospace">{{ u.preferred_role }}</span></td>
-                                    <td>{{ u.campus.name if u.campus else "N/A" }}</td>
-                                    <td>
-                                        <button class="aurora-button--outline-info aurora-button--small" type="button" data-ui-toggle="disclosure" data-ui-target="#edit-user-{{ u.public_id }}-pending-desktop" aria-expanded="false" aria-controls="edit-user-{{ u.public_id }}-pending-desktop">
-                                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> Review
-                                        </button>
-                                    </td>
-                                </tr>
-                                <tr id="edit-user-{{ u.public_id }}-pending-desktop" class="aurora-collapse">
-                                    <td colspan="5">
-                                        <div class="admin-user-edit">
-                                            {{ volunteer_summary(u) }}
-                                            <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                {{ assignment_fields(u, '-pending-desktop') }}
-                                                <button type="submit" class="aurora-button--success aurora-button--small py-1 px-3 fw-bold rounded-pill"><i class="ph ph-check" aria-hidden="true"></i> Grant access</button>
-                                            </form>
-                                            <div class="admin-user-edit__divider" role="separator"></div>
-                                            <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" data-confirm-submit="Reject registration for {{ u.username }}?">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="aurora-button--outline-danger aurora-button--small rounded-pill"><i class="ph ph-x-circle" aria-hidden="true"></i> Reject registration</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile: one summary card per pending user with the same decision forms in a disclosure. -->
-                <div class="d-md-none">
-                    {% for u in pending_users %}
-                    <div class="aurora-card--padded admin-user-row">
-                        <div class="admin-user-row__head">
-                            <div class="admin-user-row__id">
-                                <strong class="admin-user-row__name">{{ u.username }}</strong>
-                                <span class="admin-user-row__email">{{ u.email }}</span>
-                            </div>
-                            <span class="aurora-badge bg-secondary font-monospace">{{ u.preferred_role }}</span>
-                        </div>
-                        <div class="admin-user-row__meta">
-                            <span>{{ u.campus.name if u.campus else "N/A" }}</span>
-                        </div>
-                        <button class="aurora-button--outline-info aurora-button--small w-100" type="button" data-ui-toggle="disclosure" data-ui-target="#edit-user-{{ u.public_id }}-pending-mobile" aria-expanded="false" aria-controls="edit-user-{{ u.public_id }}-pending-mobile">
-                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> Review &amp; decide
-                        </button>
-                        <div id="edit-user-{{ u.public_id }}-pending-mobile" class="aurora-collapse admin-user-edit">
-                            {{ volunteer_summary(u) }}
-                            <form action="{{ url_for('dashboard.approve_user', user_id=u.id) }}" method="POST" class="d-grid gap-2">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                {{ assignment_fields(u, '-pending-mobile') }}
-                                <button type="submit" class="aurora-button--success aurora-button--small py-1 px-3 fw-bold rounded-pill"><i class="ph ph-check" aria-hidden="true"></i> Grant access</button>
-                            </form>
-                            <div class="admin-user-edit__divider" role="separator"></div>
-                            <form action="{{ url_for('dashboard.reject_user', user_id=u.id) }}" method="POST" data-confirm-submit="Reject registration for {{ u.username }}?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="aurora-button--outline-danger aurora-button--small rounded-pill w-100"><i class="ph ph-x-circle" aria-hidden="true"></i> Reject registration</button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <i class="ph ph-check-circle fs-1 text-success" aria-hidden="true"></i>
-                    <p class="text-muted mt-2">All registration requests have been cleared. No pending approvals.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Active Users Directory -->
-<div class="row">
-    <div class="col-12">
-        <div class="aurora-card--padded">
-            <div class="aurora-card__heading-row">
-                <div>
-                    <h2 class="aurora-card__heading"><i class="ph ph-users-three text-primary" aria-hidden="true"></i> Active user directory</h2>
-                    <p class="page-section__hint">Current role and scope for every approved user. Edit to change permissions.</p>
-                </div>
-                <span class="aurora-badge">{{ approved_users | length }} users</span>
-            </div>
-
-            {% if approved_users %}
-                <!-- Desktop: compact summary table with a per-row disclosure holding the edit form. -->
-                <div class="aurora-table-scroll d-none d-md-block" tabindex="0">
-                    <table class="aurora-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Active Role</th>
-                                <th>Home Campus</th>
-                                <th>Approved On</th>
-                                <th>Edit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for u in approved_users %}
-                                <tr>
-                                    <td class="fw-bold">{{ u.username }}</td>
-                                    <td>{{ u.email }}</td>
-                                    <td><span class="aurora-badge aurora-badge--role">{{ u.role }}</span></td>
-                                    <td>{{ u.campus.name if u.campus else "N/A" }}</td>
-                                    <td class="small text-muted">{{ u.approved_at.strftime('%d %b %Y') if u.approved_at else "N/A" }}</td>
-                                    <td>
-                                        <button class="aurora-button--outline-info aurora-button--small" type="button" data-ui-toggle="disclosure" data-ui-target="#edit-user-{{ u.public_id }}" aria-expanded="false" aria-controls="edit-user-{{ u.public_id }}">
-                                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit
-                                        </button>
-                                    </td>
-                                </tr>
-                                <tr id="edit-user-{{ u.public_id }}" class="aurora-collapse">
-                                    <td colspan="6">
-                                        <div class="admin-user-edit">
-                                            <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2 min-inline-form">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                {{ assignment_fields(u, '-desktop') }}
-                                                <button type="submit" class="aurora-button--outline-info aurora-button--small py-1 px-3 rounded-pill">Update</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile: one summary card per active user with the same edit form in a disclosure. -->
-                <div class="d-md-none">
-                    {% for u in approved_users %}
-                    <div class="aurora-card--padded admin-user-row">
-                        <div class="admin-user-row__head">
-                            <div class="admin-user-row__id">
-                                <strong class="admin-user-row__name">{{ u.username }}</strong>
-                                <span class="admin-user-row__email">{{ u.email }}</span>
-                            </div>
-                            <span class="aurora-badge aurora-badge--role">{{ u.role }}</span>
-                        </div>
-                        <div class="admin-user-row__meta">
-                            <span>{{ u.campus.name if u.campus else "N/A" }}</span>
-                            <span>Approved {{ u.approved_at.strftime('%d %b %Y') if u.approved_at else "N/A" }}</span>
-                        </div>
-                        <button class="aurora-button--outline-info aurora-button--small w-100" type="button" data-ui-toggle="disclosure" data-ui-target="#edit-user-{{ u.public_id }}-mobile" aria-expanded="false" aria-controls="edit-user-{{ u.public_id }}-mobile">
-                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> Edit
-                        </button>
-                        <div id="edit-user-{{ u.public_id }}-mobile" class="aurora-collapse admin-user-edit">
-                            <form action="{{ url_for('dashboard.modify_user_role', user_id=u.id) }}" method="POST" class="d-grid gap-2">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                {{ assignment_fields(u, '-mobile') }}
-                                <button type="submit" class="aurora-button--outline-info aurora-button--small py-1 px-3 rounded-pill w-100">Update</button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center py-5">
-                    <p class="text-muted">No other approved users in database.</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
+          </details>
+        </span>
+      </li>
+      {% else %}
+      <li class="cv-empty">{% if search %}Nobody matches “{{ search }}”.{% else %}Nobody else has signed up yet.{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if accounts_total > accounts|length %}<a class="cv-more" href="{{ url_for('dashboard.admin_users', all=1) }}">Show all {{ accounts_total }}</a>{% endif %}
+  </section>
 </div>
 {% endblock %}

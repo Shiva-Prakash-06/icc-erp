@@ -1,0 +1,324 @@
+/* ── Calm view ──────────────────────────────────────────────────────────
+   The simplified screens: the event page, its to-do list and folded cards,
+   the new-event form and roll call. Written for people who should never
+   have to work out what a screen is for:
+
+   - one column, a comfortable reading width, plenty of space between blocks
+   - 16px text, 44px touch targets (48px on a phone)
+   - colour only where it means something: late, done, needs an OK
+   - details stay folded until asked for
+
+   Every value comes from tokens.css. Classes are `cv-` so nothing here can
+   collide with the Tile System it sits beside. */
+
+.ds-screen__body.cv-body {
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cv-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding-bottom: var(--space-16);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.cv-lede { margin: 0 0 var(--space-6); font-size: 17px; color: var(--color-text-secondary); }
+.cv-lede strong { color: var(--color-text); font-weight: 600; }
+.cv-note { margin: var(--space-2) 0 0; font-size: 14px; color: var(--color-text-tertiary); }
+.cv-hidden { display: none !important; }
+
+/* ── Sections and folded cards ──────────────────────────────────────── */
+
+.cv-section,
+.cv-card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-panel);
+  margin-bottom: var(--space-4);
+}
+.cv-section { padding: var(--space-6); margin-bottom: var(--space-8); }
+.cv-section__head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
+.cv-section__title { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.cv-count { font-size: 15px; color: var(--color-text-tertiary); }
+
+.cv-card > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-6);
+  cursor: pointer;
+  list-style: none;
+}
+.cv-card > summary::-webkit-details-marker { display: none; }
+.cv-card > summary::after {
+  content: "";
+  width: 10px; height: 10px; margin-left: auto; flex: none;
+  border-right: 2px solid var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-text-tertiary);
+  transform: rotate(45deg);
+  transition: transform var(--motion-fast) var(--ease-enter);
+}
+.cv-card[open] > summary::after { transform: rotate(-135deg); }
+.cv-card > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; border-radius: var(--radius-panel); }
+.cv-card__title { font-size: 18px; font-weight: 600; }
+.cv-card__sum { font-size: 15px; color: var(--color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cv-card__body { padding: 0 var(--space-6) var(--space-6); }
+
+/* ── Lists ──────────────────────────────────────────────────────────── */
+
+.cv-list { list-style: none; margin: 0; padding: 0; }
+.cv-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.cv-item:first-child { border-top: 0; }
+/* Basis 0, not auto: the text gives way before the buttons do, so on a
+   phone a row's buttons stay beside it instead of dropping a line. */
+.cv-item__main { flex: 1 1 0; min-width: 120px; }
+.cv-item__title { display: block; font-size: 16px; overflow-wrap: anywhere; }
+.cv-item__meta { display: block; font-size: 14px; color: var(--color-text-tertiary); }
+.cv-item__meta--late { color: var(--color-danger); font-weight: 600; }
+.cv-item__act { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.cv-item--done .cv-item__title { color: var(--color-text-tertiary); text-decoration: line-through; }
+.cv-item:target { background: var(--color-primary-soft); }
+
+/* The tick: one press marks an item done. */
+.cv-tick {
+  flex: none;
+  width: 44px; height: 44px;
+  display: inline-grid; place-items: center;
+  border: 2px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface-1);
+  color: transparent;
+  cursor: pointer;
+}
+.cv-tick::before { content: "\2713"; font-size: 20px; line-height: 1; }
+.cv-tick:hover, .cv-tick:focus-visible { border-color: var(--color-success); color: var(--color-success); }
+.cv-tick:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.cv-tick--done { background: var(--color-success); border-color: var(--color-success); color: var(--color-surface-1); }
+.cv-select { width: 22px; height: 22px; flex: none; accent-color: var(--color-primary); }
+
+.cv-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: var(--space-2); font-size: 15px; }
+.cv-empty { margin: 0; padding: var(--space-4) 0; color: var(--color-text-tertiary); }
+
+.cv-done > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--color-text-tertiary); font-size: 15px; }
+
+/* Little "…" menus for the rarely used actions (skip, remove, edit). */
+.cv-menu { position: relative; }
+.cv-menu > summary {
+  list-style: none; cursor: pointer;
+  min-width: 44px; min-height: 44px; display: grid; place-items: center;
+  border-radius: var(--radius-control); color: var(--color-text-tertiary); font-size: 20px;
+}
+.cv-menu > summary::-webkit-details-marker { display: none; }
+.cv-menu > summary:hover, .cv-menu[open] > summary { background: var(--color-surface-2); color: var(--color-text); }
+.cv-menu__panel {
+  position: absolute; right: 0; top: 100%; z-index: var(--z-popover);
+  width: min(320px, calc(100vw - 32px));
+  padding: var(--space-4);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-2);
+}
+.cv-menu__panel > * + * { margin-top: var(--space-3); }
+
+/* ── Forms ──────────────────────────────────────────────────────────── */
+
+.cv-form { display: grid; gap: var(--space-4); }
+.cv-form--inline { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; }
+.cv-form--inline .cv-field > label { min-height: 24px; }
+.cv-field { display: grid; gap: var(--space-1); min-width: 0; }
+.cv-field > label, .cv-label { font-size: 15px; font-weight: 600; color: var(--color-text-secondary); }
+.cv-optional { font-weight: 400; color: var(--color-text-tertiary); }
+.cv-input, .cv-form input[type="text"], .cv-form input[type="email"], .cv-form input[type="number"],
+.cv-form input[type="date"], .cv-form input[type="time"], .cv-form input[type="url"], .cv-form select, .cv-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+}
+.cv-form textarea { min-height: 120px; resize: vertical; }
+.cv-form input:focus-visible, .cv-form select:focus-visible, .cv-form textarea:focus-visible {
+  outline: 3px solid var(--color-focus); outline-offset: 1px;
+}
+.cv-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); }
+
+.cv-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 44px; padding: 0 var(--space-5);
+  font: inherit; font-size: 16px; font-weight: 600; text-decoration: none;
+  color: var(--color-primary);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.cv-btn:hover { background: var(--color-surface-2); }
+.cv-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.cv-btn--primary { color: var(--color-surface-1); background: var(--color-primary); border-color: var(--color-primary); }
+.cv-btn--primary:hover { background: var(--color-primary-hover); }
+.cv-btn--quiet { border-color: transparent; background: transparent; }
+.cv-btn--danger { color: var(--color-danger); }
+.cv-btn--big { min-height: 56px; font-size: 18px; padding: 0 var(--space-8); }
+.cv-btn--full { width: 100%; }
+
+/* "What is this?" -- big chips that are really radio buttons. */
+.cv-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); border: 0; margin: 0; padding: 0; }
+.cv-chips legend { font-size: 15px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: var(--space-2); }
+.cv-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.cv-chip span {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong); border-radius: 999px; cursor: pointer; font-size: 16px;
+}
+.cv-chip input:checked + span { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-surface-1); }
+.cv-chip input:focus-visible + span { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+/* Status words on money and files. */
+.cv-tag {
+  display: inline-block; padding: 2px var(--space-2); border-radius: var(--radius-chip);
+  font-size: 13px; font-weight: 600; background: var(--color-surface-2); color: var(--color-text-secondary);
+}
+.cv-tag--asked { background: var(--color-warning-bg); color: var(--color-warning); }
+.cv-tag--approved, .cv-tag--paid, .cv-tag--good { background: var(--color-success-bg); color: var(--color-success); }
+.cv-tag--no { background: var(--color-danger-bg); color: var(--color-danger); }
+
+/* The finish checklist. */
+.cv-checks { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-2); }
+.cv-checks li { display: flex; gap: var(--space-3); align-items: baseline; font-size: 16px; }
+.cv-checks .is-ok::before { content: "\2713"; color: var(--color-success); font-weight: 700; }
+.cv-checks .is-missing::before { content: "\2715"; color: var(--color-danger); font-weight: 700; }
+.cv-checks .is-warn::before { content: "!"; color: var(--color-warning); font-weight: 700; padding: 0 3px; }
+
+.cv-link-box { display: flex; gap: var(--space-2); }
+.cv-link-box input { flex: 1 1 auto; font-family: var(--font-mono); font-size: 14px; }
+
+/* Undo: the one toast with a button in it, kept for ten seconds. */
+.alert.cv-undo { display: flex; align-items: center; gap: var(--space-3); }
+.cv-undo form { margin-left: auto; }
+
+.cv-check { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; font-size: 16px; cursor: pointer; }
+.cv-check input { width: 24px; height: 24px; accent-color: var(--color-primary); }
+
+/* Roll call: whole rows are the buttons. */
+.cv-roll { list-style: none; margin: 0; padding: 0; }
+.cv-roll li { border-top: 1px solid var(--color-border-subtle); }
+.cv-roll label { display: flex; align-items: center; gap: var(--space-4); min-height: 56px; padding: var(--space-2) 0; cursor: pointer; font-size: 17px; }
+.cv-roll input[type="checkbox"] { width: 26px; height: 26px; accent-color: var(--color-success); flex: none; }
+.cv-roll small { margin-left: auto; color: var(--color-text-tertiary); font-size: 14px; }
+.cv-sticky {
+  position: sticky; bottom: 0; z-index: var(--z-sticky);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4);
+  margin-top: var(--space-6); padding: var(--space-4) 0;
+  background: var(--color-canvas);
+}
+
+
+/* ── My work (home), Reports, People ────────────────────────────────── */
+
+.cv-lede--big { font-size: 20px; line-height: 1.4; color: var(--color-text); }
+.cv-section__link { margin-left: auto; font-size: 15px; }
+.cv-item__link { color: inherit; text-decoration: none; }
+a.cv-item__main:hover .cv-item__title, a.cv-item__link:hover { text-decoration: underline; }
+a.cv-item__main:focus-visible, a.cv-item__link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius-control); }
+
+/* Today / This week / Later: only the first starts open. */
+.cv-group + .cv-group { margin-top: var(--space-2); border-top: 1px solid var(--color-border-subtle); }
+.cv-group > summary {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  min-height: 44px; padding: var(--space-2) 0; cursor: pointer; list-style: none;
+}
+.cv-group > summary::-webkit-details-marker { display: none; }
+.cv-group > summary::before { content: "\25B8"; color: var(--color-text-tertiary); width: 1em; }
+.cv-group[open] > summary::before { content: "\25BE"; }
+.cv-group > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius-control); }
+.cv-group__label { font-size: 17px; font-weight: 600; }
+
+/* "Add file": the label is the button. Picking a file sends it straight
+   away; without JavaScript a Send button appears once a file is chosen. */
+.cv-filepick { display: flex; gap: var(--space-2); }
+.cv-filepick label:focus-within { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.cv-filepick__go { display: none; }
+.cv-filepick:has(input:valid) .cv-filepick__go { display: inline-flex; }
+
+.cv-today { flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-6); }
+.cv-today + .cv-today { margin-top: var(--space-3); }
+.cv-today__what { font-size: 15px; font-weight: 400; opacity: .9; }
+.cv-empty-state { text-align: center; }
+.cv-empty-state p { margin: 0 0 var(--space-4); font-size: 17px; color: var(--color-text-secondary); }
+
+.cv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); margin: 0; }
+.cv-stat dt { font-size: 15px; color: var(--color-text-tertiary); }
+.cv-stat dd { margin: 0; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cv-stat dd small { display: block; font-size: 14px; font-weight: 400; color: var(--color-text-tertiary); }
+
+.cv-chips--links { margin-bottom: var(--space-6); }
+.cv-chip-link {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong); border-radius: 999px; font-size: 16px;
+  color: var(--color-text); text-decoration: none;
+}
+.cv-chip-link.is-on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-surface-1); }
+.cv-chip-link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+.cv-search { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; margin-bottom: var(--space-4); }
+.cv-menu > summary { padding: 0 var(--space-3); }
+.cv-menu > summary.cv-btn { color: var(--color-primary); font-size: 16px; }
+
+.cv-stage { font-weight: 600; color: var(--color-text-secondary); }
+.cv-stage--happening { color: var(--color-success); }
+.cv-stage--needs_finishing { color: var(--color-danger); }
+.cv-stage--waiting { color: var(--color-warning); }
+
+.cv-steps { margin: 0; padding-left: var(--space-6); display: grid; gap: var(--space-6); font-size: 16px; }
+.cv-steps > li::marker { font-weight: 600; color: var(--color-text-secondary); }
+.cv-steps .cv-label { display: block; margin-bottom: var(--space-2); }
+
+.cv-row-links { display: flex; flex-wrap: wrap; gap: var(--space-6); font-size: 16px; }
+.cv-row-links a { display: inline-flex; align-items: center; min-height: 44px; }
+
+.cv-item--read .cv-item__title { color: var(--color-text-secondary); }
+.cv-filter { margin-bottom: var(--space-4); max-width: 420px; }
+.cv-facts { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: 0; font-size: 14px; }
+.cv-facts dt { color: var(--color-text-tertiary); }
+.cv-facts dd { margin: 0; overflow-wrap: anywhere; }
+
+button.ds-menu__link { width: 100%; border: 0; background: none; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+
+/* Sentence case everywhere (rule 3). The Tile System set labels, buttons,
+   breadcrumbs and badges in spaced capitals; these undo it for the pieces
+   that are still on screen. */
+.ds-crumb, .ds-rail__label, .ds-rail__scope, .ds-demo-banner, .ds-menu__title,
+.ds-btn, .ds-chip, .ds-facts dt, .page-eyebrow, .aurora-inline-label,
+.aurora-button, [class*="aurora-button--"],
+.aurora-file-field input[type="file"]::file-selector-button {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+@media (max-width: 860px) {
+  .cv-section { padding: var(--space-4); }
+  .cv-card > summary { padding: var(--space-3) var(--space-4); }
+  .cv-card__body { padding: 0 var(--space-4) var(--space-4); }
+  .cv-form--inline { grid-template-columns: minmax(0, 1fr); }
+  .cv-tick, .cv-btn, .cv-menu > summary { min-height: 48px; }
+  .cv-tick { width: 48px; height: 48px; }
+  .cv-item { flex-wrap: wrap; }
+  .cv-item__act { margin-left: auto; }
+  .cv-search { grid-template-columns: minmax(0, 1fr) auto; }
+}

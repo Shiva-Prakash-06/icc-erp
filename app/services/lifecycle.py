@@ -2,20 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy.orm import joinedload
-
 from app.database import db
-from app.models.erp import ChecklistItemStatus, DocumentRecord, OperationalRequest, WorkTask
-from app.models.production import ProjectRisk
 from app.services.audit import record_audit
 
 
+# Stages come from dates now (app/services/stage.py), so an open event has
+# only two ways to move: finished (Faculty's sign-off) or cancelled. The old
+# in-between statuses are kept as keys so rows that still carry them work.
+_OPEN_STATUSES = ("Draft", "Pending Approval", "Planned", "Active", "Closing")
 TRANSITIONS = {
-    "Draft": {"Pending Approval", "Cancelled"},
-    "Pending Approval": {"Draft", "Planned", "Cancelled"},
-    "Planned": {"Active", "Cancelled"},
-    "Active": {"Closing", "Cancelled"},
-    "Closing": {"Active", "Completed", "Cancelled"},
+    **{status: {"Completed", "Cancelled"} for status in _OPEN_STATUSES},
     "Completed": {"Archived"},
     "Cancelled": {"Archived"},
     "Archived": set(),
@@ -31,43 +27,21 @@ class ClosureBlocker:
 
 
 def closure_blockers(project):
+    """What still stops the event being finished.
+
+    Only the two things the final report is built from: the event report
+    file, and attendance for an event that had sessions. Open to-do items,
+    risks and requests used to block closure too; they are now a warning on
+    the Finish panel (app/services/finish.py), not a wall.
+    """
+    from app.services.finish import finish_checklist
+
+    check = finish_checklist(project)
     blockers = []
-    for task in WorkTask.query.filter_by(project_id=project.id, mandatory_for_closure=True).all():
-        if not task.waived and task.status not in {"Approved", "Completed"}:
-            blockers.append(ClosureBlocker("Task", task.public_id, task.title, task.status))
-
-    # Every row's `template_item` is read below, so eager-load it: the home
-    # page calls this once per project and was issuing one extra query per
-    # checklist item each time (audit B13).
-    item_statuses = (
-        ChecklistItemStatus.query.join(ChecklistItemStatus.checklist)
-        .options(joinedload(ChecklistItemStatus.template_item))
-        .filter_by(project_id=project.id)
-        .all()
-    )
-    for item in item_statuses:
-        if item.template_item.mandatory and not item.waived and item.status not in {"Approved", "Completed"}:
-            blockers.append(
-                ClosureBlocker("Checklist", item.public_id, item.template_item.title, item.status)
-            )
-
-    for document in DocumentRecord.query.filter_by(project_id=project.id, mandatory_for_closure=True).all():
-        if not document.waived and document.status != "Approved":
-            blockers.append(ClosureBlocker("Document", document.public_id, document.title, document.status))
-
-    for risk in ProjectRisk.query.filter_by(project_id=project.id, status="Open", is_critical=True).all():
-        blockers.append(ClosureBlocker("Risk", risk.public_id, risk.title, "Open critical risk"))
-
-    for operational_request in OperationalRequest.query.filter(
-        OperationalRequest.project_id == project.id,
-        OperationalRequest.status.in_(["Draft", "Pending Approval", "Submitted"]),
-    ).all():
-        blockers.append(
-            ClosureBlocker("OperationalRequest", operational_request.public_id, operational_request.title, operational_request.status)
-        )
-
-    if not (project.closure_summary or "").strip():
-        blockers.append(ClosureBlocker("Report", project.public_id, "Closure summary", "Missing"))
+    if not check["has_report"]:
+        blockers.append(ClosureBlocker("Document", None, "Event report", "Missing"))
+    if check["needs_attendance"] and not check["attendance_taken"]:
+        blockers.append(ClosureBlocker("Attendance", None, "Attendance", "Not taken"))
     return blockers
 
 

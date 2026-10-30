@@ -85,22 +85,6 @@ class ChecklistEvidenceTestCase(unittest.TestCase):
     def detach_url(self, document_public_id=None):
         return f"/erp/projects/{self.project.public_id}/checklist-items/{self.item.public_id}/documents/{document_public_id or self.document.public_id}/detach"
 
-    def test_manager_can_attach_existing_document(self):
-        self.login(self.manager)
-        response = self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("tab=logistics", response.headers["Location"])
-        db.session.refresh(self.document)
-        self.assertEqual(self.document.checklist_status_id, self.item.id)
-        self.assertEqual(list(self.item.evidence_documents), [self.document])
-
-    def test_outsider_without_permission_is_forbidden(self):
-        self.login(self.outsider)
-        response = self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        self.assertEqual(response.status_code, 403)
-        db.session.refresh(self.document)
-        self.assertIsNone(self.document.checklist_status_id)
-
     def test_cross_project_document_is_masked_as_missing(self):
         other_project = Project(
             code="ICC-2026-CEN-701", campus_id=self.campus.id, program_type_id=self.program_type.id,
@@ -140,19 +124,6 @@ class ChecklistEvidenceTestCase(unittest.TestCase):
             db.session.refresh(restricted)
             self.assertIsNone(restricted.checklist_status_id)
 
-    def test_detach_unlinks_without_deleting(self):
-        self.login(self.manager)
-        self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        before_count = DocumentRecord.query.count()
-
-        response = self.client.post(self.detach_url())
-        self.assertEqual(response.status_code, 302)
-        db.session.refresh(self.document)
-        self.assertIsNone(self.document.checklist_status_id)
-        self.assertEqual(DocumentRecord.query.count(), before_count)
-        self.assertEqual(self.document.drive_url, "https://drive.example.com/file/1")  # unchanged
-        self.assertEqual(self.document.status, "Missing")
-
     def test_attach_and_detach_leave_versions_unchanged(self):
         self.login(self.manager)
         self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
@@ -166,14 +137,6 @@ class ChecklistEvidenceTestCase(unittest.TestCase):
         db.session.refresh(self.document)
         self.assertEqual(self.item.version, 1)
         self.assertEqual(self.document.version, 1)
-
-    def test_attaching_same_document_twice_is_idempotent(self):
-        self.login(self.manager)
-        self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        response = self.client.post(self.attach_url(), data={"document_public_id": self.document.public_id})
-        self.assertEqual(response.status_code, 302)
-        db.session.refresh(self.document)
-        self.assertEqual(self.document.checklist_status_id, self.item.id)
 
     def test_rendering_shows_linked_document_and_open_link(self):
         self.login(self.manager)

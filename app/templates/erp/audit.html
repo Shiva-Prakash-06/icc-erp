@@ -1,59 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Audit History{% endblock %}
-{% block screen_title %}Audit history{% endblock %}
-{% block crumb %}<a href="{{ url_for('dashboard.index') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Audit</span>{% endblock %}
-{% block tools %}<span class="ds-filter__result">Latest {{ events|length|pluralise('event') }} · times in {{ timezone_label() }}</span>{% endblock %}
+{% block title %}Who changed what{% endblock %}
+{% block screen_title %}Who changed what{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">My work</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">Who changed what</span>{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- The latest changes, newest first, as sentences: who, did what, when.
+    The raw identifiers stay one press away for anyone chasing a problem. -#}
 {% block content %}
-<div class="ds-scroll ds-scroll--plain ds-scroll--page">
-<div>
-  <div class="page-section__bar mb-3">
-    <h2 class="page-section__title">Operational events</h2>
-    <span class="d-flex align-items-center gap-3">
-      <span class="aurora-field mb-0"><label class="visually-hidden" for="auditSearch">Search audit events</label><input class="aurora-input aurora-input--small" type="search" id="auditSearch" placeholder="Filter loaded events…" data-audit-filter></span>
-      <i class="ph ph-shield-check text-primary" aria-hidden="true"></i>
-    </span>
-  </div>
-  <div class="aurora-table-scroll" tabindex="0">
-    <table class="aurora-table--cards align-middle mb-0" id="auditTable">
-      {#- When / Who / What happened (reports-admin override). The raw
-          action string, the entity class name and the request id are
-          provenance, not the headline: the audit found `Report Generate`
-          and `ReportSnapshot` as primary copy, and three separate
-          disclosures whose labels said nothing about what was inside. -#}
-      <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What happened</th><th scope="col">Technical details</th></tr></thead>
-      <tbody>
-        {% for event in events %}
-        <tr>
-          <td data-label="When" class="font-monospace text-xs">{{ event.occurred_at|localdatetime('%d %b %Y, %I:%M %p', label=False) }}</td>
-          <td data-label="Who">
-            {% if event.actor_user_id and actors.get(event.actor_user_id) %}
-              <span>{{ actors.get(event.actor_user_id) }}</span>
-            {% elif event.actor_user_id %}
-              <span class="text-muted">An account no longer on the platform</span>
-            {% else %}
-              <span class="text-muted">The platform itself</span>
-            {% endif %}
-          </td>
-          <td data-label="What happened" class="aurora-wrap-anywhere">
-            {{ audit_action(event.action) }}{% if event.entity_type %} <span class="text-muted">({{ audit_entity(event.entity_type) }})</span>{% endif %}
-          </td>
-          <td data-label="Technical details" class="aurora-wrap-anywhere">
-            <details>
-              <summary class="small text-muted">Identifiers and raw values</summary>
-              <dl class="small mb-0">
-                <dt>Action</dt><dd><code class="aurora-wrap-anywhere">{{ event.action }}</code></dd>
-                <dt>Entity</dt><dd><code class="aurora-wrap-anywhere">{{ event.entity_type or '—' }}{% if event.entity_public_id %} {{ event.entity_public_id }}{% endif %}</code></dd>
-                <dt>Request</dt><dd><code class="aurora-wrap-anywhere">{{ event.request_id or '—' }}</code></dd>
+<div class="cv-page">
+  <section class="cv-section" aria-labelledby="history-title">
+    <div class="cv-section__head">
+      <h2 class="cv-section__title" id="history-title">Latest changes</h2>
+      <span class="cv-count">{{ events|length }} · times in {{ timezone_label() }}</span>
+    </div>
+    <div class="cv-field cv-filter">
+      <label for="auditSearch">Find a change</label>
+      <input class="cv-input" type="search" id="auditSearch" placeholder="A name, or a word like money" data-audit-filter>
+    </div>
+    <ul class="cv-list" id="auditTable">
+      {% for event in events %}
+      <li class="cv-item" data-audit-row>
+        <span class="cv-item__main">
+          <span class="cv-item__title">
+            {%- if event.actor_user_id and actors.get(event.actor_user_id) %}{{ actors.get(event.actor_user_id) }}
+            {%- elif event.actor_user_id %}Someone no longer here
+            {%- else %}The app{% endif %} {{ audit_action(event.action) }}
+            {%- if event.entity_type and audit_entity(event.entity_type) not in audit_action(event.action) %} ({{ audit_entity(event.entity_type) }}){% endif -%}
+          </span>
+          <span class="cv-item__meta">{{ event.occurred_at|localdatetime('%a %d %b %Y, %I:%M %p', label=False) }}</span>
+        </span>
+        <span class="cv-item__act">
+          <details class="cv-menu">
+            <summary aria-label="Details of this change">⋯</summary>
+            <div class="cv-menu__panel">
+              <dl class="cv-facts">
+                <dt>Action</dt><dd><code>{{ event.action }}</code></dd>
+                <dt>Record</dt><dd><code>{{ event.entity_type or '—' }}{% if event.entity_public_id %} {{ event.entity_public_id }}{% endif %}</code></dd>
+                <dt>Request</dt><dd><code>{{ event.request_id or '—' }}</code></dd>
               </dl>
-            </details>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-5">No audit events recorded.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+            </div>
+          </details>
+        </span>
+      </li>
+      {% else %}
+      <li class="cv-empty">Nothing has changed yet.</li>
+      {% endfor %}
+    </ul>
+  </section>
 </div>
 {% endblock %}

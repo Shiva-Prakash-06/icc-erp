@@ -19,7 +19,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="ICC ERP">
-  <title>{% block title %}OIA Project Intelligence{% endblock %} | Christ University</title>
+  <title>{% block title %}ICC{% endblock %} | Christ University</title>
   {% for stylesheet in ui_styles('frontend/src/entries/aurora.tsx') %}<link rel="stylesheet" href="{{ stylesheet }}">{% endfor %}
 </head>
 <body>
@@ -39,13 +39,13 @@
     <p class="ds-demo-banner" role="status">Demo environment—data may be reset; do not enter sensitive or personal data.</p>
     {% endif %}
     <nav class="ds-rail" aria-label="Sections">
-      <a class="ds-rail__brand" href="{{ url_for('dashboard.index') }}" aria-label="ICC and OIA home"><span aria-hidden="true">ICC</span></a>
+      <a class="ds-rail__brand" href="{{ url_for('dashboard.index') }}" aria-label="My work"><span aria-hidden="true">ICC</span></a>
       <div class="ds-rail__nav" data-tour="nav">
         {% for item in primary_nav if item.rail and not item.foot %}
         {#- A destination without `bottom_nav` leaves the bar on a phone:
             eleven 48px targets do not fit 375px. Each one is reachable from
             the Account screen, which lists them. -#}
-        <a href="{{ url_for(item.endpoint) }}" class="ds-rail__item{% if not item.bottom_nav %} ds-rail__item--desk{% endif %}{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
+        <a href="{{ url_for(item.endpoint) }}" class="ds-rail__item{% if not item.bottom_nav %} ds-rail__item--desk{% endif %}{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}{% if item.key == 'new' %} data-tour="new"{% endif %}>
           <i class="ph {{ item.icon }}" aria-hidden="true"></i>
           <span class="ds-rail__label" aria-hidden="true">{{ item.label }}</span>
           <span class="visually-hidden">{{ item.label }}</span>
@@ -57,7 +57,7 @@
         {#- Audit P1-10: an Events Head, a Media Head and the USC saw
             near-identical screens with nothing to say why. This is the
             answer, and it is the same answer the phone drawer gives. -#}
-        <p class="ds-rail__scope ds-rail__item--desk" title="{{ role_context[0].title }} · {{ role_context[0].scope }}">{{ role_context[0].short }}{% if role_context|length > 1 %} +{{ role_context|length - 1 }}{% endif %}<span class="visually-hidden">. Signed in as {{ role_context[0].title }}, scoped to {{ role_context[0].scope }}.</span></p>
+        <p class="ds-rail__scope ds-rail__item--desk" title="{{ role_context[0].title }} · {{ role_context[0].scope }}">{{ role_context[0].short }}{% if role_context|length > 1 %} +{{ role_context|length - 1 }}{% endif %}<span class="visually-hidden">. Signed in as {{ role_context[0].title }}. You can see {{ role_context[0].scope }}.</span></p>
         {% endif %}
         <button class="ds-rail__item ds-rail__item--desk" type="button" data-command-open data-tour="search" aria-label="Search or jump to">
           <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
@@ -74,9 +74,9 @@
           <span class="visually-hidden">{{ item.label }}{% if item.key == 'notifications' and shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}</span>
         </a>
         {% endfor %}
-        <button class="ds-rail__item ds-rail__item--desk onb-help" type="button" data-onboarding-replay aria-label="Replay the guided tour">
+        <button class="ds-rail__item ds-rail__item--desk onb-help" type="button" data-onboarding-replay aria-label="Show me around again">
           <span aria-hidden="true">?</span>
-          <span class="ds-rail__label" aria-hidden="true">Replay the tour</span>
+          <span class="ds-rail__label" aria-hidden="true">Show me around</span>
         </button>
         <a class="ds-rail__item ds-rail__item--desk" href="{{ url_for('auth.logout') }}">
           <i class="ph ph-power" aria-hidden="true"></i>
@@ -94,7 +94,7 @@
             <span class="visually-hidden">Menu{% if shell_unread_count %}, {{ shell_unread_count }} unread alerts{% endif %}</span>
           </summary>
           <div class="ds-menu__drawer">
-            <h2 class="ds-menu__title">Everything else</h2>
+            <h2 class="ds-menu__title">Menu</h2>
             {% if role_context %}
             {#- Audit P1-10: why these records and not others. The server
                 already knows; it simply never said. -#}
@@ -111,6 +111,7 @@
                 {%- if item.key == 'notifications' and shell_unread_count %} <span class="ds-menu__count">{{ shell_unread_count }} unread</span>{% endif %}
               </a></li>
               {% endfor %}
+              <li><button class="ds-menu__link" type="button" data-onboarding-replay><i class="ph ph-info" aria-hidden="true"></i>Show me around again</button></li>
               <li><a class="ds-menu__link" href="{{ url_for('auth.logout') }}"><i class="ph ph-power" aria-hidden="true"></i>Log out</a></li>
             </ul>
           </div>
@@ -133,10 +134,20 @@
     </main>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
+      {% set undo = pop_undo() %}
+      {% if messages or undo %}
       {#- Fixed, not in flow: a flash must never consume screen height, or the
           one-screen budget changes depending on whether you just saved. -#}
       <div class="ds-flash" aria-label="System messages">
+        {% if undo %}
+        {#- Removing something is never final straight away: this toast stays
+            for ten seconds with the button that puts it back. -#}
+        <div class="alert alert-info alert-dismissible cv-undo" role="status" data-undo>
+          <i class="ph ph-info" aria-hidden="true"></i>
+          <span>{{ undo.message }}</span>
+          <form method="POST" action="{{ undo.url }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="cv-btn" type="submit">Undo</button></form>
+        </div>
+        {% endif %}
         {% for category, message in messages %}
         <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible" role="{{ 'alert' if category in ['danger', 'error'] else 'status' }}">
           <i class="ph {{ 'ph-x-circle' if category in ['danger','error'] else 'ph-warning' if category == 'warning' else 'ph-check-circle' if category == 'success' else 'ph-info' }}" aria-hidden="true"></i>

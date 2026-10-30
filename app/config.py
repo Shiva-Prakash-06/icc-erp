@@ -157,6 +157,15 @@ class BaseConfig:
     # mint the Google OIDC token the Cloud Scheduler path expects. Unset means
     # the cron path is disabled and only OIDC is accepted.
     CRON_SECRET = os.getenv("CRON_SECRET")
+    # Sign-up is open to these email domains (and their subdomains, such as
+    # mba.christuniversity.in). A new account starts as a volunteer, which
+    # sees only the events it is listed on; Faculty promotes from there.
+    # Empty means any domain.
+    SIGNUP_EMAIL_DOMAINS = [
+        domain.strip().lower().lstrip("@")
+        for domain in os.getenv("SIGNUP_EMAIL_DOMAINS", "christuniversity.in").split(",")
+        if domain.strip()
+    ]
     UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
     UPLOAD_MAX_TOTAL_BYTES = int(os.getenv("UPLOAD_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)))

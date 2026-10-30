@@ -1,85 +1,64 @@
 {% extends "base.html" %}
-{% from "_tiles.html" import file_picker %}
-{% block title %}New Project{% endblock %}
-{% block mobile_title %}Create project{% endblock %}
-{% block screen_title %}Create a project{% endblock %}
+{% block title %}New event{% endblock %}
+{% block screen_title %}New event{% endblock %}
 {% block crumb %}<a href="{{ url_for('erp.projects') }}">Events</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">New</span>{% endblock %}
 {% block back_url %}{{ url_for('erp.projects') }}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- A name and a date are all that is needed. A time and a place make the
+    main session; the standard to-do list is added without asking. The two
+    other ways to start sit below, folded, because most events start here. -#}
 {% block content %}
-<div class="ds-scroll ds-scroll--plain ds-scroll--page">
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="aurora-card--padded">
-      <h2 class="aurora-card__heading"><i class="ph ph-calendar-check" aria-hidden="true"></i> Import ICC event summary</h2>
-      <p class="text-muted">Stage the campus-wide ICC events spreadsheet; each row becomes its own event project with a session, documents, and audience already filled in.</p>
-      <a class="aurora-button--primary" href="{{ url_for('erp.imports') }}">Go to imports</a>
-    </div>
-  </div>
+<div class="cv-page">
+  <section class="cv-section" aria-labelledby="new-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="new-title">What is the event?</h2></div>
+    <form method="POST" action="{{ url_for('erp.quick_create_project') }}" class="cv-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cv-field"><label for="new-name">Name</label><input type="text" id="new-name" name="title" required maxlength="150" placeholder="e.g. Coffee Meet &amp; Greet" autofocus></div>
+      {% if program_types|length > 1 %}
+      <fieldset class="cv-chips">
+        <legend>Is it ICC or IGP?</legend>
+        {% for program in program_types %}
+        <label class="cv-chip"><input type="radio" name="program_type_name" value="{{ program.name }}" {% if loop.first %}checked{% endif %}><span>{{ program.name }}</span></label>
+        {% endfor %}
+      </fieldset>
+      {% elif program_types %}
+      <input type="hidden" name="program_type_name" value="{{ program_types[0].name }}">
+      {% endif %}
+      <div class="cv-row">
+        <div class="cv-field"><label for="new-date">Date</label><input type="date" id="new-date" name="start_date" required value="{{ today.isoformat() }}"></div>
+        <div class="cv-field"><label for="new-end">Last day <span class="cv-optional">(if more than one day)</span></label><input type="date" id="new-end" name="end_date"></div>
+      </div>
+      <div class="cv-row">
+        <div class="cv-field"><label for="new-start-time">Starts <span class="cv-optional">(optional)</span></label><input type="time" id="new-start-time" name="start_time"></div>
+        <div class="cv-field"><label for="new-end-time">Ends <span class="cv-optional">(optional)</span></label><input type="time" id="new-end-time" name="end_time"></div>
+        <div class="cv-field"><label for="new-venue">Where <span class="cv-optional">(optional)</span></label><input type="text" id="new-venue" name="venue" placeholder="e.g. Main auditorium"></div>
+      </div>
+      {% if past_events %}
+      <div class="cv-field">
+        <label for="new-copy">Start from a past event <span class="cv-optional">(optional)</span></label>
+        <select id="new-copy" name="copy_from">
+          <option value="">No — start with the standard to-do list</option>
+          {% for event in past_events %}<option value="{{ event.public_id }}">{{ event.title }} ({{ event.start_date|localdate('%b %Y') }})</option>{% endfor %}
+        </select>
+        <p class="cv-note">Copies its to-do list and session times to the new date. People, money and files are not copied.</p>
+      </div>
+      {% endif %}
+      <div><button class="cv-btn cv-btn--primary cv-btn--big" type="submit">Create event</button></div>
+    </form>
+  </section>
 
-  <div class="col-lg-6">
-    <div class="aurora-card--padded">
-      <h2 class="aurora-card__heading"><i class="ph ph-airplane-tilt" aria-hidden="true"></i> Create IGP from itinerary</h2>
-      <p class="text-muted">Upload a day-by-day itinerary (.xlsx or .csv). The program title and dates are inferred from the file, and every session is imported immediately.</p>
-      <form method="POST" action="{{ url_for('erp.quick_create_from_itinerary') }}" enctype="multipart/form-data">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {{ file_picker('itinerary_source_file', 'source_file', 'Itinerary file', 'Accepted formats: .xlsx or .csv.', '.xlsx,.csv', wrapper='mb-3') }}
-        <button class="aurora-button--primary w-100">Create IGP project</button>
+  {% if program_types|selectattr('name', 'equalto', 'IGP')|list %}
+  <details class="cv-card">
+    <summary><span class="cv-card__title">Have an IGP itinerary file?</span><span class="cv-card__sum">The name, dates and every session come from the file</span></summary>
+    <div class="cv-card__body">
+      <form method="POST" action="{{ url_for('erp.quick_create_from_itinerary') }}" enctype="multipart/form-data" class="cv-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="cv-field"><label for="itinerary-file">Itinerary (.xlsx or .csv)</label><input type="file" id="itinerary-file" name="source_file" accept=".xlsx,.csv" required></div>
+        <div><button class="cv-btn cv-btn--primary" type="submit">Create from itinerary</button></div>
       </form>
     </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="aurora-card--padded">
-      <h2 class="aurora-card__heading"><i class="ph ph-file-arrow-up" aria-hidden="true"></i> Upload program/event documents</h2>
-      <p class="text-muted">Give the project a title and dates, then upload its documents in one step — each file is automatically classified and stored.</p>
-      <form method="POST" action="{{ url_for('erp.quick_create_with_documents') }}" enctype="multipart/form-data" class="aurora-form-groups">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <fieldset class="aurora-fieldset">
-          <legend class="aurora-fieldset__legend">Project details</legend>
-          <div class="row g-2">
-            <div class="col-md-6"><label class="aurora-label" for="doc_program_type">Program</label><select id="doc_program_type" class="aurora-select" name="program_type_name" required>{% for program in program_types %}<option value="{{ program.name }}">{{ program.name }}</option>{% endfor %}</select></div>
-            <div class="col-md-6"><label class="aurora-label" for="doc_title">Title <span aria-hidden="true">*</span></label><input id="doc_title" class="aurora-input" name="title" required></div>
-            <div class="col-md-6"><label class="aurora-label" for="doc_start">Start <span aria-hidden="true">*</span></label><input id="doc_start" type="date" class="aurora-input" name="start_date" required></div>
-            <div class="col-md-6"><label class="aurora-label" for="doc_end">End <span aria-hidden="true">*</span></label><input id="doc_end" type="date" class="aurora-input" name="end_date" required></div>
-          </div>
-        </fieldset>
-        <fieldset class="aurora-fieldset">
-          <legend class="aurora-fieldset__legend">Documents</legend>
-          {{ file_picker('doc_files', 'source_files', 'Documents', 'Choose one or more files; each is classified automatically.', multiple=true) }}
-        </fieldset>
-        <button class="aurora-button--primary w-100">Create &amp; upload</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="aurora-card--padded">
-      <h2 class="aurora-card__heading"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Create manually</h2>
-      <p class="text-muted">Only a title and dates are required. Campus, academic year, owner, code, and status are inferred automatically.</p>
-      <form method="POST" action="{{ url_for('erp.quick_create_project') }}" class="aurora-form-groups">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <fieldset class="aurora-fieldset">
-          <legend class="aurora-fieldset__legend">Project details</legend>
-          <div class="row g-2">
-            <div class="col-md-6"><label class="aurora-label" for="manual_program_type">Program</label><select id="manual_program_type" class="aurora-select" name="program_type_name" required>{% for program in program_types %}<option value="{{ program.name }}">{{ program.name }}</option>{% endfor %}</select></div>
-            <div class="col-md-6"><label class="aurora-label" for="manual_title">Title <span aria-hidden="true">*</span></label><input id="manual_title" class="aurora-input" name="title" required></div>
-            <div class="col-md-6"><label class="aurora-label" for="manual_start">Start <span aria-hidden="true">*</span></label><input id="manual_start" type="date" class="aurora-input" name="start_date" required></div>
-            <div class="col-md-6"><label class="aurora-label" for="manual_end">End <span aria-hidden="true">*</span></label><input id="manual_end" type="date" class="aurora-input" name="end_date" required></div>
-          </div>
-        </fieldset>
-        <div class="aurora-disclosure" id="moreDetailsDisclosure">
-          <button class="aurora-disclosure__trigger" type="button" data-ui-toggle="disclosure" data-ui-target="#collapseMoreDetails" aria-expanded="false" aria-controls="collapseMoreDetails">More details (optional)</button>
-          <div id="collapseMoreDetails" class="aurora-collapse" data-ui-parent="#moreDetailsDisclosure">
-            <div class="row g-2 mt-2">
-              <div class="col-md-6"><label class="aurora-label" for="manual_venue">Venue</label><input id="manual_venue" class="aurora-input" name="venue"></div>
-              <div class="col-md-6"><label class="aurora-label" for="manual_audience">Target audience</label><input id="manual_audience" class="aurora-input" name="target_audience"></div>
-            </div>
-          </div>
-        </div>
-        <button class="aurora-button--primary w-100">Create project</button>
-      </form>
-    </div>
-  </div>
-</div>
+  </details>
+  {% endif %}
 </div>
 {% endblock %}

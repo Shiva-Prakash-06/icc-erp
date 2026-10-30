@@ -3,8 +3,8 @@
   "captured_at": "2026-07-17",
   "contract": "presentation-only Aurora migration",
   "url_map": {
-    "route_count": 145,
-    "sha256": "914fee812af8ae30c60a3f8f5b67f0e26983ed97a195063d6a3a3b3a66a74dff",
+    "route_count": 146,
+    "sha256": "9a46592a848e0d6744dd8d35a13359d652b0e4dda59fd09d5b7e04d53bc152d2",
     "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
     "includes_parameter_converters": true
   },
@@ -19,14 +19,11 @@
     "/register": {
       "method": "POST",
       "names": [
-        "username",
+        "first_name",
+        "last_name",
         "email",
         "password",
-        "confirm_password",
-        "preferred_role",
-        "campus_id",
-        "skills",
-        "interests"
+        "campus_id"
       ]
     },
     "/forgot-password": {
@@ -56,8 +53,10 @@
         "title",
         "start_date",
         "end_date",
+        "start_time",
+        "end_time",
         "venue",
-        "target_audience"
+        "copy_from"
       ]
     },
     "/erp/projects/quick-create-from-itinerary": {
@@ -66,46 +65,12 @@
         "source_file"
       ]
     },
-    "/erp/projects/quick-create-with-documents": {
-      "method": "POST",
-      "names": [
-        "program_type_name",
-        "title",
-        "start_date",
-        "end_date",
-        "source_files"
-      ]
-    },
-    "/erp/projects/<public_id>/transition": {
-      "method": "POST",
-      "names": [
-        "version",
-        "target_status",
-        "reason"
-      ]
-    },
     "/erp/projects/<public_id>/tasks": {
       "method": "POST",
       "names": [
         "title",
-        "priority",
-        "mandatory_for_closure"
-      ]
-    },
-    "/erp/projects/<public_id>/tasks/<task_public_id>/status": {
-      "method": "POST",
-      "names": [
-        "version",
-        "status",
-        "comment"
-      ]
-    },
-    "/erp/projects/<public_id>/checklist-items/<item_public_id>/status": {
-      "method": "POST",
-      "names": [
-        "version",
-        "status",
-        "comment"
+        "who",
+        "due"
       ]
     },
     "/erp/imports/stage": {
@@ -125,28 +90,100 @@
     "/admin/users/approve/<user_id>": {
       "method": "POST",
       "names": [
-        "role",
-        "campus_public_id",
-        "academic_year_public_id",
-        "wing_public_id",
-        "project_public_id",
-        "platform_scope",
-        "can_view_sensitive_links"
+        "role"
       ]
     },
-    "/erp/projects/<public_id>/checklist-items/<item_public_id>/documents": {
+    "/erp/projects/<public_id>/todos/done": {
       "method": "POST",
       "names": [
-        "document_public_id"
+        "done",
+        "items"
       ]
     },
-    "/erp/projects/<public_id>/checklist-items/<item_public_id>/documents/upload": {
+    "/erp/projects/<public_id>/todos/<ref>/skip": {
       "method": "POST",
       "names": [
-        "source_file",
-        "category",
-        "category_other",
-        "permission_classification"
+        "reason"
+      ]
+    },
+    "/erp/projects/<public_id>/todos/<ref>/file": {
+      "method": "POST",
+      "names": [
+        "file"
+      ]
+    },
+    "/erp/projects/<public_id>/sessions": {
+      "method": "POST",
+      "names": [
+        "title",
+        "day",
+        "start_time",
+        "end_time",
+        "venue"
+      ]
+    },
+    "/erp/projects/<public_id>/sessions/<session_public_id>/attendance": {
+      "method": "POST",
+      "names": [
+        "roster",
+        "walk_ins",
+        "hours"
+      ]
+    },
+    "/erp/projects/<public_id>/team/paste": {
+      "method": "POST",
+      "names": [
+        "people",
+        "job"
+      ]
+    },
+    "/erp/projects/<public_id>/reimbursements": {
+      "method": "POST",
+      "names": [
+        "particular",
+        "amount",
+        "party_name",
+        "bill"
+      ]
+    },
+    "/erp/projects/<public_id>/files": {
+      "method": "POST",
+      "names": [
+        "files",
+        "kind",
+        "drive_url"
+      ]
+    },
+    "/erp/projects/<public_id>/feedback-link": {
+      "method": "POST",
+      "names": [
+        "questions"
+      ]
+    },
+    "/erp/projects/<public_id>/finish": {
+      "method": "POST",
+      "names": [
+        "summary",
+        "show_on_website"
+      ]
+    },
+    "/erp/projects/<public_id>/finish/decision": {
+      "method": "POST",
+      "names": [
+        "decision",
+        "note"
+      ]
+    },
+    "/public/feedback/<token>": {
+      "method": "POST",
+      "names": [
+        "rating"
+      ]
+    },
+    "/admin/users/modify-role/<user_id>": {
+      "method": "POST",
+      "names": [
+        "role"
       ]
     }
   },

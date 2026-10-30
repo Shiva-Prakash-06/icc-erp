@@ -1,50 +1,267 @@
-"""Role-aware data for the `/` home page.
+"""What `/` shows: the signed-in person's own work, and nothing else.
 
-Formerly ``mission_control.py``, absorbing what used to be three separate
-pages: Mission Control (person-scoped: my projects/tasks/requests), the ERP
-hub (portfolio-scoped: visible/active project counts, people/import
-records), and Oversight (approver-scoped: the 10-source decision queue and
-its metrics). See in-the-operation-checklists-crystalline-dongarra.md
-Step 2 -- the merge exists because those three pages showed contradictory
-numbers for the same thing (Mission Control's decision count covered 2 of
-Oversight's 10 sources) and duplicated the same KPI-row-plus-list shape
-three times.
+Every role gets the same page, filled from its own data, and a block with
+nothing in it is not drawn:
+
+1. One sentence: how much is due today and how much needs your OK.
+2. Needs your OK -- Faculty only: money, events to sign off, the website.
+3. To do -- items for you or your team, in Today / This week / Later.
+4. Today's event -- a Take attendance button on an event day.
+5. Your events -- at most three, with how much is left on each.
+
+A volunteer has nothing to tick, so they get :func:`build_my_activities`
+instead: the events they are on, when and where, their job and their buddy.
+
+Whose item is whose
+-------------------
+An item for a named person is theirs. An item for a team belongs to whoever
+holds that team's role (app/services/teams.py). An item for nobody in
+particular belongs to the team that runs that kind of event: the Events team
+for ICC, the IGP team for IGP. That last rule is what keeps Faculty's list
+short -- Faculty runs nothing day to day, so only items handed to Faculty
+reach them.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from app.models.erp import ImportBatch, OperationalRequest, Person, ProjectSession, SessionAttendance, WorkTask
-from app.models.production import ApprovalEvent, ContributionRecord, RecruitmentApplication
-from app.models.project import BuddyAssignment
-from app.services.action_queue import build_action_queue, build_oversight_metrics
+from app.models.erp import ImportBatch, ProjectSession, SessionAttendance, TeamAssignment
+from app.models.production import ApprovalEvent, ContributionRecord
+from app.models.project import BuddyAssignment, Project
+from app.services.action_queue import build_action_queue
 from app.services.authorization import has_any_permission, has_permission
-from app.services.lifecycle import closure_blockers
 from app.services.roles import (
     ONBOARDING_CHECKLISTS,
     ONBOARDING_CLIENT_SIGNALS,
     onboarding_audience,
 )
 from app.services.scope import approvable_projects, visible_projects
+from app.services.stage import CANCELLED, COMING_UP, FINISHED, HAPPENING, NEEDS_FINISHING, STAGE_LABELS, WAITING, event_stage
+from app.services.teams import EVENTS, IGP, contributor_projects, user_teams
+from app.services.timeutil import to_campus
+from app.services.todo import can_tick, todos_for_projects
 
-_OPEN_TASK_STATUSES = ("Not Started", "In Progress", "Blocked", "Submitted")
+#: How many rows a group shows before "Show all".
+SHOW = 5
+
+#: Permissions that mean someone works on events rather than only turning up.
+_WORKING_PERMISSIONS = ("manage_projects", "approve", "report", "contribute_team", "manage_users", "audit")
+
+#: Words in an item's title that mean it is finished by handing in a file.
+_FILE_WORDS = ("poster", "photo", "video", "report", "upload", "file", "bill", "brochure", "certificate", "slides", "flyer")
+
+TODAY = "today"
+WEEK = "week"
+LATER = "later"
+GROUP_LABELS = {TODAY: "Today", WEEK: "This week", LATER: "Later"}
+
+
+def is_view_only(user):
+    """True for a volunteer: someone who is on events but runs none of them."""
+    return not any(has_any_permission(user, permission) for permission in _WORKING_PERMISSIONS)
+
+
+def is_faculty(user):
+    return has_any_permission(user, "approve")
+
+
+def needs_file(item):
+    title = (item.title or "").lower()
+    return any(word in title for word in _FILE_WORDS)
+
+
+def _lead_team(project):
+    return IGP if project.program_type and project.program_type.name == "IGP" else EVENTS
+
+
+def _is_mine(item, person_id, teams):
+    if item.owner is not None:
+        return bool(person_id) and item.owner.id == person_id
+    return (item.team or _lead_team(item.project)) in teams
+
+
+def _when(item):
+    """The day an item is for: its due date, else the event's first day."""
+    if item.due_at is not None:
+        return to_campus(item.due_at if item.due_at.tzinfo else item.due_at.replace(tzinfo=timezone.utc)).date()
+    return item.project.start_date
+
+
+def _group(day, today):
+    if day is None or day <= today:
+        return TODAY
+    if day <= today + timedelta(days=7):
+        return WEEK
+    return LATER
+
+
+def projects_in_reach(user):
+    """Every unfinished event ``user`` can see or contribute to."""
+    found = {project.id: project for project in visible_projects(user)}
+    for project in contributor_projects(user):
+        found.setdefault(project.id, project)
+    return [project for project in found.values() if event_stage(project) not in {FINISHED, CANCELLED}]
+
+
+def _event_order(faculty):
+    first = {WAITING: 0, HAPPENING: 1, NEEDS_FINISHING: 2, COMING_UP: 3} if faculty else \
+        {HAPPENING: 0, NEEDS_FINISHING: 1, WAITING: 2, COMING_UP: 3}
+
+    def key(row):
+        return (first.get(row["stage"], 9), row["project"].start_date or date.max)
+    return key
+
+
+def build_my_work(user, *, today=None, show=None):
+    """Everything the home page draws for someone who works on events.
+
+    ``show`` names the one group to show in full ("today", "week", "later"
+    or "ok"); every other list stops at :data:`SHOW` rows.
+    """
+    today = today or to_campus(datetime.now(timezone.utc)).date()
+    faculty = is_faculty(user)
+    contributor_only = has_any_permission(user, "contribute_team") and not has_any_permission(user, "manage_projects")
+
+    needs_ok = build_action_queue(user, projects=approvable_projects(user)) if faculty else []
+
+    reach = projects_in_reach(user)
+    teams = user_teams(user)
+    person_id = user.person_id
+    tickable_cache = {}
+    open_items = [item for item in todos_for_projects(reach) if not item.done]
+    mine = []
+    for item in open_items:
+        if not _is_mine(item, person_id, teams):
+            continue
+        key = (item.project.id, item.ref)
+        if key not in tickable_cache:
+            tickable_cache[key] = can_tick(user, item.project, item)
+        if tickable_cache[key]:
+            mine.append(item)
+
+    # Oldest first within each group: what was due longest ago leads.
+    mine.sort(key=lambda item: (_when(item) or today, item.due_at is None, item.sequence))
+    groups = {TODAY: [], WEEK: [], LATER: []}
+    for item in mine:
+        groups[_group(_when(item), today)].append(item)
+    todo_groups = [
+        {"key": key, "label": GROUP_LABELS[key], "items": items, "total": len(items),
+         "shown": items if show == key else items[:SHOW]}
+        for key, items in groups.items() if items
+    ]
+    # Only the first group with anything in it starts open: usually Today.
+    for index, group in enumerate(todo_groups):
+        group["open"] = index == 0 or show == group["key"]
+
+    # Event day: the sessions starting today on events this person runs.
+    managed = [project for project in reach if has_permission(user, "manage_projects", project)]
+    start = datetime.combine(today, datetime.min.time(), tzinfo=to_campus(datetime.now(timezone.utc)).tzinfo)
+    todays_sessions = []
+    if managed:
+        todays_sessions = (
+            ProjectSession.query.filter(
+                ProjectSession.project_id.in_([project.id for project in managed]),
+                ProjectSession.is_active.is_(True),
+                ProjectSession.starts_at >= start.astimezone(timezone.utc),
+                ProjectSession.starts_at < (start + timedelta(days=1)).astimezone(timezone.utc),
+            ).order_by(ProjectSession.starts_at).limit(3).all()
+        )
+
+    # Your events: what each one has left. A contributor counts only their
+    # own team's items -- the rest of the event is not theirs to worry about.
+    left = {}
+    for item in (mine if contributor_only else open_items):
+        left[item.project.id] = left.get(item.project.id, 0) + 1
+    event_rows = [{"project": project, "stage": event_stage(project, today), "left": left.get(project.id, 0)} for project in reach]
+    if contributor_only:
+        event_rows = [row for row in event_rows if row["left"]]
+    event_rows.sort(key=_event_order(faculty))
+
+    return {
+        "today": today,
+        "is_faculty": faculty,
+        "needs_ok": needs_ok if show == "ok" else needs_ok[:SHOW],
+        "needs_ok_total": len(needs_ok),
+        "todo_groups": todo_groups,
+        "due_today": len(groups[TODAY]),
+        "todo_total": len(mine),
+        "todays_sessions": todays_sessions,
+        "your_events": event_rows[:3],
+        "events_total": len(event_rows),
+        "can_create": has_any_permission(user, "manage_projects"),
+        "needs_file": needs_file,
+        "STAGE_LABELS": STAGE_LABELS,
+        "onboarding_checklist": build_onboarding_checklist(user),
+        "onboarding_tour_project": reach[0].public_id if reach else None,
+    }
+
+
+def build_my_activities(user, *, today=None):
+    """A volunteer's events: when, where, their job and their buddy.
+
+    Upcoming and running events first, soonest first; past ones fold away
+    under one line.
+    """
+    today = today or to_campus(datetime.now(timezone.utc)).date()
+    person_id = user.person_id
+    by_project = {}
+
+    def row(project):
+        return by_project.setdefault(project.id, {"project": project, "job": None, "buddies": []})
+
+    if person_id:
+        for assignment in TeamAssignment.query.filter_by(person_id=person_id).all():
+            if assignment.status == "Active" and assignment.project is not None:
+                row(assignment.project)["job"] = assignment.role_label or "Volunteer"
+    pairs = BuddyAssignment.query.filter(
+        (BuddyAssignment.buddy_user_id == user.id)
+        | ((BuddyAssignment.buddy_person_id == person_id) if person_id else False)
+        | ((BuddyAssignment.exchange_student_person_id == person_id) if person_id else False)
+    ).all()
+    for pair in pairs:
+        project = Project.query.get(pair.project_id)
+        if project is None:
+            continue
+        mine_as_buddy = pair.buddy_user_id == user.id or (person_id and pair.buddy_person_id == person_id)
+        other = pair.exchange_student_person if mine_as_buddy else pair.buddy_person
+        entry = row(project)
+        entry["job"] = entry["job"] or ("Buddy" if mine_as_buddy else "Student")
+        if other is not None:
+            entry["buddies"].append(other.display_name)
+
+    now = datetime.now(timezone.utc)
+    upcoming, past = [], []
+    for entry in by_project.values():
+        project = entry["project"]
+        if project.status == "Cancelled":
+            continue
+        sessions = sorted((s for s in project.sessions if s.is_active), key=lambda s: s.starts_at)
+        entry["next_session"] = next((s for s in sessions if _aware(s.ends_at) >= now), None)
+        entry["venue"] = (entry["next_session"].venue if entry["next_session"] and entry["next_session"].venue else None) or project.venue
+        (upcoming if (project.end_date or project.start_date) >= today else past).append(entry)
+    upcoming.sort(key=lambda entry: entry["project"].start_date)
+    past.sort(key=lambda entry: entry["project"].start_date, reverse=True)
+    return {"today": today, "activities": upcoming, "past_activities": past}
+
+
+def _aware(value):
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+# ── Getting started ────────────────────────────────────────────────────
 
 
 def _onboarding_completion(user):
-    """Which getting-started tasks are already done.
+    """Which getting-started tasks are already done, read from the rows the
+    work leaves behind wherever there is one."""
+    from app.models.erp import AuditEvent
 
-    Everything that leaves a row behind is read from that row rather than
-    from a flag: a decision the user actually cleared, a roll call they
-    actually verified, an import they actually committed. Only the three
-    tasks that touch nothing in the database (using the command palette,
-    opening a project, reading the audit trail) come from the signals the
-    browser reports -- see ONBOARDING_CLIENT_SIGNALS.
-    """
     signals = user.onboarding_signals or {}
     done = {key for key in ONBOARDING_CLIENT_SIGNALS if signals.get(key)}
 
-    if ApprovalEvent.query.filter_by(actor_user_id=user.id).first():
+    if ApprovalEvent.query.filter_by(actor_user_id=user.id).first() or \
+            AuditEvent.query.filter(AuditEvent.actor_user_id == user.id, AuditEvent.action.in_(("reimbursement.status", "project.finish_signoff", "project.finish_returned"))).first():
         done.add("decision")
     if SessionAttendance.query.filter_by(verified_by_id=user.id).first():
         done.add("roll_call")
@@ -52,15 +269,16 @@ def _onboarding_completion(user):
         done.add("import_committed")
     if user.person_id and ContributionRecord.query.filter_by(person_id=user.person_id).first():
         done.add("hours_logged")
+    if AuditEvent.query.filter(AuditEvent.actor_user_id == user.id, AuditEvent.action.in_(("task.status", "checklist.status"))).first():
+        done.add("todo_ticked")
+    if AuditEvent.query.filter(AuditEvent.actor_user_id == user.id, AuditEvent.action == "project.create").first():
+        done.add("event_created")
     return done
 
 
 def build_onboarding_checklist(user):
-    """The getting-started card: the role's three or four tasks, each with a
-    real completion flag and the page where it is done. Returns ``None`` once the
-    user has hidden it, so the card disappears for good rather than lingering
-    as a permanently-ticked decoration. Skipping the *tour* does not hide it --
-    that is exactly when a written list is most useful."""
+    """The getting-started card: two or three things worth doing once, each
+    ticked from real data. ``None`` once hidden, or for a role with none."""
     signals = user.onboarding_signals or {}
     if signals.get("checklist_hidden"):
         return None
@@ -72,135 +290,12 @@ def build_onboarding_checklist(user):
     # Not "items": a dict key of that name is shadowed by dict.items in Jinja.
     rows = [{**task, "done": task["key"] in done} for task in tasks]
     completed = sum(row["done"] for row in rows)
+    if completed == len(rows):
+        return None
     return {
         "audience": audience,
         "tasks": rows,
         "completed": completed,
         "total": len(rows),
         "percent": round(completed * 100 / len(rows)),
-    }
-
-
-def build_home(user, *, show_all_queue=False):
-    now = datetime.now(timezone.utc)
-    projects_in_scope = visible_projects(user)
-    project_ids = [project.id for project in projects_in_scope]
-
-    upcoming_sessions = (
-        ProjectSession.query.filter(
-            ProjectSession.project_id.in_(project_ids or [-1]),
-            ProjectSession.starts_at >= now,
-        )
-        .order_by(ProjectSession.starts_at)
-        .limit(8)
-        .all()
-    )
-
-    my_tasks = []
-    if user.person_id:
-        my_tasks = (
-            WorkTask.query.filter(
-                WorkTask.owner_person_id == user.person_id,
-                WorkTask.status.in_(_OPEN_TASK_STATUSES),
-            )
-            .order_by(WorkTask.due_at.is_(None), WorkTask.due_at)
-            .limit(8)
-            .all()
-        )
-
-    my_requests = (
-        OperationalRequest.query.filter(
-            OperationalRequest.project_id.in_(project_ids or [-1]),
-            (OperationalRequest.created_by_id == user.id) | (OperationalRequest.submitted_by_id == user.id),
-        )
-        .order_by(OperationalRequest.created_at.desc())
-        .limit(8)
-        .all()
-    )
-
-    # can_act gates the full decision queue + oversight metrics -- matches
-    # the old /erp/oversight 403 gate exactly (has_any_permission(user, "approve")).
-    can_act = has_any_permission(user, "approve")
-    can_view_decision_queue = can_act or has_any_permission(user, "approve_operational_requests")
-
-    action_queue = []
-    action_queue_total = 0
-    oversight_metrics = None
-    if can_view_decision_queue:
-        approve_projects = approvable_projects(user)
-        full_queue = build_action_queue(user, projects=approve_projects)
-        action_queue_total = len(full_queue)
-        action_queue = full_queue if show_all_queue else full_queue[:8]
-        if can_act:
-            oversight_metrics = build_oversight_metrics(user, projects=approve_projects)
-
-    portfolio = {
-        "projects": len(projects_in_scope),
-        "active": sum(project.status in {"Planned", "Active", "Closing"} for project in projects_in_scope),
-        "people": Person.query.count() if has_any_permission(user, "manage_projects") else None,
-        "imports": ImportBatch.query.count() if has_permission(user, "manage_imports") else None,
-    }
-
-    igp_projects = [project for project in projects_in_scope if project.program_type.name == "IGP"]
-    igp_indicators = None
-    if igp_projects:
-        igp_project_ids = [project.id for project in igp_projects]
-        pending_applications = RecruitmentApplication.query.filter(
-            RecruitmentApplication.project_id.in_(igp_project_ids),
-            RecruitmentApplication.decision.in_(["Submitted", "Interview Scheduled"]),
-        ).count()
-        active_buddy_pairs = BuddyAssignment.query.filter(BuddyAssignment.project_id.in_(igp_project_ids)).count()
-        open_closure_blockers = sum(len(closure_blockers(project)) for project in igp_projects)
-        igp_indicators = {
-            "pending_applications": pending_applications,
-            "active_buddy_pairs": active_buddy_pairs,
-            "open_closure_blockers": open_closure_blockers,
-        }
-
-    return {
-        # The queue screen marks a row overdue by comparing against this,
-        # rather than each template re-deriving "now" and disagreeing.
-        "now": now,
-        "projects_in_scope": projects_in_scope[:8],
-        "project_count": len(projects_in_scope),
-        "portfolio": portfolio,
-        "upcoming_sessions": upcoming_sessions,
-        "my_tasks": my_tasks,
-        "my_requests": my_requests,
-        "can_act": can_act,
-        "can_view_decision_queue": can_view_decision_queue,
-        "action_queue": action_queue,
-        "action_queue_total": action_queue_total,
-        "show_all_queue": show_all_queue,
-        "oversight_metrics": oversight_metrics,
-        "igp_indicators": igp_indicators,
-        "onboarding_checklist": build_onboarding_checklist(user),
-        # The tour's "blockers" step anchors to an element that only exists on
-        # a project page, so the step needs somewhere to navigate to. Resolved
-        # here because `projects_in_scope` is already in hand; on any other
-        # page the step has no destination and is skipped rather than shown
-        # pointing at nothing.
-        "onboarding_tour_project": projects_in_scope[0].public_id if projects_in_scope else None,
-    }
-
-
-def build_campus_home(user):
-    """What the campus screen needs beyond its tiles.
-
-    Deliberately much cheaper than :func:`build_home`: the campus screen
-    shows four tiles, a count, and a first-run checklist, so it must not pay
-    for the ten-source decision queue that now lives on ``/queue``. The
-    count is the queue's length, which is the one number that decides
-    whether the head shows a "waiting on you" button at all.
-    """
-    projects_in_scope = visible_projects(user)
-    pending = 0
-    if has_any_permission(user, "approve") or has_any_permission(user, "approve_operational_requests"):
-        pending = len(build_action_queue(user, projects=approvable_projects(user)))
-    return {
-        "pending_decisions": pending,
-        "onboarding_checklist": build_onboarding_checklist(user),
-        # The tour's "blockers" step anchors to an element that only exists
-        # on a project page, so the step needs somewhere to navigate to.
-        "onboarding_tour_project": projects_in_scope[0].public_id if projects_in_scope else None,
     }

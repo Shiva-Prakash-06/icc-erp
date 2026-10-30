@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.index') }}">My activities</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ project.title }}</span>{% endblock %}
+{% block screen_title %}{{ project.title }}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- What a volunteer sees of an event they are on: when, where, their job
+    and their buddy. Nothing to fill in and nothing about anyone else. -#}
+{% block content %}
+<div class="cv-page">
+  <p class="cv-lede"><strong>{{ stage_label }}</strong> · {{ project.start_date|localdate('%a %d %b') }}{% if project.end_date != project.start_date %} – {{ project.end_date|localdate('%a %d %b') }}{% endif %}{% if project.venue %} · {{ project.venue }}{% endif %}</p>
+
+  <section class="cv-section" aria-labelledby="you-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="you-title">You</h2></div>
+    <ul class="cv-list">
+      <li class="cv-item"><span class="cv-item__main"><span class="cv-item__meta">Your job</span><span class="cv-item__title">{{ me.role_label if me and me.role_label else 'Volunteer' }}</span></span></li>
+      {% for pair in my_buddies %}
+      {% set other = pair.exchange_student_person if pair.buddy_person_id == g.user.person_id else pair.buddy_person %}
+      <li class="cv-item"><span class="cv-item__main"><span class="cv-item__meta">Your buddy</span><span class="cv-item__title">{{ other.display_name if other else '—' }}</span></span></li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="cv-section" aria-labelledby="when-title">
+    <div class="cv-section__head"><h2 class="cv-section__title" id="when-title">When and where</h2></div>
+    <ul class="cv-list">
+      {% for item in sessions %}
+      <li class="cv-item"><span class="cv-item__main">
+        <span class="cv-item__title">{{ item.title }}</span>
+        <span class="cv-item__meta">{{ item.starts_at|localdate('%a %d %b') }} · {{ item.starts_at|localtime('%I:%M %p', label=False) }}–{{ item.ends_at|localtime('%I:%M %p', label=False) }}{% if item.venue or project.venue %} · {{ item.venue or project.venue }}{% endif %}</span>
+      </span></li>
+      {% else %}
+      <li class="cv-empty">Times will show here once they are set.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

@@ -1,309 +1,212 @@
-# OIA Intelligence Hub — Design System Master
+# ICC — Design System Master
 
-Status: mandatory source of truth  
-Mode: light Tile System application UI; white high-contrast print output  
-Density: enterprise dense 9/10  
-Motion: restrained 4/10  
-Last revised: 17 September 2026
+Status: mandatory source of truth
+Mode: calm, task-first; light; white high-contrast print output
+Density: low. Whitespace is a feature, not waste.
+Motion: restrained
+Last revised: 30 October 2026
 
-This file governs the presentation layer only. Existing Flask routes, Jinja permission branches, form payloads, server validation, exports, offline snapshots, models, and workflows remain authoritative.
+This file governs the presentation layer: what a screen shows, in what words,
+and how it is laid out. Flask routes, permission checks, form payloads,
+server validation, exports and models stay authoritative.
 
-## What changed on 17 September 2026, and why this file changed with it
+## Why this file changed on 30 October 2026
 
-This document described the **flat blueprint**: a 56px sticky top bar, no desktop
-rail, square corners everywhere and no elevation. That system was superseded the
-same day by the **ICC ERP Tile System**, and the Flask application was migrated
-to it (see the "Tile System migration" section of `docs/UI_LEGACY_LEDGER.md`).
+It used to describe an "enterprise dense 9/10" ERP: a Tile System of campus
+and division tiles, seven-column work rows, a tab with a strip of section
+tiles, sixteen modal dialogs and five status dimensions. People could not
+find their own work in it. The application was rebuilt in four phases
+(recorded in `docs/UI_LEGACY_LEDGER.md`) around one idea — **each person
+opens the app and sees their own list of things to do** — and this file now
+describes that.
 
-The UI/UX audit in `docs/ui-ux-audit-2026-09-17/AUDIT.md` was written against
-this file while the screenshots were taken of the migrated application, so two
-of its findings — **P1-01** ("the shell still uses the retired desktop rail")
-and the blueprint half of **P1-05** — asked for the migration to be reverted.
-They are recorded as superseded in that document. Everything else the audit
-found was real and has been fixed inside the Tile System.
+Who the screens are for: Faculty, the USC, the ICC Events, Media and
+Culturals heads, the IGP head, and volunteers. **Assume every reader reads
+like a twelve-year-old.** Data entry comes first; seeing your work comes
+second.
 
-The sections below now describe the shipped system. Neutrals, ink, hairlines,
-the spacing scale and the three Barlow / IBM Plex Mono faces carried across from
-the blueprint unchanged; radius, elevation, colour roles and layout are the
-Tile System's.
+## The eight rules
 
-## Product character
+1. **One screen, one job.** At most one primary button per screen. If a
+   screen needs two, it is two screens or a folded card.
+2. **Show five, hide the rest.** Lists show at most five rows, then
+   "Show all 12". Finished things fold into one line, such as "✓ 12 done".
+   Groups (Today / This week / Later) start folded except the first.
+3. **Plain words only.** Short sentences, sentence case, no uppercase
+   micro-labels, no record codes (`ICC-2026-CEN-001`) shown to people. The
+   banned words and their replacements are `glossary.PLAIN_WORDS`, and
+   `tests/plain_language_test.py` fails the build if one reaches a page or a
+   message. Say "money", not "reimbursement"; "skip", not "waive"; "file",
+   not "evidence"; "check" and "save", not "stage" and "commit".
+4. **Big and calm.** Body text 16–17px. Every control at least 44px tall
+   (48px on a phone). At least `--space-6` between blocks. White sections on
+   the grey canvas. Colour only where it means something: late, done, needs
+   an OK.
+5. **Defaults everywhere.** Dates default to the event's date or today; a
+   venue to the event's venue; the program is picked when there is only one
+   to pick; "Who?" defaults to you; a head's year to the current one.
+6. **Everything can be fixed.** Every saved row can be changed or removed.
+   Removing shows a ten-second **Undo** and keeps the row (soft delete).
+7. **Stay where you are.** After saving, come back to the same card with
+   "Saved ✓" — never bounce to another step. A form posted from My work
+   returns to My work (`next`).
+8. **Phone first on the event day.** Roll call, ticking a to-do, adding a
+   photo or a bill all work one-handed at 375px.
 
-Precise, institutional, and quiet. The system reads as a technical drawing of the record: a flat ground, hairline rules, condensed uppercase labels, and registration marks at the corners of the things you act on. Nothing floats, nothing glows, and nothing is decorated. The ERP supplies every fact, action, state, and permission; the presentation layer's only job is to make the next decision obvious.
+## Where things are
 
-Three rules carry the whole system:
+**The rail** (`app/services/navigation.py`) is four places and a Menu, and a
+phone's bottom bar is exactly that:
 
-1. **The number is a link.** A count that cannot be opened is a dead end. Every counter that has a real destination navigates to the filtered list behind it; a counter with no destination is set as plain text rather than given a false affordance.
-2. **Decide in place.** Approving is one click from the list it appears in. Sending something back opens the record, because every reject path requires a written reason.
-3. **Nothing that blocks you is collapsed.** Closure blockers, the decision queue and a tab's primary content are never behind a disclosure. Disclosures hold provenance, settled records and secondary "add" forms.
+| Slot | Who | Goes to |
+|---|---|---|
+| My work | everyone (volunteers see "My activities") | `/` |
+| Events | everyone but volunteers | `/erp/projects` |
+| + New event | people who run events | `/erp/projects/new` |
+| Reports, or Account | Reports for Faculty and the USC; Account for everyone else | `/reports` · `/profile` |
+
+The Menu holds Alerts, Account, People (Faculty), Upload a sheet, Who
+changed what, "Show me around again" and Log out.
+
+**My work** (`dashboard/home.html`) is one sentence, then — only when they
+have something in them — Needs your OK (Faculty), To do (Today / This week /
+Later), Today's event (Take attendance) and Your events (three at most). The
+circle ticks an item in one press; an item about a poster, photos, a report
+or a bill shows **Add file**, which sends the file and ticks it.
+
+**An event** (`erp/event.html`) is its to-do list, then folded cards: Schedule,
+People, Money, Files, Buddies (IGP), Feedback, Applications, Event details,
+Finish. Each card shows one line until opened. Rarely used actions on a row
+sit behind its "⋯".
+
+## Click budget
+
+Measured from My work by `e2e/click-budget.spec.ts`; a change that breaks one
+of these is a regression.
+
+| Task | Presses |
+|---|---|
+| See my work | 0 |
+| Tick a to-do | 1 |
+| Approve money (Faculty) | 1 |
+| Hand in a poster against a Media item | 2 |
+| Take attendance on the event day | 2 |
+| Create an event | 2 (plus typing) |
+| Ask for money | 3 (plus typing) |
+
+## Building blocks
+
+The calm classes are `cv-*` in `app/static/css/calm.css`:
+
+- `cv-page` — one centred column, 820px at most.
+- `cv-lede` — the one sentence at the top of a screen.
+- `cv-section` — a white block with a heading (`cv-section__title`) and an
+  optional count (`cv-count`) or link (`cv-section__link`).
+- `cv-card` — a `<details>` that folds: a title and a one-line summary
+  (`cv-card__sum`) until opened. Works without JavaScript.
+- `cv-list` / `cv-item` — a row: `cv-item__main` (title and one meta line)
+  and `cv-item__act` (its buttons). `cv-item__meta--late` for overdue.
+- `cv-tick` — the round one-press "done" button.
+- `cv-menu` — the "⋯" for skip, remove, change.
+- `cv-group` — Today / This week / Later.
+- `cv-form`, `cv-field`, `cv-row`, `cv-chips` / `cv-chip` (big radio
+  buttons), `cv-check`, `cv-roll` (roll call), `cv-sticky` (a save bar).
+- `cv-btn` (`--primary`, `--quiet`, `--danger`, `--big`, `--full`),
+  `cv-more` ("Show all"), `cv-done` (a folded "✓ N done").
+- `cv-stats` / `cv-stat` — the few big numbers on Reports.
+
+A class built in a template string (`cv-tag--{{ status }}`,
+`cv-stage--{{ stage }}`) must be safelisted in `postcss.config.cjs` or
+PurgeCSS removes it.
 
 ## Foundation tokens
 
+Unchanged from the Tile System and defined in `app/static/css/tokens.css`:
+
 | Token | Value | Use |
 |---|---:|---|
-| `--color-canvas` | `#F2F2F3` | Application ground |
-| `--color-surface-1` | `#FFFFFF` | Input and table surfaces |
-| `--color-surface-2` | `#E9E9EA` | Hover and nested fills |
-| `--color-surface-ink` | `#1D2D3D` | Inverse: avatars, toasts |
-| `--color-primary` | `#5980A6` | Primary actions, active marks |
-| `--color-primary-hover` | `#416180` | Primary hover/pressed |
-| `--color-text` | `#1D1F20` | Primary text |
-| `--color-text-secondary` | `#424244` | Secondary text |
-| `--color-text-tertiary` | `#5D5D60` | Metadata, micro-labels |
-| `--color-border` | `rgb(29 31 32 / 16%)` | Hairline rules |
-| `--color-border-strong` | `rgb(29 31 32 / 30%)` | Inputs, buttons, popovers |
+| `--color-canvas` | `#F2F2F3` | Page ground |
+| `--color-surface-1` | `#FFFFFF` | Sections, cards, inputs |
+| `--color-surface-2` | `#E9E9EA` | Hover |
+| `--color-primary` | `#5980A6` | The one primary button, links |
+| `--color-text` | `#1D1F20` | Text |
+| `--color-text-secondary` | `#424244` | Labels |
+| `--color-text-tertiary` | `#5D5D60` | One meta line under a title |
+| `--color-border-strong` | `rgb(29 31 32 / 30%)` | Inputs and buttons |
 | `--color-focus` | `#2C455D` | Focus ring |
-| `--color-success` | `#3D6B57` | Approved/completed |
-| `--color-warning` | `#8A6329` | Pending/attention |
-| `--color-danger` | `#8F3D38` | Errors/destructive actions |
+| `--color-success` | `#3D6B57` | Done, happening now |
+| `--color-warning` | `#8A6329` | Asked, waiting for Faculty |
+| `--color-danger` | `#8F3D38` | Late, needs finishing, remove |
 
-Gradients of any kind are excluded. Status is never conveyed by color alone; retain its label and, where useful, a Lucide icon.
+No gradients, glass, glow or tilt.
 
-## Typography
+## Words
 
-- Headings, buttons, column heads, status words and micro-labels: Barlow Condensed, 500/600/700.
-- Interface and body: Barlow, 400/500/600.
-- Codes, dates, percentages, counts, and tabular data: IBM Plex Mono, 400/600.
-- All fonts are self-hosted WOFF2 with `font-display: swap`; runtime font CDNs are forbidden.
-- Body copy is 15px. Metadata may be 13px, and 12px when nonessential.
-- Use sentence case for prose and headings. Uppercase with `.09em` tracking is the system's micro-label, used for column heads, field labels, eyebrows, status words and button text.
-- Page titles are 40/42 desktop and 28/32 mobile.
-
-## Geometry
-
-- **The shell is a 72px rail**, down the left above 860px and along the bottom below it. The blueprint's top bar is gone. `.ds-app` is a named-area grid — `banner / rail / screen` — so the demo banner and the bottom navigation reserve layout space instead of floating over the record.
-- **Two surfaces carry the product.** A *tile* (`--radius-tile`, filled with a family accent, lifts on hover) takes you somewhere; a *row* (44px, labelled cells) is a thing you act on. A screen is one or the other.
-- **One screen, one viewport.** `.ds-app` is `overflow: hidden` at `100dvh`; a screen declares at most one `.ds-scroll`, and that is the only thing that moves. **The event workspace declares none** — see "A tab is a section strip and one open section" below.
-- Radius encodes what a surface does: `--radius-chip` 4px, `--radius-control` 6px, `--radius-panel` 10px, `--radius-tile` 16px. The tile radius appears nowhere else — the corner *is* the signal that a surface drills down.
-- Elevation belongs to navigational and floating surfaces only (`--shadow-tile`, `--shadow-tile-raised`). A work row never casts.
-- Separation inside a work surface is a 1px hairline, never a shadow and never a fill.
-- Controls are sized for density: 38px default, 30px compact, 34px segmented, 26px inside a row. Touch targets on the mobile bottom bar and the Menu drawer remain at least 44px.
-- Spacing follows the 4, 8, 12, 16, 20, 24, 32, 40, 48, and 64px scale.
-
-### A tab is a section strip and one open section
-
-Revised 17 September 2026. Each of the event workspace's four work tabs used
-to render every list it owned inside one `.ds-scroll`: Logistics stacked the
-fact strip, the tasks, every checklist and the schedule; People stacked five
-lists. The screen scrolled to hold it, and the reader met forty rows when the
-decision in front of them concerned one.
-
-A tab is now `.ds-work`, a two-track grid of **a section strip and one open
-section**, and it declares no scroll container at all.
-
-- **The strip** (`.ds-sections`) is one `.ds-section` tile per section,
-  rotating through the three family accents *by position, not by meaning*.
-  A closed tile is the accent's tint with ink on it; the open one is the solid
-  accent with `--on-accent`. Each tile carries the section's name, its total,
-  and how many items in it still need somebody — so the counts that used to
-  justify scrolling the whole tab are readable without opening anything. The
-  strip is the one element allowed to overflow sideways; it is a control, not
-  a page.
-- **The open section** (`.ds-panel`) is three fixed tracks: a 48px head
-  carrying the title, the count and the section's actions; a
-  `minmax(0, 1fr)` body at `overflow: hidden`; and a 40px pager pinned to the
-  bottom, so the pager is in the same place whether a page holds eight rows
-  or one.
-- **A page is `paging.PAGE_SIZE` rows**, currently 8. That is the count that
-  fits the shortest supported viewport between the fixed tracks, not a taste
-  setting: it is paired with the `--row-height` track, and changing one means
-  recomputing the other.
-- **Paging is a query argument** resolved on the server (`?section=`,
-  `?page=`, `?focus=`). The URL map is frozen and query arguments are not part
-  of it, exactly as `tab` already was. The pager is therefore ordinary links:
-  no JavaScript, keyboard operable for free, and a page can be bookmarked.
-- **Reachability is the contract pagination must not break.** `?focus=<id>`
-  resolves a record to the section *and the page* that hold it, and every
-  deep link that names a record (the decision queue, a closure blocker, a
-  post-decision redirect) carries it. Every form inside a panel posts `next`,
-  which `_redirect_to_tab` already honoured, so a verdict returns to the
-  section and page it was taken on.
-- **Reference facts are a section, not a header.** The record's own attributes
-  are `.ds-fact` cards in a `.ds-factgrid`, taking the same three tints. They
-  are reference, never items, and they are one click away rather than
-  permanently above the work.
-- **Two exceptions scroll, and both are correct.** Below 860px a row becomes a
-  labelled record card several lines tall and under 720px of height the fixed
-  tracks alone use most of the screen; in those two cases `.ds-panel__body`
-  scrolls, and it is still the only thing on the screen that does. The other
-  is `.ds-forms` — Public disclosure is three blocking forms and no pager.
-
-### A tab is a tile
-
-Revised 17 September 2026. The tab strip was five words in
-`--color-text-tertiary` on transparent, marked only by a 2px underline on the
-active one. On the `--color-canvas` ground the resting tabs read as page
-furniture rather than as controls — the reader could not see where the strip
-began or ended.
-
-Each tab now carries a fill at 32px with `--radius-control`, and the underline
-is gone: a filled tab needs no second marker. **The hue is the record's own
-family** — pine for an ICC event, indigo for an IGP programme, set once on
-`.ds-tabs` as `--tab-accent` / `--tab-tint`. That keeps colour inside its one
-permitted job, identity, instead of handing five tabs five decorative hues,
-and it is the hue the reader clicked through from the division tile to get
-here. Resting tabs take the tint with ink on it; the open one takes the solid
-accent with `--on-accent`, named explicitly on the count as well as the tab.
-
-The bare `.ds-tabs` fallback (brand blue) is declared **before** the two family
-modifiers. They are all one class, so at equal specificity the later rule wins:
-declared after, it would repaint every strip brand blue whatever family it
-carries.
-
-### Dialogs
-
-`.ds-modal` is a `:target` dialog: the trigger is a link to the dialog's id,
-`:target` shows it, and the scrim and close control are links back to `#`.
-No JavaScript, so it survives the no-JS contract, and no inline handler, which
-CSP would kill and `tests/ui_contract_test.py` forbids. It carries `role="dialog"`
-and `aria-labelledby` but **not** `aria-modal`: the page behind is still
-reachable by tab, and claiming otherwise would be a lie to assistive
-technology. A dialog is rendered only when its own trigger is, so a reader
-without the permission carries no hidden form.
-
-Every "add", "import", "attach" and "open a form" of the workspace lives in
-one — sixteen of them, each three to six fields tall when open, which was most
-of the reason a tab could not fit its viewport. The dialog's body is the one
-place an internal scroll is right: it belongs to the dialog, not to the screen
-behind it.
-
-### Mobile navigation contract
-
-Below 860px the rail becomes a bottom bar of **four primary destinations plus
-Menu**, and nothing else. `navigation.MAX_BOTTOM_NAV_ITEMS` is the ceiling and
-is asserted by `tests/ui_audit_regression_test.py`; eleven 48px targets do not
-fit 375px. Everything the bar drops — alerts, the account, imports, audit,
-administration, sign-out — lives in the labelled `.ds-menu__drawer`, a native
-`<details>` that needs no JavaScript, together with the reader's role and scope.
-The bar reserves `56px + env(safe-area-inset-bottom)`.
-
-### A record row on a phone
-
-A `.ds-row` folds into a labelled record card below 860px: each cell prints its
-own column name from `data-label`, the title wraps rather than clipping, and the
-actions sit inside the card. Row actions are never positioned off-canvas.
-
-## Depth
-
-There is no glass: `.aurora-card--glass` and the `--color-surface-glass*` tokens are gone. Work surfaces are opaque and flat. Elevation is carried by navigational tiles and by the four things that genuinely float above the record — the toast, the command dialog, the row's review panel, and the Menu drawer — and is a plain ink shadow, never a colour glow.
-
-The blueprint registration mark (`.blueprint` plus four empty `<i class="corner">` elements) survives on the sign-in action and the first-run cards. It is decorative and invisible to the accessibility tree.
-
-No cursor spotlight, no perspective, no tilt, no parallax.
-
-## Foreground on an accent ground
-
-`--tile-pine`, `--tile-indigo` and `--tile-brass` are dark grounds, and anything
-drawn on them takes `--on-accent` (white, 6.33–9.92:1) or `--on-accent-muted`
-(white at 88%, 5.33–8.14:1). **A heading must name the token explicitly.**
-`base.css` sets `h1..h6 { color: var(--color-text) }`, which is specificity
-(0,0,1) and beats the tile's *inherited* white however specific the tile's own
-selector is — that is how every dark tile heading came to render at 1.67:1
-(audit P1-06). `tests/ui_audit_regression_test.py` measures every pair.
-
-## The two divisions
-
-Revised 17 September 2026. **IGP is "India Gateway Program" and ICC is
-"International Christite Community"** — the offices' own names. One expansion
-each, everywhere: `services/glossary.DIVISION_NAMES`, `hierarchy.DIVISIONS`,
-the seeded operating units and the public landing copy were changed together,
-because the bug audit P1-08 was raised to fix is a canonical name that
-disagrees with another screen. Stored `operating_units.name` rows are left
-alone and mapped at render time; renaming that column on a populated database
-would be a data migration to fix a caption.
-
-The record noun is unchanged: the interface says "event" for ICC, "programme"
-for IGP, and "record" where it must cover both, while routes and the model
-keep saying `project`.
-
-## Status
-
-Status has **five named dimensions**, defined once in `app/services/status.py`:
-`availability` (is the file there), `workflow`, `review` (what an approver
-decided), `publication` and `lifecycle`. A chip carries its dimension, so
-"File: No file" beside "Review: Approved" reads as two facts about one record
-rather than as a contradiction (audit P0-04).
-
-- **The label is the stored word.** The vocabulary is not rewritten for style:
-  `Pending` and `Submitted` are distinct states in different workflows and must
-  not be collapsed. The explanation lives in the chip's hint.
-- **An unknown value degrades to neutral, never to danger.** The hand-written
-  ternaries this replaced used `else` as a synonym for "bad", which is how a
-  *verified* buddy interaction came to be painted in danger red under a warning
-  triangle.
-- **Tone describes the reader's next action, not sentiment.** `attention` means
-  somebody has to do something; `critical` means something is wrong. A waived
-  requirement is a decision, not a failure.
-- Every state renders a word, an icon and a colour. Colour is never the only
-  carrier.
+- An event's stage comes from its dates and reads: Coming up, Happening
+  now, Needs finishing, Waiting for Faculty, Finished, Cancelled
+  (`app/services/stage.py`).
+- Money reads: Asked, Approved, Paid, Not approved.
+- A to-do is done, skipped (with a reason), or still to do.
+- Role names are plain: Faculty, USC, Events head, Media head, Culturals
+  head, IGP head, Volunteer.
+- IGP is "India Gateway Program" and ICC is "International Christite
+  Community" (`glossary.DIVISION_NAMES`). The interface says "event" for both.
+- The history page (`/erp/audit`) reads as sentences — "Asha took
+  attendance" — from `glossary.AUDIT_ACTIONS`; raw identifiers sit behind
+  its "⋯".
 
 ## Numbers, money and dates
 
-Shared formatters in `app/services/formatting.py`, registered as Jinja filters,
-are the only way a number reaches a template. Indian digit grouping
-(`₹7,65,000`); trailing `.00` dropped unless the value has paise; `short_money`
-(`₹7.2L`) only where the exact figure sits beside it or one click away;
-`pluralise` for every count. Dates and times go through `timeutil`'s
-`localdate` / `localtime` / `localdatetime`, which render campus-local and label
-the zone. Raw values stay raw in exports, the API and the audit payload.
+Shared formatters in `app/services/formatting.py` are the only way a number
+reaches a template: Indian digit grouping (`₹7,65,000`), `.00` dropped
+unless there are paise, `pluralise` for every count. Dates and times go
+through `localdate` / `localtime` / `localdatetime` and are campus-local.
 
 ## Icons
 
-Lucide is the only visual icon language. React islands use `lucide-react`; server-rendered templates receive locally generated Lucide SVG masks from `icons.css`. Historical `ph-*` class names are compatibility hooks only and no longer load the Phosphor font.
-
-## Motion
-
-- Typical duration: 160–300ms. Use transform and opacity; progress uses `scaleX`.
-- Two keyframes exist: `rise` and `fade`, for the toast, the command dialog and the sign-in column.
-- Numeric data renders its true value immediately. No fake count-up or simulated workflow progress.
-- Tables, forms, validation errors, audit rows, and notification lists do not stagger.
-- Below-fold dashboard sections may reveal once; there is no scroll-jacking or pinned storytelling.
-- `prefers-reduced-motion` removes perspective, parallax, stagger, count transitions, cursor spotlight, and large transforms.
-- Framer Motion is progressive enhancement only. Navigation, forms, content, feedback, and exports must remain usable without JavaScript.
+Lucide masks in `icons.css`, reached through historical `ph-*` class names.
+A `ph-*` name with no mask draws as a solid square, so
+`tests/ui_contract_test.py` checks every template and
+`tests/my_work_test.py` checks every rail icon.
 
 ## Accessibility
 
-- WCAG 2.2 AA is the release floor for structure, naming, focus and keyboard operation, verified by axe on every page state.
-- **Target size is a deliberate exception.** The blanket 44×44px floor was dropped for this design: it is the AAA criterion, it is touch-oriented, and enforcing it on pointer devices is what previously forced the Home counters to be non-clickable. Desktop controls are sized for density; the mobile bottom nav and drawer keep 44px.
-- **Colour contrast is not gated by axe in CI**, because the palette's muted metadata tone sits near the 4.5:1 boundary. It is gated another way: `tests/ui_audit_regression_test.py` measures every accent ground against its foreground token, and `e2e/accessibility-responsive.spec.ts` measures every rendered tile in the browser. Both require 4.5:1.
-- **Forms reveal conditional fields with CSS `:has()`, never JavaScript.** The rule *hides*, so a browser without `:has()` drops the selector and the field stays visible — the behaviour before the rule existed, never a field the reader cannot reach. The input keeps its name, its label and the server's validation either way.
-- Every control has a visible label or accessible name and a visible `:focus-visible` treatment.
-- No hover-only behavior. Touch, keyboard, and pointer paths receive the same functionality.
-- Server validation remains adjacent to its field and connected through `aria-describedby`/`aria-invalid` where available.
-- Mobile data tables become record cards/definition lists when row actions would otherwise become inaccessible; read-only ledgers may scroll priority columns.
-- Forced-colors retains native affordances, borders, focus, and status text.
+- WCAG 2.2 AA is the floor, checked by axe on every page in
+  `e2e/platform-matrix.spec.ts` and `e2e/accessibility-responsive.spec.ts`.
+- Targets are 44px everywhere and 48px on a phone.
+- A scrolling region must contain something focusable, or axe fails it.
+- Folding is a native `<details>`, so it opens and closes with JavaScript
+  off. "Add file" falls back to a Send button that appears once a file is
+  chosen (CSS `:has()`).
+- Every control has a visible label; no placeholder-only labels; no
+  hover-only behaviour; status is never colour alone.
 
 ## Print
 
-Reports, audit views, and structured project summaries print on white without shell, glass, ambient backgrounds, or motion. Table headers repeat where supported; record blocks avoid page breaks; interactive-only controls are hidden.
+Reports print on white without the rail. The one-screen frame
+(`.ds-app`, `.ds-screen`, `.ds-screen__body`) is unclamped for print, and
+folded cards print open.
 
-**The one-screen frame must be unclamped for print.** `.ds-app`, `.ds-screen`,
-`.ds-screen__body` and `.ds-scroll` are all reset to `display: block; height:
-auto; overflow: visible`, or a report prints the rail plus exactly one viewport
-and silently drops everything below the fold. Disclosures print open —
-provenance and settled records are what a printed ledger is for — and a record
-row prints as a labelled block rather than as a seven-column grid.
+## Architecture invariants
 
-## Architecture and functional invariants
+- Flask/Jinja owns content, navigation, permission branches and forms.
+  Every screen works with JavaScript off.
+- The route count and URL-map hash change only with a re-baselined
+  `tests/ui_contract/baseline.json` (`scripts/regen_ui_baseline.py`) and an
+  entry in `docs/UI_LEGACY_LEDGER.md`. Old addresses that are retired
+  redirect rather than 404.
+- Local storage is unused.
 
-- Flask/Jinja owns content, navigation, permission branches, forms, errors, and links.
-- React/Framer Motion islands mount only over usable server-rendered fallbacks and accept minimal allowlisted props.
-- Tailwind, TanStack Router, Radix, shadcn, React Query, and Recharts are not production dependencies.
-- Chart.js remains the chart implementation.
-- Local storage is unused. `oia.ui.rail-collapsed` went away with the rail.
-- Route count and URL-map hash may not change without a deliberate, documented and re-baselined update (`scripts/regen_ui_baseline.py`) recorded in `docs/UI_LEGACY_LEDGER.md`. Form actions/methods/field names, CSRF/version fields, and role navigation may not change. **Redirect endpoint and HTTP status may not change; the `tab` query argument on a project workspace redirect is presentation and may be re-pointed** (e.g. the `operations` → `delivery`/`contributions`/`finance` tab split), since query arguments are not part of the URL map. Downloads and offline behavior may not change.
-- Prototype mock data, fictional actions, appearance settings, synthetic system health, and simulated report progress are forbidden.
+## Anti-patterns
 
-## Explicit anti-patterns
-
-- Dark legacy surfaces, purple/pink gradients, neon effects, particles, autoplay media, or decorative tickers.
-- Blur, gradients, glow, rounded cards, drop shadows on work surfaces, or hover lift.
-- A count that is not a link when a destination for it exists.
-- **A counter whose destination does not contain the records it counted.** A counter links to the `state` filter, which reproduces `event_state`, and never to `status`, which matches the stored column that no counter counts.
-- A decision that requires leaving the list to take it, when the decision needs no reason.
-- A select, a free-text reason and a verb wedged into a record row. The row reads; `Review` opens the form.
-- Truncating the only visible copy of a title, a required instruction or a fact.
-- Primary content behind a disclosure.
-- Color-only status, placeholder-only labels, or icon-only primary navigation.
-- Client-side permission filtering or sensitive records serialized for hidden island state.
-- New business functionality introduced during visual migration.
+- A screen that opens on anything other than the reader's own work.
+- More than one primary button on a screen.
+- A list longer than five rows with no "Show all".
+- A record code, an uppercase micro-label or a word from
+  `glossary.PLAIN_WORDS` on a page.
+- A form that sends you somewhere else after saving.
+- A required field that could have had a default.
+- Removing something with no Undo.
+- An approval for anything other than money, finishing an event, or the
+  public website — and an approver other than Faculty.
+- Colour-only status, placeholder-only labels, icon-only navigation.

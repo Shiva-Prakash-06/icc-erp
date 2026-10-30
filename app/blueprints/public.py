@@ -9,17 +9,19 @@ non-Restricted curated-category documents may be surfaced here.
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, render_template
+from flask import Blueprint, abort, render_template, request
 
-from app.database import db
-from app.models.erp import DocumentRecord, ReportSnapshot
+from app.database import db, limiter
+from app.models.erp import DocumentRecord, FeedbackForm, FeedbackResponse, ReportSnapshot
 from app.models.project import AcademicYear, Campus, Project, ProgramType
 
 
 public_bp = Blueprint("public", __name__, url_prefix="/public")
 
 _PUBLIC_PROJECT_STATUSES = ("Planned", "Active", "Closing", "Completed")
-_PUBLIC_DOCUMENT_CATEGORIES = ("Poster", "Photo")
+# "Event Poster" and "Images/Photos" are what the event page's "What is
+# this?" choices store; the two short names are kept for older rows.
+_PUBLIC_DOCUMENT_CATEGORIES = ("Poster", "Photo", "Event Poster", "Images/Photos")
 
 
 def _published_projects_query():
@@ -170,3 +172,34 @@ def analytics_data():
     server-side from allow-listed fields (never raw per-project detail).
     Only Published projects are counted -- see PLAN.md publication gate."""
     return _published_analytics_payload()
+
+
+@public_bp.route("/feedback/<string:token>", methods=["GET", "POST"])
+@limiter.limit("30 per hour", methods=["POST"])
+def feedback_answer(token):
+    """The feedback link shared after an event. No sign-in: the link itself
+    is the key, and it stops working when the event closes it. Only the
+    event title is shown; nothing about anyone who took part."""
+    form = FeedbackForm.query.filter_by(public_token=token).first()
+    if form is None:
+        abort(404)
+    project = db.session.get(Project, form.project_id)
+    if not form.is_open:
+        return render_template("public_site/feedback.html", form=form, title=project.title, closed=True)
+    errors = {}
+    if request.method == "POST":
+        try:
+            rating = int(request.form.get("rating") or 0)
+        except ValueError:
+            rating = 0
+        if rating not in range(1, 6):
+            errors["rating"] = "Pick a number from 1 to 5."
+        else:
+            answers = {"rating": rating}
+            for question in form.questions_json or []:
+                if question.get("type") == "text":
+                    answers[question["key"]] = (request.form.get(question["key"]) or "").strip()[:2000]
+            db.session.add(FeedbackResponse(form_id=form.id, answers_json=answers, moderation_status="Approved"))
+            db.session.commit()
+            return render_template("public_site/feedback.html", form=form, title=project.title, thanks=True)
+    return render_template("public_site/feedback.html", form=form, title=project.title, errors=errors), (422 if errors else 200)

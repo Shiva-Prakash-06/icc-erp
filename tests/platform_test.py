@@ -5,6 +5,7 @@ import unittest
 from datetime import date
 from app import create_app, db
 from app.models.user import User
+from app.models.erp import Person, RoleAssignment
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 
 class OIAPlatformTestCase(unittest.TestCase):
@@ -101,25 +102,52 @@ class OIAPlatformTestCase(unittest.TestCase):
             user = db.session.get(User, self.faculty_id)
             self.assertFalse(user.needs_password_reset)
 
-    def test_user_registration_pending_workflow(self):
-        """New registrants are placed in pending state and restricted from dashboard views."""
+    def test_sign_up_is_instantly_a_volunteer(self):
+        """Signing up needs no approval: the account is a volunteer straight
+        away and lands on the home screen."""
         response = self.client.post('/register', data={
-            'username': 'volunteer1',
-            'email': 'vol@test.com',
+            'first_name': 'Asha',
+            'last_name': 'Rao',
+            'email': 'asha.rao@christuniversity.in',
             'password': 'Volunteer-Test-2026!',
-            'confirm_password': 'Volunteer-Test-2026!',
-            'preferred_role': 'Volunteer',
-            'campus_id': self.campus_id
-        }, follow_redirects=True)
+            'campus_id': self.campus_id,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers['Location'].endswith('/'))
 
-        self.assertIn(b"Registration Pending", response.data)
-
-        # Verify user is in pending state in db
         with self.app.app_context():
-            new_user = User.query.filter_by(username='volunteer1').first()
-            self.assertEqual(new_user.status, 'Pending')
-            self.assertEqual(new_user.role, 'Pending')
+            new_user = User.query.filter_by(email='asha.rao@christuniversity.in').one()
+            self.assertEqual(new_user.status, 'Approved')
+            self.assertEqual(new_user.username, 'asha.rao')
+            self.assertEqual(new_user.person.first_name, 'Asha')
+            self.assertEqual(new_user.person.last_name, 'Rao')
+            codes = {a.role_code for a in RoleAssignment.query.filter_by(user_id=new_user.id, is_active=True)}
+            self.assertEqual(codes, {'VOLUNTEER'})
 
+    def test_sign_up_refuses_a_non_university_email(self):
+        response = self.client.post('/register', data={
+            'first_name': 'Out', 'email': 'someone@gmail.com',
+            'password': 'Volunteer-Test-2026!', 'campus_id': self.campus_id,
+        })
+        self.assertEqual(response.status_code, 422)
+        self.assertIn(b"Use your university email", response.data)
+        with self.app.app_context():
+            self.assertIsNone(User.query.filter_by(email='someone@gmail.com').first())
+
+    def test_sign_up_joins_an_existing_person_record(self):
+        """A volunteer a head already listed on an event keeps those events."""
+        with self.app.app_context():
+            person = Person(first_name='Listed', primary_email='listed@christuniversity.in', person_type='Student')
+            db.session.add(person)
+            db.session.commit()
+            person_id = person.id
+        self.client.post('/register', data={
+            'first_name': 'Listed', 'email': 'listed@christuniversity.in',
+            'password': 'Volunteer-Test-2026!', 'campus_id': self.campus_id,
+        })
+        with self.app.app_context():
+            user = User.query.filter_by(email='listed@christuniversity.in').one()
+            self.assertEqual(user.person_id, person_id)
 
 if __name__ == '__main__':
     unittest.main()

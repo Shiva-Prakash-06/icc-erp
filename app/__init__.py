@@ -64,14 +64,6 @@ def create_app(config_object=None):
     register_status(app)
     register_glossary(app)
 
-    # The four reserved states are read by the directory, both dashboards
-    # and every work row. Exposing the mapping rather than pre-computing it
-    # per view is what keeps a card and the counter above it in agreement.
-    from app.services.hierarchy import STATE_LABELS, event_state
-
-    app.jinja_env.globals["event_state"] = event_state
-    app.jinja_env.globals["STATE_LABELS"] = STATE_LABELS
-
     # Server duration and query counts for the beta latency work (audit B13).
     # Off unless REQUEST_TIMING_ENABLED is set.
     from app.services.instrumentation import register_request_timing
@@ -173,6 +165,14 @@ def create_app(config_object=None):
             "has_any_permission": has_any_permission,
             "vocabulary_display": vocabulary_display,
         }
+
+    @app.context_processor
+    def undo_offer():
+        """The Undo toast after a removal (app/blueprints/erp_event.py). A
+        function, not a value: templates may bind their own `session`."""
+        from flask import session as flask_session
+
+        return {"pop_undo": lambda: flask_session.pop("undo", None)}
 
     @app.context_processor
     def current_academic_year_label():

@@ -12,6 +12,23 @@ from app.models.project import AcademicYear, Campus, Project
 from app.services.authorization import LEGACY_ROLE_MAP, has_permission, invalidate_assignment_cache
 
 
+HEAD_ROLES_WITHOUT_WING = {"ICC_EVENTS_HEAD", "ICC_MEDIA_HEAD", "ICC_CULTURALS_HEAD"}
+
+#: The roles Faculty can give someone, in the order the picker shows them.
+#: Every other role code still resolves (old rows keep working) but is no
+#: longer handed out: associates, buddies, participants and programme leads
+#: are all volunteers now, and Faculty sees what the auditor role saw.
+ASSIGNABLE_ROLES = [
+    "Volunteer",
+    "ICC Events Head",
+    "ICC Media Head",
+    "ICC Culturals Head",
+    "IGP Head",
+    "ICC Secretary / USC",
+    "Faculty",
+]
+
+
 def replace_scoped_assignment(user, legacy_role, scope, actor):
     """Deactivate `user`'s existing active assignments and create a new one
     for `legacy_role`, resolving scope fields from `scope` (a dict-like
@@ -26,21 +43,18 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
     unit = wing = None
     if role_code.startswith("ICC_"):
         unit = OperatingUnit.query.filter_by(code="ICC").first()
-        wing_code = {
-            "ICC_EVENTS_HEAD": "EVENTS",
-            "ICC_MEDIA_HEAD": "MEDIA",
-            "ICC_CULTURALS_HEAD": "CULTURALS",
-        }.get(role_code)
-        wing = Wing.query.filter_by(operating_unit_id=unit.id, code=wing_code).first() if unit and wing_code else None
     elif role_code.startswith("IGP_"):
         unit = OperatingUnit.query.filter_by(code="IGP").first()
-    requested_wing = Wing.query.filter_by(public_id=scope.get("wing_public_id")).first() if scope.get("wing_public_id") else None
-    if requested_wing:
-        if not unit or requested_wing.operating_unit_id != unit.id:
-            raise ValueError("The selected wing is outside this role's operating unit.")
-        if wing and wing.id != requested_wing.id:
-            raise ValueError("This head role is fixed to its designated wing.")
-        wing = requested_wing
+    # Head roles are no longer pinned to a wing. The Events head runs every
+    # ICC event (unwinged ones used to be invisible to them), and the Media
+    # and Culturals heads reach events through the items handed to their
+    # team, across wings and across ICC/IGP -- see app/services/teams.py.
+    if role_code not in HEAD_ROLES_WITHOUT_WING:
+        requested_wing = Wing.query.filter_by(public_id=scope.get("wing_public_id")).first() if scope.get("wing_public_id") else None
+        if requested_wing:
+            if not unit or requested_wing.operating_unit_id != unit.id:
+                raise ValueError("The selected wing is outside this role's operating unit.")
+            wing = requested_wing
     academic_year = AcademicYear.query.filter_by(public_id=scope.get("academic_year_public_id")).first() if scope.get("academic_year_public_id") else None
     project = Project.query.filter_by(public_id=scope.get("project_public_id")).first() if scope.get("project_public_id") else None
     campus = Campus.query.filter_by(public_id=scope.get("campus_public_id")).first() if scope.get("campus_public_id") else user.campus
@@ -53,18 +67,24 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
         academic_year = project.academic_year
     annual_roles = {"ICC_SECRETARY_USC", "ICC_EVENTS_HEAD", "ICC_MEDIA_HEAD", "ICC_CULTURALS_HEAD", "ICC_ASSOCIATE", "IGP_HEAD"}
     if role_code in annual_roles and not academic_year:
+        # Faculty promotes someone for this year; nobody should have to say so.
+        academic_year = AcademicYear.query.filter_by(is_current=True).first() or \
+            AcademicYear.query.order_by(AcademicYear.start_date.desc()).first()
+    if role_code in annual_roles and not academic_year:
         raise ValueError("Annual ICC/IGP leadership and associate assignments require an academic year.")
     if role_code == "ICC_ASSOCIATE" and not wing:
         raise ValueError("ICC Associate assignments require a wing.")
     if role_code == "IGP_PROGRAM_LEAD" and not project:
         raise ValueError("IGP Program Lead assignments require a specific program.")
-    if role_code in {"VOLUNTEER", "BUDDY", "PARTICIPANT"} and not project:
-        raise ValueError("Volunteer, buddy, and participant access requires a specific project/program.")
+    # A volunteer needs no project: what they see is decided by the events
+    # they are listed on (TeamAssignment), not by the assignment's scope.
+    if role_code in {"BUDDY", "PARTICIPANT"} and not project:
+        raise ValueError("Buddy and participant access requires a specific project/program.")
     platform_scope = role_code == "SYSTEM_ADMINISTRATOR" or scope.get("platform_scope") == "on"
-    if platform_scope and role_code not in {"SYSTEM_ADMINISTRATOR", "OIA_FACULTY_ADMINISTRATOR"}:
+    if platform_scope and role_code not in {"SYSTEM_ADMINISTRATOR", "OIA_FACULTY_ADMINISTRATOR", "FACULTY_COORDINATOR"}:
         raise ValueError("Only system and OIA faculty administrators may receive platform scope.")
     sensitive_requested = scope.get("can_view_sensitive_links") == "on"
-    sensitive_allowed = role_code in {"OIA_FACULTY_ADMINISTRATOR", "IGP_HEAD"}
+    sensitive_allowed = role_code in {"OIA_FACULTY_ADMINISTRATOR", "FACULTY_COORDINATOR", "IGP_HEAD"}
     if sensitive_requested and (not sensitive_allowed or not has_permission(actor, "sensitive_links", sensitive=True)):
         raise ValueError("The selected role or approving user cannot grant restricted-reference access.")
     # Resolve and validate the complete replacement before touching the current
@@ -94,11 +114,10 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
 # ──────────────────────────────────────────────────────────────────────────
 # First-run onboarding: role → welcome copy, tour steps, checklist tasks.
 #
-# Three audiences, not fourteen: someone who *decides* (the approve
-# permission), someone who *runs the office* (imports, records, audit) and
-# someone who *does the work* on one project. The scoped role codes above
-# collapse into those three here, and nothing else in the app needs to know
-# the difference.
+# Four audiences: Faculty, who says yes (the approve permission); the people
+# who run events (heads and the USC); the Media and Culturals heads, who get
+# work handed to their team; and volunteers, who only look. Each tour is at
+# most three steps, all on the home page or the rail, in plain words.
 #
 # `url_for` is unavailable in a service -- these run in tests and jobs with
 # only an app context -- so every step and task carries an endpoint name
@@ -107,104 +126,110 @@ def replace_scoped_assignment(user, legacy_role, scope, actor):
 
 ONBOARDING_COORDINATOR = "coordinator"
 ONBOARDING_OFFICE = "office"
+ONBOARDING_CONTRIBUTOR = "contributor"
 ONBOARDING_VOLUNTEER = "volunteer"
 
-# Copy for the four shared steps is taken verbatim from the redesign artboard's
-# TOUR constant ("ICC ERP Redesign.dc.html"); `nav` and `checklist` are new,
-# written to the same voice, because the artboard's tour was four fixed cards
-# and had no anchored navigation or checklist step. `nav` was rewritten for
-# the Tile System rail -- it used to describe a top bar that no longer exists.
 _STEPS = {
-    "queue": {
-        "title": "Everything waiting on you is here",
-        "body": "One list on the home screen. Approve or send back without leaving the page.",
+    "ok": {
+        "title": "These need your OK",
+        "body": "Money, finished events and the website. Press Approve, or Not now if something is wrong.",
         "placement": "bottom",
     },
-    "counters": {
-        "title": "The numbers are links",
-        "body": "Tap any counter to see just those records — no separate filter screen.",
+    "mywork": {
+        "title": "This is your list",
+        "body": "Everything you or your team has to do, from every event. Today comes first.",
         "placement": "bottom",
     },
-    "search": {
-        "title": "Jump anywhere with ⌘K",
-        "body": "Search projects, people and sessions from one box. It also runs actions.",
+    "tick": {
+        "title": "Press the circle when it is done",
+        "body": "One press ticks it off. Nothing else to fill in.",
         "placement": "bottom",
     },
-    "blockers": {
-        "title": "A project shows what's blocking it",
-        "body": "Closure blockers sit at the top of every project, already open.",
+    "file": {
+        "title": "Hand in a file here",
+        "body": "Posters, photos, the report. Press Add file, pick the file, and the item is ticked for you.",
+        "placement": "bottom",
+    },
+    "new": {
+        "title": "Make a new event",
+        "body": "A name and a date are enough. The to-do list is made for you.",
+        "placement": "right",
+    },
+    "activities": {
+        "title": "Your events",
+        "body": "When, where, your job and your buddy. Open one to see all its times.",
         "placement": "bottom",
     },
     "nav": {
-        "title": "Everything else is in the rail",
-        "body": "Campuses, events, analytics and your account sit down the left edge. On a phone they run along the bottom.",
+        "title": "Everything else is here",
+        "body": "All events, your account and alerts. On a phone this runs along the bottom.",
         "placement": "right",
-    },
-    "checklist": {
-        "title": "A short list to start with",
-        "body": "Four things worth doing once. It ticks itself off as you do them, then disappears.",
-        "placement": "left",
     },
 }
 
-# Step order per audience. A step whose target element is not on the page is
-# skipped at runtime rather than drawn as an orphan tooltip, so a role that
-# cannot see the decision queue simply never sees that card.
+# A step whose target is not on the page is skipped at runtime rather than
+# drawn as an orphan tooltip: someone with nothing to tick never sees "tick".
 ONBOARDING_TOURS = {
-    ONBOARDING_COORDINATOR: ["queue", "counters", "search", "blockers", "nav", "checklist"],
-    ONBOARDING_VOLUNTEER: ["queue", "counters", "nav", "checklist"],
-    ONBOARDING_OFFICE: ["queue", "counters", "nav", "search", "checklist"],
+    ONBOARDING_COORDINATOR: ["ok", "tick", "nav"],
+    ONBOARDING_OFFICE: ["mywork", "tick", "new"],
+    ONBOARDING_CONTRIBUTOR: ["mywork", "tick", "file"],
+    ONBOARDING_VOLUNTEER: ["activities", "nav"],
 }
 
 ONBOARDING_WELCOME = {
     ONBOARDING_COORDINATOR: {
-        "title": "Everything waiting on you, on one page",
-        "body": "You approve work for the projects you oversee. The platform is built so that deciding is the fastest thing you can do in it.",
+        "title": "Your work, on one page",
+        "body": "You say yes to money, finished events and the website. The teams do the rest.",
         "bullets": [
-            "Home opens on the decisions waiting on you — approve them in place.",
-            "Sending something back always opens the record, because it needs a reason.",
-            "Every project shows what is blocking its closure before anything else.",
+            "Home shows what needs your OK. Approve takes one press.",
+            "Press the circle next to a to-do item to tick it off.",
+            "Each event has one page. Open a part of it only when you need it.",
         ],
     },
     ONBOARDING_OFFICE: {
-        "title": "The office view of every record",
-        "body": "Imports, people, campuses and the audit trail all lead back to the same projects. Nothing here is a copy of anything else.",
+        "title": "Your work, on one page",
+        "body": "You run events. Home shows what is left to do, today first.",
         "bullets": [
-            "Home collects the work in front of you across every project in scope.",
-            "Imports stage first and commit second, so a bad sheet never lands.",
-            "The audit trail is append-only — it is the record of who changed what.",
+            "Press the circle next to a to-do item to tick it off.",
+            "A new event needs only a name and a date.",
+            "Each event has one page. Open a part of it only when you need it.",
+        ],
+    },
+    ONBOARDING_CONTRIBUTOR: {
+        "title": "Your team's work, on one page",
+        "body": "Events hand your team things to do, like posters and photos.",
+        "bullets": [
+            "Home lists your team's to-do items from every event.",
+            "Press the circle to tick one off.",
+            "Need to hand in a file? Press Add file and pick it.",
         ],
     },
     ONBOARDING_VOLUNTEER: {
-        "title": "Your projects and your open work",
-        "body": "You will mostly live on one page: what is open against your name, and the sessions coming up.",
+        "title": "Your activities",
+        "body": "See the events you are on: when, where, your job and your buddy.",
         "bullets": [
-            "Home lists your tasks and requests — nothing else competes for the space.",
-            "Hours you log go to your coordinator for approval, with the evidence attached.",
-            "Your project page holds the sessions, the team and the paperwork.",
+            "Home lists your events, soonest first.",
+            "Open one to see all its times.",
         ],
     },
 }
 
 # Each task names the signal that completes it (resolved in
-# app/services/home.py) and the page where it is done.
+# app/services/home.py) and the page where it is done. Volunteers have none:
+# there is nothing for them to set up.
 ONBOARDING_CHECKLISTS = {
     ONBOARDING_COORDINATOR: [
-        {"key": "decision", "label": "Clear your first decision", "endpoint": "dashboard.index", "params": {"queue": "all"}},
-        {"key": "project_opened", "label": "Open a project and read its blockers", "endpoint": "erp.projects", "params": {}},
-        {"key": "search_used", "label": "Jump somewhere with ⌘K", "endpoint": None, "params": {}},
-        {"key": "roll_call", "label": "Take a roll call at a session", "endpoint": "dashboard.index", "params": {}},
+        {"key": "decision", "label": "Approve something, or say not now", "endpoint": "dashboard.index", "params": {}},
+        {"key": "project_opened", "label": "Open an event", "endpoint": "erp.projects", "params": {}},
     ],
     ONBOARDING_OFFICE: [
-        {"key": "project_opened", "label": "Open a project", "endpoint": "erp.projects", "params": {}},
-        {"key": "import_committed", "label": "Commit an import batch", "endpoint": "erp.imports", "params": {}},
-        {"key": "search_used", "label": "Jump somewhere with ⌘K", "endpoint": None, "params": {}},
-        {"key": "audit_viewed", "label": "Read the audit trail", "endpoint": "erp.audit", "params": {}},
+        {"key": "event_created", "label": "Make an event", "endpoint": "erp.new_project", "params": {}},
+        {"key": "todo_ticked", "label": "Tick off a to-do item", "endpoint": "dashboard.index", "params": {}},
+        {"key": "roll_call", "label": "Take attendance once", "endpoint": "erp.projects", "params": {}},
     ],
-    ONBOARDING_VOLUNTEER: [
-        {"key": "project_opened", "label": "Open your project", "endpoint": "erp.projects", "params": {}},
-        {"key": "hours_logged", "label": "Log the hours you have worked", "endpoint": "erp.projects", "params": {}},
-        {"key": "search_used", "label": "Jump somewhere with ⌘K", "endpoint": None, "params": {}},
+    ONBOARDING_CONTRIBUTOR: [
+        {"key": "todo_ticked", "label": "Tick off a to-do item", "endpoint": "dashboard.index", "params": {}},
+        {"key": "project_opened", "label": "Open an event", "endpoint": "erp.projects", "params": {}},
     ],
 }
 
@@ -213,16 +238,16 @@ ONBOARDING_CLIENT_SIGNALS = {"search_used", "project_opened", "audit_viewed"}
 
 
 def onboarding_audience(user):
-    """Collapse a user's scoped permissions into one of three onboarding
-    audiences. Deciding wins over office work, which wins over doing: an OIA
-    faculty administrator holds every permission and should be introduced to
-    the decision queue first."""
+    """Faculty first, then the people who run events, then the team heads
+    who are handed work; everyone else is a volunteer."""
     from app.services.authorization import has_any_permission
 
-    if has_any_permission(user, "approve") or has_any_permission(user, "approve_operational_requests"):
+    if has_any_permission(user, "approve"):
         return ONBOARDING_COORDINATOR
-    if has_any_permission(user, "manage_imports") or has_any_permission(user, "audit"):
+    if any(has_any_permission(user, permission) for permission in ("manage_projects", "manage_imports", "audit")):
         return ONBOARDING_OFFICE
+    if has_any_permission(user, "contribute_team"):
+        return ONBOARDING_CONTRIBUTOR
     return ONBOARDING_VOLUNTEER
 
 
@@ -243,35 +268,35 @@ def onboarding_tour_steps(audience):
 #: assistive tech read; this is only the badge.
 ROLE_SHORT = {
     "SYSTEM_ADMINISTRATOR": "Admin",
-    "OIA_FACULTY_ADMINISTRATOR": "OIA admin",
+    "OIA_FACULTY_ADMINISTRATOR": "Faculty",
     "FACULTY_COORDINATOR": "Faculty",
-    "ICC_SECRETARY_USC": "ICC USC",
-    "ICC_EVENTS_HEAD": "ICC events",
-    "ICC_CULTURALS_HEAD": "ICC culturals",
-    "ICC_MEDIA_HEAD": "ICC media",
-    "ICC_ASSOCIATE": "ICC assoc.",
+    "ICC_SECRETARY_USC": "USC",
+    "ICC_EVENTS_HEAD": "Events head",
+    "ICC_CULTURALS_HEAD": "Culturals head",
+    "ICC_MEDIA_HEAD": "Media head",
+    "ICC_ASSOCIATE": "Volunteer",
     "IGP_HEAD": "IGP head",
-    "IGP_PROGRAM_LEAD": "IGP lead",
+    "IGP_PROGRAM_LEAD": "Volunteer",
     "VOLUNTEER": "Volunteer",
-    "BUDDY": "Buddy",
-    "PARTICIPANT": "Participant",
+    "BUDDY": "Volunteer",
+    "PARTICIPANT": "Volunteer",
     "AUDITOR": "Read-only",
 }
 
 ROLE_TITLES = {
     "SYSTEM_ADMINISTRATOR": "System administrator",
-    "OIA_FACULTY_ADMINISTRATOR": "OIA faculty administrator",
-    "FACULTY_COORDINATOR": "Faculty coordinator",
+    "OIA_FACULTY_ADMINISTRATOR": "Faculty",
+    "FACULTY_COORDINATOR": "Faculty",
     "ICC_SECRETARY_USC": "ICC Secretary / USC",
     "ICC_EVENTS_HEAD": "ICC Events head",
     "ICC_CULTURALS_HEAD": "ICC Culturals head",
     "ICC_MEDIA_HEAD": "ICC Media head",
-    "ICC_ASSOCIATE": "ICC associate",
+    "ICC_ASSOCIATE": "Volunteer",
     "IGP_HEAD": "IGP head",
-    "IGP_PROGRAM_LEAD": "IGP programme lead",
+    "IGP_PROGRAM_LEAD": "Volunteer",
     "VOLUNTEER": "Volunteer",
-    "BUDDY": "Buddy",
-    "PARTICIPANT": "Participant",
+    "BUDDY": "Volunteer",
+    "PARTICIPANT": "Volunteer",
     "AUDITOR": "Auditor (read-only)",
 }
 
@@ -309,7 +334,7 @@ def role_context(user):
         if year is not None:
             scope_parts.append(year.name)
         if project is not None:
-            scope_parts.append(project.code or project.title)
+            scope_parts.append(project.title or project.code)
         rows.append({
             "title": ROLE_TITLES.get(assignment.role_code, assignment.role_code.replace("_", " ").title()),
             "short": ROLE_SHORT.get(assignment.role_code, assignment.role_code.split("_")[0].title()),

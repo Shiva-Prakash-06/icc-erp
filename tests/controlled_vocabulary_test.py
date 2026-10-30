@@ -6,7 +6,7 @@ os.environ["TESTING"] = "true"
 
 from app import create_app
 from app.database import db
-from app.models.erp import BudgetLine, OperatingUnit, OperationalRequest, ProjectSession, RoleAssignment
+from app.models.erp import BudgetLine, OperatingUnit, ProjectSession, RoleAssignment
 from app.models.project import AcademicYear, Campus, ProgramType, Project
 from app.models.user import User
 from app.services.vocabulary import resolve_vocabulary_value, vocabulary_options
@@ -87,17 +87,6 @@ class VocabularyDrivenFormsTestCase(unittest.TestCase):
         db.drop_all()
         self.context.pop()
 
-    def test_project_creation_accepts_other_category_with_detail(self):
-        response = self.client.post("/erp/projects", data={
-            "title": "Other Category Project", "campus_public_id": self.campus.public_id,
-            "program_type_public_id": self.icc.public_id, "academic_year_public_id": self.year.public_id,
-            "start_date": "2026-08-01", "end_date": "2026-08-02",
-            "category": "Other", "category_other": "Bespoke Category",
-        })
-        self.assertEqual(response.status_code, 302)
-        project = Project.query.filter_by(title="Other Category Project").one()
-        self.assertEqual(project.category, "Bespoke Category")
-
     def test_session_type_other_requires_detail(self):
         response = self.client.post(
             f"/erp/projects/{self.project.public_id}/sessions",
@@ -115,24 +104,6 @@ class VocabularyDrivenFormsTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         session = ProjectSession.query.filter_by(project_id=self.project.id).one()
         self.assertEqual(session.session_type, "Retreat")
-
-    def test_operational_request_type_is_constrained(self):
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/operational-requests",
-            data={"request_type": "Vehicle", "title": "Airport pickup"},
-        )
-        self.assertEqual(response.status_code, 302)
-        request_item = OperationalRequest.query.filter_by(project_id=self.project.id).one()
-        self.assertEqual(request_item.request_type, "Vehicle")
-
-    def test_budget_category_other_requires_detail(self):
-        response = self.client.post(
-            f"/erp/projects/{self.project.public_id}/budgets",
-            data={"category": "Other", "category_other": "", "estimated_amount": "10"},
-            follow_redirects=True,
-        )
-        self.assertIn(b"Provide details for", response.data)
-        self.assertEqual(BudgetLine.query.filter_by(project_id=self.project.id).count(), 0)
 
     def test_generic_api_rejects_value_outside_active_vocabulary(self):
         response = self.client.post("/api/v1/budgets", json={

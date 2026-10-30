@@ -129,7 +129,7 @@ class ImportCommitHandoffTestCase(unittest.TestCase):
         response = self.client.get("/erp/imports")
         self.assertEqual(response.status_code, 200)
         body = response.data.decode()
-        self.assertIn("Awaiting faculty commit", body)
+        self.assertIn("Waiting for Faculty to save it", body)
         self.assertNotIn(f"/imports/{self.batch.public_id}/commit", body)
 
     def test_faculty_is_shown_the_commit_action(self):
@@ -138,7 +138,10 @@ class ImportCommitHandoffTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.data.decode()
         self.assertIn(f"/imports/{self.batch.public_id}/commit", body)
-        self.assertNotIn("Awaiting faculty commit", body)
+        self.assertNotIn("Waiting for Faculty to save it", body)
+        # Sheet kinds read as plain names, not mangled identifiers.
+        self.assertIn("ICC volunteer list", body)
+        self.assertNotIn("Icc roster", body)
 
     def test_the_route_itself_still_refuses_usc(self):
         """The UI change must not be mistaken for a permission change: the

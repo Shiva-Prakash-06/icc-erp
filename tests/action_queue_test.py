@@ -1,6 +1,6 @@
 import os
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 
 os.environ["TESTING"] = "true"
 
@@ -61,19 +61,15 @@ class ActionQueueTestCase(unittest.TestCase):
         db.drop_all()
         self.context.pop()
 
-    def test_approved_request_keeps_completion_action_reachable(self):
+    def test_an_old_request_link_lands_on_the_money_card(self):
+        """Requests were folded into the money list. A link written before
+        that (``?tab=finance&focus=<request>``) still opens Money."""
         item = OperationalRequest.query.filter_by(title="Pending request").one()
-        item.status = "Approved"
-        db.session.commit()
         client = self.app.test_client()
         client.post("/login", data={"username": "approver", "password": "A-secure-test-password-2026"})
-        # The queue links with `focus=<public_id>`, which resolves to the
-        # section and the page that actually contain the record -- landing on
-        # page 1 of a list the row is not in is the same as not arriving.
         response = client.get(f"/erp/projects/{self.project.public_id}?tab=finance&focus={item.public_id}")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Mark completed", response.data)
-        self.assertNotIn(b"Show 1 settled request", response.data)
+        self.assertRegex(response.get_data(as_text=True), r'id="card-money"\s+open')
 
     def _seed_one_pending_item_of_every_kind(self):
         db.session.add(WorkTask(project_id=self.project.id, title="Pending task", status="Submitted", version=1))
@@ -103,6 +99,9 @@ class ActionQueueTestCase(unittest.TestCase):
         from app.models.erp import OperationalRequest
         db.session.add(OperationalRequest(project_id=self.project.id, request_type="Equipment", title="Pending request", status="Submitted", created_by_id=self.approver.id, version=1))
 
+        from app.models.erp import ReimbursementEntry
+        db.session.add(ReimbursementEntry(project_id=self.project.id, date=date(2026, 8, 1), party_name="Caterer", amount=500, particular="Tea and snacks", status="Asked", created_by_id=self.op_request_approver.id))
+
         from app.models.erp import BudgetLine
         db.session.add(BudgetLine(project_id=self.project.id, category="Travel", description="Pending line", estimated_amount=100, status="Submitted", version=1))
 
@@ -128,6 +127,15 @@ class ActionQueueTestCase(unittest.TestCase):
         from app.models.erp import ReportSnapshot
         db.session.add(ReportSnapshot(project_id=self.project.id, report_type="Event Report", title="Pending report", approval_status="Draft"))
 
+        # An event sent to Faculty to sign off.
+        finished = Project(
+            code="ICC-2026-CEN-501", campus_id=self.campus.id, program_type_id=self.icc.id,
+            academic_year_id=self.year.id, title="Finished event", category="Operational",
+            status="Active", start_date=date(2026, 7, 1), end_date=date(2026, 7, 1),
+            finish_requested_at=datetime.now(timezone.utc), finish_requested_by_id=self.op_request_approver.id,
+        )
+        db.session.add(finished)
+
         # Audit B12: a pending publication is a decision like any other and
         # belongs in the queue. Requested by someone other than the approver,
         # since a reviewer may not decide their own request.
@@ -151,8 +159,8 @@ class ActionQueueTestCase(unittest.TestCase):
         self.assertIn("Queue test project", item["title"])
         self.assertIn("opreqapprover", item["title"])  # names the requester
         self.assertEqual(item["project"].public_id, self.project.public_id)
-        # Public disclosure is decided beside the report it publishes.
-        self.assertEqual((item["tab"], item["anchor"]), ("documents", "publication"))
+        # Decided on the event's Finish card, beside the sign-off.
+        self.assertEqual((item["tab"], item["anchor"]), ("finish", "publication"))
 
     def test_a_reviewer_is_not_offered_their_own_publication_request(self):
         """`decide_project_publication` refuses self-review, so queueing it
@@ -174,58 +182,34 @@ class ActionQueueTestCase(unittest.TestCase):
         queue = build_action_queue(self.no_permission_user)
         self.assertEqual([item for item in queue if item["kind"] == "Project publication"], [])
 
-    def test_operational_request_scoped_separately_from_approve(self):
-        # A user can hold "approve" on a project without holding
-        # "approve_operational_requests" on it -- IGP_PROGRAM_LEAD is one
-        # such role. The Operational request kind must then be absent even
-        # though the other nine kinds (scoped only by "approve") are
-        # present, proving the two-tier scoping in build_action_queue.
-        igp_type = ProgramType(name="IGP")
-        db.session.add(igp_type)
-        db.session.flush()
-        igp_project = Project(
-            code="IGP-2026-CEN-500", campus_id=self.campus.id, program_type_id=igp_type.id,
-            academic_year_id=self.year.id, title="IGP queue project", category="Operational",
-            status="Active", start_date=date(2026, 8, 1), end_date=date(2026, 8, 2),
-        )
-        db.session.add(igp_project)
-        db.session.flush()
-        db.session.add(WorkTask(project_id=igp_project.id, title="IGP pending task", status="Submitted", version=1))
-        db.session.add(OperationalRequest(project_id=igp_project.id, request_type="Equipment", title="IGP pending request", status="Submitted", created_by_id=self.op_request_approver.id, version=1))
-        db.session.commit()
-        db.session.add(RoleAssignment(user_id=self.op_request_approver.id, role_code="IGP_PROGRAM_LEAD", project_id=igp_project.id, is_active=True))
-        db.session.commit()
+    def test_a_head_has_no_decisions_to_make(self):
+        # Only Faculty approves. An Events head runs events -- including
+        # this one -- but every decision on it waits for Faculty.
+        self.assertEqual(build_action_queue(self.op_request_approver), [])
 
-        queue = build_action_queue(self.op_request_approver)
-        request_titles = {item["title"] for item in queue if item["kind"] == "Operational request"}
-        task_titles = {item["title"] for item in queue if item["kind"] == "Task"}
-        self.assertIn("IGP pending task", task_titles)  # approve alone is enough for Task
-        self.assertIn("Pending request", request_titles)  # approve_operational_requests on self.project
-        self.assertNotIn("IGP pending request", request_titles)  # but not on igp_project
+    def test_faculty_is_not_offered_money_they_asked_for(self):
+        from app.models.erp import ReimbursementEntry
+        db.session.add(ReimbursementEntry(project_id=self.project.id, date=date(2026, 8, 2), party_name="", amount=90, particular="Faculty's own ask", status="Asked", created_by_id=self.approver.id))
+        db.session.commit()
+        titles = {item["title"] for item in build_action_queue(self.approver) if item["kind"] == "Money"}
+        self.assertTrue(any(title.startswith("Tea and snacks") for title in titles))
+        self.assertFalse(any(title.startswith("Faculty's own ask") for title in titles))
 
     def test_no_permission_user_sees_empty_queue(self):
         self.assertEqual(build_action_queue(self.no_permission_user), [])
 
-    def test_queue_items_use_new_tab_values(self):
-        """Every row lands on one of the Tile System's five tabs.
-
-        Re-pointed on 2026-09-17 with the seven-tab workspace: delivery ->
-        logistics, contributions -> people, resources -> documents, and
-        insights split (feedback is People's, a report is Documents').
-        """
+    def test_queue_items_open_the_card_that_holds_them(self):
         queue = build_action_queue(self.approver)
-        by_kind = {item["kind"]: item["tab"] for item in queue}
-        self.assertEqual(by_kind["Task"], "logistics")
-        self.assertEqual(by_kind["Checklist"], "logistics")
-        self.assertEqual(by_kind["Contribution"], "people")
-        self.assertEqual(by_kind["Buddy log"], "people")
-        self.assertEqual(by_kind["Operational request"], "finance")
-        self.assertEqual(by_kind["Budget line"], "finance")
-        self.assertEqual(by_kind["Document"], "documents")
-        self.assertEqual(by_kind["Feedback moderation"], "people")
-        self.assertEqual(by_kind["Report approval"], "documents")
-        self.assertEqual(by_kind["Recruitment"], "people")
-        self.assertTrue(set(by_kind.values()) <= {"logistics", "finance", "documents", "people", "analytics"})
+        by_kind = {item["kind"]: (item["tab"], item["anchor"]) for item in queue}
+        self.assertEqual(by_kind["Money"][0], "money")
+        self.assertEqual(by_kind["Finish event"], ("finish", "finish"))
+        self.assertEqual(by_kind["Project publication"], ("finish", "publication"))
+
+    def test_a_finish_request_is_not_offered_to_whoever_sent_it(self):
+        finished = Project.query.filter_by(title="Finished event").one()
+        finished.finish_requested_by_id = self.approver.id
+        db.session.commit()
+        self.assertFalse([item for item in build_action_queue(self.approver) if item["kind"] == "Finish event"])
 
 
 if __name__ == "__main__":

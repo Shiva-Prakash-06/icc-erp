@@ -1,11 +1,16 @@
-# Authentication Override
+# Sign-in and sign-up
 
 Inherits `MASTER.md`.
 
-- One centred 380px column on the flat ground. No marketing panel, no split screen: six things to read before you can type a username was the worst thing on the old sign-in page.
-- Mark and wordmark, then the heading, then the fields. Registration and recovery are two small links under the primary action.
-- Maximum form width 380px (620px for registration); reading line length 55 characters.
-- Password fields include show/hide controls with accessible labels.
-- The primary action is full width and carries the blueprint corner marks. Its accessible name is `Access Platform`.
-- Server error summary appears before the first field and focuses after submission.
-- Autofill, password managers, 400% zoom, and mobile keyboards must not cover the primary action.
+- One centred column: the mark, the heading, the fields. Nothing else to read
+  before you can type.
+- Sign in asks for a username or email and a password. The button says
+  **Sign in**. "Forgot password" and "New here? Sign up" are two small links
+  under it.
+- Sign up asks for first name, last name, university email and password —
+  and the campus only when there is more than one. A
+  `SIGNUP_EMAIL_DOMAINS` address goes straight in as a volunteer; there is
+  no waiting step.
+- Password fields have a Show button with an accessible name.
+- Errors say what to do next in one sentence ("That username or password is
+  not right. Try again.").

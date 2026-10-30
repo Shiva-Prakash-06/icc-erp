@@ -28,7 +28,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Transient positive feedback may dismiss; warnings and errors persist.
     document.querySelectorAll('.alert-success.alert-dismissible, .alert-info.alert-dismissible').forEach(function(alert) {
-        setTimeout(function() { if (alert.isConnected) alert.remove(); }, 5000);
+        // An Undo toast gets twice as long: it is the only one with a button.
+        setTimeout(function() { if (alert.isConnected) alert.remove(); }, alert.hasAttribute('data-undo') ? 10000 : 5000);
+    });
+
+    // "Add file": picking the file is the last step, so it sends itself.
+    document.querySelectorAll('form[data-autosubmit] input[type="file"]').forEach(function(input) {
+        input.addEventListener('change', function() {
+            if (input.files && input.files.length) input.form.requestSubmit ? input.form.requestSubmit() : input.form.submit();
+        });
     });
 
     // Accessible mobile navigation drawer.
@@ -177,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-audit-filter]').forEach(function(input) {
         const table = document.getElementById('auditTable');
         if (!table) return;
-        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        const rows = Array.from(table.querySelectorAll('tbody tr, [data-audit-row]'));
         input.addEventListener('input', function() {
             const query = input.value.trim().toLowerCase();
             rows.forEach(function(row) {

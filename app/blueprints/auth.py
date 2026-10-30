@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, re
 from app.database import db
 from app.database import limiter
 from app.models.user import User
-from app.models.erp import Person
+from app.models.erp import Person, RoleAssignment
 from app.models.project import Campus
 from app.services.audit import record_audit
 from app.services.identity import InternalPasswordIdentityProvider
@@ -21,7 +21,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if g.user is None:
-            flash("You must be logged in to access this page.", "warning")
+            flash("Sign in first.", "warning")
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -42,13 +42,13 @@ def login():
 
         now = datetime.now(timezone.utc)
         if user and user.locked_until and user.locked_until.replace(tzinfo=timezone.utc) > now:
-            flash("This account is temporarily locked. Try again later or contact an administrator.", "danger")
+            flash("Too many tries. Wait a few minutes, then try again, or ask Faculty for help.", "danger")
             return render_template('auth/login.html'), 429
 
         identity = InternalPasswordIdentityProvider().authenticate(username_or_email, password)
         if user and identity and not user.is_archived:
             if user.status == 'Rejected':
-                flash("Your access registration has been rejected by administration.", "danger")
+                flash("Faculty did not let this account in. Ask them if you think that is wrong.", "danger")
                 return redirect(url_for('auth.login'))
 
             session.clear()
@@ -74,80 +74,118 @@ def login():
                 if user.failed_login_count >= 5:
                     user.locked_until = now + timedelta(minutes=15)
                 db.session.commit()
-            flash("Invalid username/email or password.", "danger")
+            flash("That username or password is not right. Try again.", "danger")
 
     return render_template('auth/login.html')
+
+def _signup_email_allowed(email):
+    domains = current_app.config.get("SIGNUP_EMAIL_DOMAINS") or []
+    if not domains:
+        return True
+    host = email.rpartition("@")[2]
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def _username_from_email(email):
+    """Usernames are not asked for any more: the part before the @ is used,
+    with a number added if someone already has it."""
+    base = "".join(ch for ch in email.partition("@")[0] if ch.isalnum() or ch in "._-")[:70] or "user"
+    candidate, suffix = base, 1
+    while User.query.filter(db.func.lower(User.username) == candidate.lower()).first():
+        suffix += 1
+        candidate = f"{base}{suffix}"
+    return candidate
+
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 @limiter.limit("5 per hour", methods=["POST"])
 def register():
+    """Sign up: name, university email, password -- and you are in.
+
+    Every new account is a volunteer straight away, with nothing to approve:
+    a volunteer only sees the events they are listed on, so there is nothing
+    to protect by making them wait. Faculty gives anyone a bigger role from
+    the People page.
+    """
     if g.user:
         return redirect(url_for('dashboard.index'))
 
-    campuses = Campus.query.all()
+    campuses = Campus.query.order_by(Campus.id).all()
 
     if request.method == 'POST':
-        username = (request.form.get('username') or "").strip()
+        first_name = (request.form.get('first_name') or "").strip()
+        last_name = (request.form.get('last_name') or "").strip()
         email = (request.form.get('email') or "").strip().lower()
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        preferred_role = request.form.get('preferred_role')
+        password = request.form.get('password') or ""
         campus_id = request.form.get('campus_id')
+        campus = db.session.get(Campus, int(campus_id)) if (campus_id or "").isdigit() else None
+        if campus is None and len(campuses) == 1:
+            campus = campuses[0]
 
-        # Simple validations
-        if not username or not email or not password or not preferred_role:
-            flash("All fields are required.", "danger")
-            return render_template('auth/register.html', campuses=campuses)
+        errors = {}
+        if not first_name:
+            errors["first_name"] = "Type your first name."
+        if not email or "@" not in email:
+            errors["email"] = "Type your university email."
+        elif not _signup_email_allowed(email):
+            errors["email"] = "Use your university email address."
+        if campus is None:
+            errors["campus_id"] = "Pick your campus."
+        if not errors:
+            try:
+                validate_password(password)
+            except (ValueError, requests.RequestException) as error:
+                errors["password"] = str(error)
+        if not errors and User.query.filter(db.func.lower(User.email) == email).first():
+            errors["email"] = "This email already has an account. Sign in instead."
+        if errors:
+            return render_template('auth/register.html', campuses=campuses, field_errors=errors, form=request.form), 422
 
-        if password != confirm_password:
-            flash("Passwords do not match.", "danger")
-            return render_template('auth/register.html', campuses=campuses)
-
-        try:
-            validate_password(password)
-        except (ValueError, requests.RequestException) as error:
-            flash(str(error), "danger")
-            return render_template('auth/register.html', campuses=campuses)
-
-        existing_user = User.query.filter((db.func.lower(User.username) == username.lower()) | (db.func.lower(User.email) == email)).first()
-        if existing_user:
-            flash("Username or Email already registered.", "danger")
-            return render_template('auth/register.html', campuses=campuses)
-
-        # Create user in Pending status
+        now = datetime.now(timezone.utc)
         new_user = User(
-            username=username,
+            username=_username_from_email(email),
             email=email,
-            preferred_role=preferred_role,
-            role='Pending',  # Force Role as Pending initially
-            status='Pending',
-            campus_id=int(campus_id) if campus_id else None
+            preferred_role="Volunteer",
+            role="Volunteer",
+            status="Approved",
+            approved_at=now,
+            campus_id=campus.id,
+            # Signing up is the first visit: show the welcome, not skip it.
+            onboarding_seen=False,
         )
         new_user.set_password(password)
+        new_user.password_changed_at = now
         db.session.add(new_user)
+        db.session.flush()
+
+        # Someone already listed on an event (by a head pasting a volunteer
+        # list) is the same person: their account picks up those events.
+        person = Person.query.filter(db.func.lower(Person.primary_email) == email).first()
+        if person is None:
+            person = Person(first_name=first_name, last_name=last_name or None, primary_email=email,
+                            campus_id=campus.id, person_type="Platform User")
+            db.session.add(person)
+            db.session.flush()
+        elif person.user_account is not None:
+            db.session.rollback()
+            errors = {"email": "This email already has an account. Sign in instead."}
+            return render_template('auth/register.html', campuses=campuses, field_errors=errors, form=request.form), 422
+        new_user.person_id = person.id
+        db.session.add(RoleAssignment(
+            user_id=new_user.id, role_code="VOLUNTEER", campus_id=campus.id,
+            assignment_reason="Signed up", is_active=True,
+        ))
+        record_audit("account.signup", new_user, after={"role": "Volunteer", "campus": campus.public_id}, actor=new_user)
         db.session.commit()
 
-        # Volunteers/buddies capture skills/interests on their Person record
-        # (rather than a separate profile table) so the same data is visible
-        # to the production scoped-role system once they're approved.
-        if preferred_role in ('Volunteer', 'Buddy'):
-            skills = request.form.get('skills', '')
-            interests = request.form.get('interests', '')
-            person = Person.query.filter(db.func.lower(Person.primary_email) == email).first()
-            if not person:
-                person = Person(first_name=username, primary_email=email, campus_id=new_user.campus_id, person_type="Platform User")
-                db.session.add(person)
-                db.session.flush()
-            person.skills = skills
-            person.interests = interests
-            new_user.person_id = person.id
-            db.session.commit()
-
+        session.clear()
         session['user_id'] = new_user.id
         session['session_version'] = new_user.session_version
-        return redirect(url_for('auth.pending_approval'))
+        session.permanent = True
+        flash(f"Welcome, {first_name}!", "success")
+        return redirect(url_for('dashboard.index'))
 
-    return render_template('auth/register.html', campuses=campuses)
+    return render_template('auth/register.html', campuses=campuses, field_errors={}, form={})
 
 @auth_bp.route('/pending-approval')
 def pending_approval():
@@ -255,7 +293,7 @@ def forgot_password_sent():
 def recover_password(token):
     user = find_user_for_reset(token)
     if not user:
-        flash("This password reset link is invalid or expired.", "danger")
+        flash("That link has run out. Ask for a new one.", "danger")
         return redirect(url_for("auth.forgot_password"))
     if request.method == "POST":
         password = request.form.get("new_password")
@@ -277,7 +315,7 @@ def recover_password(token):
         user.session_version += 1
         record_audit("account.password_recovered", user, actor=user)
         db.session.commit()
-        flash("Password reset complete. Sign in with the new password.", "success")
+        flash("Your new password is saved. Sign in with it.", "success")
         return redirect(url_for("auth.login"))
     return render_template("auth/recover_password.html")
 

@@ -26,7 +26,7 @@
   {% if guidance %}<p class="ds-error__hint">{{ guidance }}</p>{% endif %}
   <div class="ds-error__actions">
     <a class="ds-btn ds-btn--primary" href="{{ safe_url }}">{{ safe_label }}</a>
-    {% if g.user %}<a class="ds-btn" href="{{ url_for('dashboard.queue') }}">What is waiting on me</a>{% endif %}
+    {% if g.user %}<a class="ds-btn" href="{{ url_for('dashboard.index') }}">Go to My work</a>{% endif %}
   </div>
   {% if request_id %}
   <details class="ds-error__details">

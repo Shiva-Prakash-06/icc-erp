@@ -42,17 +42,10 @@ class ReportRoutesTestCase(unittest.TestCase):
         db.drop_all()
         self.context.pop()
 
-    def test_preflight_route_returns_json(self):
-        response = self.client.get(f"/erp/projects/{self.project.public_id}/report/preflight")
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIn("complete", data)
-        self.assertIn("dependencies", data)
-
     def test_preview_page_renders(self):
         response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Complete report", response.data)
+        self.assertIn(b"The report", response.data)
 
     def test_preview_copy_matches_the_real_dependency_mode(self):
         """Audit P0-04: the page claimed the PDF was "assembled from the
@@ -64,8 +57,8 @@ class ReportRoutesTestCase(unittest.TestCase):
         """
         response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete")
         body = response.data.decode()
-        self.assertIn("No report or appendix documents have been indexed", body)
-        self.assertNotIn("authoritative Event Report document, with every appendix", body)
+        self.assertIn("There are no files yet", body)
+        self.assertNotIn("starts with the event report file", body)
 
     def test_download_without_dependencies_returns_generated_summary_pdf(self):
         response = self.client.get(f"/erp/projects/{self.project.public_id}/report/complete.pdf")
@@ -104,7 +97,7 @@ class ReportRoutesTestCase(unittest.TestCase):
         db.session.commit()
         client = self.app.test_client()
         client.post("/login", data={"username": "stranger", "password": "A-secure-test-password-2026"}, follow_redirects=True)
-        response = client.get(f"/erp/projects/{self.project.public_id}/report/preflight")
+        response = client.get(f"/erp/projects/{self.project.public_id}/report/complete")
         self.assertEqual(response.status_code, 403)
 
 
