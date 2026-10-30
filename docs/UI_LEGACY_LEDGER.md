@@ -482,3 +482,15 @@ in the plan from My work.
   the `cv-*` building blocks); `USER_ACCEPTANCE_GUIDE.md` has one journey per
   role, including the new `uat_media_head` and `uat_culturals_head`
   accounts that `flask provision-uat` now makes.
+
+## Your details on Account (30 October 2026)
+
+- **Added:** `POST /profile/details` (`dashboard.update_my_details`). The
+  Account page has a folded "Your details" card where anyone can change
+  their own first and last name, phone and register number — the last open
+  item of section 10 of the plan. An account with no Person record gets
+  one, or picks up an unclaimed Person with the same email. A register
+  number already used by someone else is refused in plain words. The change
+  is recorded as `person.update_own` ("changed their own details").
+- **Baseline:** regenerated, 147 rules; the new form's field names are
+  frozen in `tests/ui_contract/baseline.json`.

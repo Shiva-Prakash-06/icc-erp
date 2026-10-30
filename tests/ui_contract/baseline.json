@@ -3,8 +3,8 @@
   "captured_at": "2026-07-17",
   "contract": "presentation-only Aurora migration",
   "url_map": {
-    "route_count": 146,
-    "sha256": "9a46592a848e0d6744dd8d35a13359d652b0e4dda59fd09d5b7e04d53bc152d2",
+    "route_count": 147,
+    "sha256": "545736f1c280b8f90178ef9428b823ac291e86c0a27668f1e6ca4cdc15943ed2",
     "canonicalization": "JSON array sorted by endpoint, rule and methods; each row is [endpoint, rule, sorted(methods excluding HEAD and OPTIONS)]",
     "includes_parameter_converters": true
   },
@@ -184,6 +184,15 @@
       "method": "POST",
       "names": [
         "role"
+      ]
+    },
+    "/profile/details": {
+      "method": "POST",
+      "names": [
+        "first_name",
+        "last_name",
+        "phone",
+        "registration_number"
       ]
     }
   },

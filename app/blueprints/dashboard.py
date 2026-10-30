@@ -183,3 +183,43 @@ def profile():
     password-security actions -- replaces the volunteer-oriented, commonly-
     empty "My Profile" page. See PLAN.md "USC My Profile" finding."""
     return render_template('dashboard/profile.html', person=g.user.person, **build_account_activity(g.user))
+
+
+@dashboard_bp.route('/profile/details', methods=['POST'])
+@login_required
+def update_my_details():
+    """Anyone can fix their own name, phone and register number. An account
+    made before sign-up created a Person gets one here, matched by email."""
+    first_name = (request.form.get('first_name') or "").strip()
+    last_name = (request.form.get('last_name') or "").strip() or None
+    phone = (request.form.get('phone') or "").strip() or None
+    registration_number = (request.form.get('registration_number') or "").strip() or None
+    if not first_name:
+        flash("Type your first name.", "danger")
+        return redirect(url_for('dashboard.profile') + '#details')
+    if len(first_name) > 100 or (last_name and len(last_name) > 100) or (phone and len(phone) > 40) or (registration_number and len(registration_number) > 80):
+        flash("That is too long. Make it shorter.", "danger")
+        return redirect(url_for('dashboard.profile') + '#details')
+
+    person = g.user.person
+    if person is None and g.user.email:
+        person = Person.query.filter(db.func.lower(Person.primary_email) == g.user.email.lower()).first()
+        if person is not None and person.user_account is not None:
+            person = None
+    if registration_number:
+        taken = Person.query.filter(Person.registration_number == registration_number).first()
+        if taken is not None and taken is not person:
+            flash("That register number is already someone else's. Check it, or ask Faculty.", "danger")
+            return redirect(url_for('dashboard.profile') + '#details')
+    if person is None:
+        person = Person(first_name=first_name, primary_email=g.user.email, campus_id=g.user.campus_id, person_type="Platform User")
+        db.session.add(person)
+    g.user.person = person
+
+    before = {"first_name": person.first_name, "last_name": person.last_name, "phone": person.phone, "registration_number": person.registration_number}
+    person.first_name, person.last_name, person.phone, person.registration_number = first_name, last_name, phone, registration_number
+    db.session.flush()
+    record_audit("person.update_own", person, before=before, after={"first_name": first_name, "last_name": last_name, "phone": phone, "registration_number": registration_number}, actor=g.user)
+    db.session.commit()
+    flash("Saved ✓ Your details are up to date.", "success")
+    return redirect(url_for('dashboard.profile') + '#details')

@@ -21,6 +21,22 @@
     <p class="cv-note">Need to be something else? Ask Faculty.</p>
   </section>
 
+  <details class="cv-card" id="details">
+    <summary><span class="cv-card__title">Your details</span><span class="cv-card__sum">{% if person and person.phone %}{{ person.phone }}{% else %}No phone yet{% endif %}{% if person and person.registration_number %} · {{ person.registration_number }}{% endif %}</span></summary>
+    <form method="POST" action="{{ url_for('dashboard.update_my_details') }}" class="cv-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cv-row">
+        <div class="cv-field"><label for="me-first">First name</label><input type="text" id="me-first" name="first_name" required maxlength="100" autocomplete="given-name" value="{{ person.first_name if person else '' }}"></div>
+        <div class="cv-field"><label for="me-last">Last name</label><input type="text" id="me-last" name="last_name" maxlength="100" autocomplete="family-name" value="{{ person.last_name or '' if person else '' }}"></div>
+      </div>
+      <div class="cv-row">
+        <div class="cv-field"><label for="me-phone">Phone</label><input type="tel" id="me-phone" name="phone" maxlength="40" autocomplete="tel" value="{{ person.phone or '' if person else '' }}"></div>
+        <div class="cv-field"><label for="me-reg">Register number</label><input type="text" id="me-reg" name="registration_number" maxlength="80" value="{{ person.registration_number or '' if person else '' }}"></div>
+      </div>
+      <p><button type="submit" class="cv-btn cv-btn--primary">Save</button></p>
+    </form>
+  </details>
+
   {% if assigned_projects %}
   <section class="cv-section" aria-labelledby="events-title">
     <div class="cv-section__head"><h2 class="cv-section__title" id="events-title">Your events</h2><span class="cv-count">{{ assigned_projects|length }}</span></div>

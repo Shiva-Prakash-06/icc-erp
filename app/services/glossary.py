@@ -118,6 +118,7 @@ AUDIT_ACTIONS = {
     "session.restore": "put a time back",
     "attendance.mark": "took attendance",
     "person.create": "added a person",
+    "person.update_own": "changed their own details",
     "team.enroll": "added someone to the event",
     "team.remove": "took someone off the event",
     "team.restore": "put someone back on the event",

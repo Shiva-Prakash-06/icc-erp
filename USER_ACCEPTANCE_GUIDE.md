@@ -145,6 +145,9 @@ yourself.
 2. Open an event. You see when and where, your job and your buddy — nothing
    about anyone else, and nothing to fill in.
 3. The rail has only My activities and Account (and the Menu).
+4. Open **Account**, open **Your details**, add a phone number and your
+   register number, and press **Save**. It says "Saved ✓" and the numbers
+   show on the folded card.
 
 ## Sign up as someone new
 

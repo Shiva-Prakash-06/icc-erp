@@ -71,6 +71,49 @@ class AccountActivityTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Nothing here yet", response.get_data(as_text=True))
 
+    def test_anyone_can_fix_their_own_details(self):
+        self.login(self.empty_user)
+        self.assertIn('name="registration_number"', self.client.get("/profile").get_data(as_text=True))
+        response = self.client.post("/profile/details", data={
+            "first_name": " Lonely ", "last_name": "Learner", "phone": "+91 98450 12345", "registration_number": "2441234",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/profile#details"))
+        person = db.session.get(User, self.empty_user.id).person
+        self.assertEqual((person.first_name, person.last_name, person.phone, person.registration_number),
+                         ("Lonely", "Learner", "+91 98450 12345", "2441234"))
+        self.assertEqual(person.primary_email, "lonely@example.com")
+
+        # Clearing an optional box clears it; the same Person is kept.
+        self.client.post("/profile/details", data={"first_name": "Lonely", "last_name": "", "phone": "", "registration_number": "2441234"})
+        db.session.expire_all()
+        again = db.session.get(User, self.empty_user.id).person
+        self.assertEqual(again.id, person.id)
+        self.assertIsNone(again.phone)
+        self.assertIsNone(again.last_name)
+
+    def test_details_need_a_first_name_and_a_free_register_number(self):
+        from app.models.erp import Person
+
+        db.session.add(Person(first_name="Someone", registration_number="TAKEN-1"))
+        db.session.commit()
+        self.login(self.usc)
+        page = self.client.post("/profile/details", data={"first_name": "USC", "registration_number": "TAKEN-1"}, follow_redirects=True)
+        self.assertIn("already someone else", page.get_data(as_text=True))
+        page = self.client.post("/profile/details", data={"first_name": "  "}, follow_redirects=True)
+        self.assertIn("Type your first name", page.get_data(as_text=True))
+        self.assertIsNone(db.session.get(User, self.usc.id).person)
+
+    def test_details_attach_an_existing_unclaimed_person_by_email(self):
+        from app.models.erp import Person
+
+        listed = Person(first_name="Listed", primary_email="LONELY@example.com")
+        db.session.add(listed)
+        db.session.commit()
+        self.login(self.empty_user)
+        self.client.post("/profile/details", data={"first_name": "Lonely"})
+        self.assertEqual(db.session.get(User, self.empty_user.id).person_id, listed.id)
+
 
 if __name__ == "__main__":
     unittest.main()
