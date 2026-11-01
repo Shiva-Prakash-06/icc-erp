@@ -1,8 +1,9 @@
 """Single source of truth for the rail, the command palette, and the
 narrow-viewport bottom bar.
 
-Four places and a Menu, and no more: My work, Events, + New event, and
-Reports (Faculty and the USC) or Account (everyone else). Everything that
+Four places and a Menu on a phone, and no more: Campuses, My work, Events,
+and Reports (Faculty and the USC) or Account (everyone else). + New event
+is in the rail on a laptop and in the Menu on a phone. Everything that
 is not one of those four -- alerts, people, imports, the audit trail, your
 account -- sits in the Menu on a phone and lower down the rail on a laptop.
 Entries are dropped for anyone who cannot use them, so a volunteer's bar is
@@ -23,6 +24,11 @@ from app.services.authorization import has_any_permission
 REPORT_TEAMS = {"faculty", "usc"}
 
 NAV_REGISTRY = [
+    # The landing page for everyone who works on events: campuses, then a
+    # campus's programs, then one program's actions and their owners.
+    {"key": "overview", "label": "Campuses", "mobile_label": "Campuses", "bottom_nav": True, "rail": True, "icon": "ph-buildings", "group": "Go to",
+     "endpoint": "dashboard.overview", "hide_for_view_only": True,
+     "active_endpoints": {"dashboard.overview", "dashboard.overview_campus", "dashboard.overview_program"}},
     {"key": "home", "label": "My work", "mobile_label": "My work", "bottom_nav": True, "rail": True, "icon": "ph-check-square", "group": "Go to", "endpoint": "dashboard.index",
      "active_endpoints": {"dashboard.index", "dashboard.queue"}},
     {
@@ -30,7 +36,7 @@ NAV_REGISTRY = [
         "endpoint": "erp.projects", "active_blueprint": "erp", "hide_for_view_only": True,
         "active_exclude_endpoints": {"erp.notifications", "erp.audit", "erp.imports", "erp.new_project"},
     },
-    {"key": "new", "label": "New event", "mobile_label": "New", "bottom_nav": True, "rail": True, "icon": "ph-plus-circle", "group": "Go to", "endpoint": "erp.new_project",
+    {"key": "new", "label": "New event", "mobile_label": "New", "bottom_nav": False, "rail": True, "icon": "ph-plus-circle", "group": "Go to", "endpoint": "erp.new_project",
      "permission": "manage_projects"},
     {"key": "reports", "label": "Reports", "mobile_label": "Reports", "bottom_nav": True, "rail": True, "icon": "ph-chart-bar", "group": "Go to", "endpoint": "dashboard.reports",
      "teams": REPORT_TEAMS},

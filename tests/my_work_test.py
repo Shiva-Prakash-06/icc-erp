@@ -202,10 +202,10 @@ class MyWorkTestCase(unittest.TestCase):
 
     def test_the_phone_bar_is_four_places_at_most(self):
         with self.app.test_request_context("/"):
-            self.assertEqual(self._bar(self.faculty), ["home", "projects", "new", "reports"])
-            self.assertEqual(self._bar(self.usc), ["home", "projects", "new", "reports"])
-            self.assertEqual(self._bar(self.events_head), ["home", "projects", "new", "profile"])
-            self.assertEqual(self._bar(self.media_head), ["home", "projects", "profile"])
+            self.assertEqual(self._bar(self.faculty), ["overview", "home", "projects", "reports"])
+            self.assertEqual(self._bar(self.usc), ["overview", "home", "projects", "reports"])
+            self.assertEqual(self._bar(self.events_head), ["overview", "home", "projects", "profile"])
+            self.assertEqual(self._bar(self.media_head), ["overview", "home", "projects", "profile"])
             self.assertEqual(self._bar(self.volunteer), ["home", "profile"])
             for user in (self.faculty, self.events_head, self.volunteer):
                 self.assertLessEqual(len(self._bar(user)), MAX_BOTTOM_NAV_ITEMS)
@@ -270,6 +270,78 @@ class MyWorkTestCase(unittest.TestCase):
         steps = re.search(r'"steps": (\[.*?\])\}</script>', html).group(1)
         self.assertIn('"target": "file"', steps)
 
+
+    # --- the campus overview ----------------------------------------------
+
+    def test_working_roles_land_on_the_campus_overview(self):
+        for user, landing in ((self.faculty, "/overview"), (self.usc, "/overview"), (self.events_head, "/overview"),
+                              (self.media_head, "/overview"), (self.volunteer, "/")):
+            with self.subTest(user=user.username):
+                self.client.get("/logout")
+                response = self.client.post("/login", data={"username": user.username, "password": "A-secure-test-password-2026"})
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers["Location"].endswith(landing), response.headers["Location"])
+
+    def test_the_overview_drills_from_campus_to_program_to_actions(self):
+        from app.models.erp import Person as PersonModel
+
+        owner = PersonModel(first_name="Rhea", last_name="Thomas", primary_email="rhea@example.test")
+        db.session.add(owner)
+        db.session.flush()
+        self.unassigned.owner_person_id = owner.id
+        self.icc_event.owner_person_id = owner.id
+        db.session.commit()
+
+        self._login(self.events_head)
+        html = self.client.get("/overview").get_data(as_text=True)
+        for campus in ("Central", "Kengeri", "Yeshwantpur", "Bannerghatta"):
+            self.assertIn(campus, html)
+        self.assertIn(f"/overview/campus/{self.campus.public_id}", html)
+        self.assertIn("Not set up yet", html)
+
+        html = self.client.get(f"/overview/campus/{self.campus.public_id}").get_data(as_text=True)
+        self.assertIn("Coffee meet", html)
+        self.assertIn("Summer school", html)
+        self.assertIn(f"/overview/program/{self.icc_event.public_id}", html)
+
+        html = self.client.get(f"/overview/program/{self.icc_event.public_id}").get_data(as_text=True)
+        self.assertIn("Book the hall", html)
+        self.assertIn("Rhea Thomas", html)
+        self.assertIn("Media team", html)
+        self.assertIn("Who has what", html)
+
+    def test_the_overview_is_not_for_volunteers(self):
+        self._login(self.volunteer)
+        for path in ("/overview", f"/overview/campus/{self.campus.public_id}", f"/overview/program/{self.icc_event.public_id}"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 403)
+
+    def test_a_head_sees_programs_on_campuses_outside_their_own(self):
+        other = Campus(name="Bangalore Kengeri Campus", code="BKC")
+        db.session.add(other)
+        db.session.flush()
+        far = Project(code="FAR", title="Food fest", campus_id=other.id, program_type_id=self.icc_type.id, academic_year_id=self.year.id,
+                      operating_unit_id=self.icc.id, category="Event", status="Active", start_date=TODAY, end_date=TODAY)
+        db.session.add(far)
+        db.session.flush()
+        self._task(far, "Confirm the stalls")
+        db.session.commit()
+
+        self._login(self.events_head)
+        self.assertIn("Food fest", self.client.get(f"/overview/campus/{other.public_id}").get_data(as_text=True))
+        html = self.client.get(f"/overview/program/{far.public_id}").get_data(as_text=True)
+        self.assertIn("Confirm the stalls", html)
+        # Read-only: no way onto an event page the head cannot open.
+        self.assertNotIn(f"/erp/projects/{far.public_id}", html)
+
+    def test_the_campus_demo_adds_four_campuses_once(self):
+        from app.services.campus_demo import seed_campus_demo
+
+        first = seed_campus_demo(today=TODAY)
+        self.assertEqual(first["campuses"], 3)
+        self.assertGreater(first["programs"], 8)
+        self.assertEqual(seed_campus_demo(today=TODAY), {"campuses": 0, "programs": 0, "actions": 0})
+        self.assertEqual(Campus.query.count(), 4)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,161 @@
+/* ── Campus overview ────────────────────────────────────────────────────
+   The landing page for Faculty, the USC and the heads (app/services/
+   overview.py): four campus tiles, then a campus's programs, then one
+   program's actions and their owners. Information only -- nothing on these
+   screens is ticked or approved -- so every surface is a link or a reading,
+   never a control. Classes are `ov-`; every value is a token. */
+
+.ov-page { max-width: 1240px; margin: 0 auto; padding-bottom: var(--space-12); color: var(--color-text); }
+.ov-lede { margin: 0 0 var(--space-5); font-size: 17px; line-height: 1.5; color: var(--color-text-secondary); }
+.ov-lede strong { color: var(--color-text); font-weight: 600; }
+
+/* The three numbers that open every level. */
+.ov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-6); padding: 0; list-style: none; }
+.ov-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel);
+  background: var(--color-surface-1);
+}
+.ov-stat__value { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 700; }
+.ov-stat__label { font-size: 14px; color: var(--color-text-tertiary); }
+.ov-stat--late .ov-stat__value { color: var(--color-danger); }
+.ov-stat--done .ov-stat__value { color: var(--color-success); }
+
+/* ── Level 1: the campus tiles ─────────────────────────────────────────── */
+.ov-campuses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
+.ov-campuses .ds-tile { min-height: 248px; padding: var(--space-6) var(--space-8) var(--space-6); }
+.ov-tile__facts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+.ov-tile__fact {
+  padding: 4px var(--space-3); border-radius: 999px;
+  background: rgb(255 255 255 / 16%); color: var(--on-accent);
+  font-size: 13px; font-weight: 600;
+}
+.ov-tile__fact--late { background: rgb(255 255 255 / 92%); color: var(--color-danger); }
+.ov-tile__meter { width: min(320px, 70%); margin: var(--space-4) 0 var(--space-4); }
+.ov-tile__meter .ov-meter__bar { background: rgb(255 255 255 / 22%); }
+.ov-tile__meter .ov-meter__fill { background: #fff; }
+.ov-tile__meter .ov-meter__text { color: var(--on-accent-muted); }
+
+.ds-tile--plum { background: var(--tile-plum); border-color: var(--tile-plum); color: var(--on-accent); }
+.ds-tile--plum .ds-tile__title, .ds-tile--plum .ds-tile__code, .ds-tile--plum .ds-tile__go { color: var(--on-accent); }
+.ds-tile--plum .ds-tile__note, .ds-tile--plum .ds-tile__stat { color: var(--on-accent-muted); }
+.ds-tile--plum:focus-visible { outline-color: var(--color-text); }
+
+/* ── A progress meter ─────────────────────────────────────────────────── */
+.ov-meter { display: flex; flex-direction: column; gap: 6px; }
+.ov-meter__bar { height: 8px; border-radius: 999px; background: var(--color-surface-3); overflow: hidden; }
+.ov-meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--color-success); }
+.ov-meter__text { font-size: 13px; color: var(--color-text-tertiary); }
+
+/* ── Level 2: the programs in a campus ────────────────────────────────── */
+.ov-divisions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); align-items: start; }
+.ov-division__head { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); }
+.ov-division__dot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.ov-division__dot--pine { background: var(--tile-pine); }
+.ov-division__dot--indigo { background: var(--tile-indigo); }
+.ov-division__title { margin: 0; font-size: 19px; font-weight: 600; }
+.ov-division__count { font-size: 15px; color: var(--color-text-tertiary); }
+.ov-programs { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.ov-empty {
+  margin: 0; padding: var(--space-5); border: 1px dashed var(--color-border); border-radius: var(--radius-panel);
+  color: var(--color-text-tertiary); font-size: 15px;
+}
+
+.ov-program {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-4) calc(var(--space-5) + 4px);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel);
+  background: var(--color-surface-1); box-shadow: var(--shadow-tile);
+  color: inherit; text-decoration: none;
+  transition: box-shadow var(--motion-standard), translate var(--motion-standard);
+}
+.ov-program::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 0 4px 4px 0; background: var(--ov-accent, var(--color-primary)); }
+.ov-program--pine { --ov-accent: var(--tile-pine); }
+.ov-program--indigo { --ov-accent: var(--tile-indigo); }
+.ov-program:hover { box-shadow: var(--shadow-tile-raised); translate: 0 -1px; }
+.ov-program:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ov-program__title { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600; }
+.ov-program__meta { margin: 0; grid-column: 1 / -1; font-size: 14px; color: var(--color-text-tertiary); }
+.ov-program__meta b { font-weight: 600; color: var(--color-text-secondary); }
+.ov-program__foot { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-4); }
+.ov-program__foot .ov-meter { flex: 1 1 auto; }
+.ov-program__late { flex: none; font-size: 13px; font-weight: 600; color: var(--color-danger); }
+
+/* ── Level 3: one program's actions ───────────────────────────────────── */
+.ov-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4);
+  margin: 0 0 var(--space-6); padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); background: var(--color-surface-1);
+}
+.ov-facts div { min-width: 0; }
+.ov-facts dt { font-size: 13px; color: var(--color-text-tertiary); }
+.ov-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+
+.ov-owners { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-6); padding: 0; list-style: none; }
+.ov-owner {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 6px var(--space-3); border-radius: 999px;
+  border: 1px solid var(--color-border-subtle); background: var(--color-surface-1);
+  font-size: 14px;
+}
+.ov-owner__count { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-tertiary); }
+.ov-owner__count--late { color: var(--color-danger); font-weight: 600; }
+
+.ov-section-title { margin: 0 0 var(--space-3); font-size: 19px; font-weight: 600; }
+
+.ov-actions { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--color-surface-1); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); overflow: hidden; }
+.ov-actions th {
+  padding: var(--space-3) var(--space-4); text-align: left;
+  background: var(--color-surface-2); color: var(--color-text-secondary);
+  font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--color-border-subtle);
+}
+.ov-actions td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-subtle); font-size: 15px; vertical-align: middle; }
+.ov-actions tr:last-child td { border-bottom: 0; }
+.ov-actions__num { width: 40px; font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary); }
+.ov-actions__title { font-weight: 500; }
+.ov-actions__owner { display: flex; align-items: center; gap: var(--space-2); }
+.ov-actions__avatar {
+  width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%;
+  background: var(--tile-indigo-tint); color: var(--tile-indigo); font-size: 12px; font-weight: 700;
+}
+.ov-actions__avatar--team { background: var(--tile-pine-tint); color: var(--tile-pine); }
+.ov-actions__avatar--none { background: var(--color-surface-2); color: var(--color-text-tertiary); }
+.ov-actions__who small { display: block; font-size: 12px; color: var(--color-text-tertiary); }
+.ov-actions__nobody { color: var(--color-text-tertiary); font-style: italic; }
+.ov-actions__due { white-space: nowrap; color: var(--color-text-secondary); }
+.ov-actions__due--late { color: var(--color-danger); font-weight: 600; }
+.ov-actions tr.is-done .ov-actions__title { color: var(--color-text-tertiary); text-decoration: line-through; text-decoration-color: var(--color-border-strong); }
+
+@media (max-width: 1100px) {
+  .ov-divisions { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 860px) {
+  .ov-campuses { grid-template-columns: minmax(0, 1fr); }
+  .ov-campuses .ds-tile { min-height: 0; padding: var(--space-5); }
+  .ov-stats { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .ov-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--space-4); }
+  .ov-stat { padding: var(--space-3); }
+  .ov-stat__value { font-size: 22px; line-height: 26px; }
+  .ov-stat__label { font-size: 12px; }
+  /* The table folds into one card per action on a phone. */
+  .ov-actions, .ov-actions tbody, .ov-actions tr, .ov-actions td { display: block; width: 100%; }
+  .ov-actions { border: 0; background: transparent; }
+  .ov-actions thead { display: none; }
+  .ov-actions tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3); padding: var(--space-4);
+    border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); background: var(--color-surface-1);
+  }
+  .ov-actions td { padding: 0; border: 0; }
+  .ov-actions__num { display: none !important; }
+  .ov-actions__title { grid-column: 1 / -1; }
+  .ov-actions__state { grid-column: 2; grid-row: 2; }
+  .ov-actions__ownercell { grid-column: 1; grid-row: 2; }
+  .ov-actions__due { grid-column: 1 / -1; font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ov-program { transition: none; }
+}

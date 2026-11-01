@@ -66,8 +66,10 @@ def login():
             if user.status == 'Pending':
                 return redirect(url_for('auth.pending_approval'))
 
+            from app.blueprints.dashboard import landing_endpoint
+
             flash(f"Welcome back, {user.username}!", "success")
-            return redirect(url_for('dashboard.index'))
+            return redirect(url_for(landing_endpoint(user)))
         else:
             if user:
                 user.failed_login_count += 1

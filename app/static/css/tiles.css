@@ -124,84 +124,94 @@
 
 /* ── Rail ──────────────────────────────────────────────────────────────── */
 
+/* A labelled sidebar: every destination is an icon *and* its name, always
+   on screen. It used to be a 72px strip of bare icons whose names only
+   appeared as a hover flyout, which nobody could read at a glance and a
+   touch screen never showed at all. */
 .ds-rail {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-2);
-  padding: var(--space-4) 0;
+  padding: var(--space-4) var(--space-3);
   background: var(--color-surface-ink);
   color: #fff;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid rgb(255 255 255 / 6%);
 }
 
 .ds-rail__brand {
-  width: 36px; height: 36px;
-  display: grid; place-items: center;
-  margin-bottom: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0 0 var(--space-4); padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-control);
-  background: var(--color-primary);
   color: #fff;
-  font-family: var(--font-display);
-  font-size: 15px; font-weight: 700; letter-spacing: .06em;
   text-decoration: none;
 }
+.ds-rail__mark {
+  width: 36px; height: 36px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 700; letter-spacing: .06em;
+}
+.ds-rail__wordmark { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.ds-rail__wordmark b { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #fff; }
+.ds-rail__wordmark small { font-size: 12px; color: rgb(255 255 255 / 72%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ds-rail__brand:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-.ds-rail__nav { display: flex; flex-direction: column; gap: var(--space-1); width: 100%; align-items: center; }
+.ds-rail__nav { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .ds-rail__spacer { margin-top: auto; }
+.ds-rail__group {
+  margin: var(--space-4) var(--space-3) var(--space-1);
+  font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  color: rgb(255 255 255 / 60%);
+}
 
 .ds-rail__item {
   position: relative;
-  width: 44px; height: 44px;
-  display: grid; place-items: center;
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 40px;
+  padding: 0 var(--space-3);
   border: 0; border-radius: var(--radius-control);
   background: transparent;
-  color: #fff;
-  opacity: .68;
+  color: rgb(255 255 255 / 86%);
+  font: inherit; font-size: 14px; font-weight: 500; text-align: left;
   cursor: pointer;
   text-decoration: none;
-  transition: opacity var(--motion-fast), background-color var(--motion-fast);
+  transition: color var(--motion-fast), background-color var(--motion-fast);
 }
-.ds-rail__item:hover { opacity: 1; background: rgb(255 255 255 / 12%); }
-.ds-rail__item.is-active { opacity: 1; background: rgb(255 255 255 / 16%); }
+.ds-rail__item:hover { color: #fff; background: rgb(255 255 255 / 10%); }
+.ds-rail__item.is-active { color: #fff; background: rgb(148 188 227 / 22%); font-weight: 600; }
 .ds-rail__item.is-active::before {
-  content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px;
+  content: ""; position: absolute; left: calc(-1 * var(--space-3)); top: 8px; bottom: 8px;
   width: 3px; border-radius: var(--radius-chip); background: var(--color-decorative-sky);
 }
-.ds-rail__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; opacity: 1; }
-.ds-rail__item .ph { font-size: 20px; }
+.ds-rail__item.is-active .ph { color: var(--color-decorative-sky); }
+.ds-rail__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.ds-rail__item .ph { font-size: 20px; flex: none; }
 
-/* The label is a flyout: it overlays, so the screen beside it never reflows. */
 .ds-rail__label {
-  position: absolute; left: calc(100% + 8px); top: 50%; translate: 0 -50%;
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-ink);
-  box-shadow: var(--shadow-3);
-  font-family: var(--font-display);
-  font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
-  white-space: nowrap; opacity: 0; pointer-events: none;
-  transition: opacity var(--motion-fast);
-  z-index: var(--z-popover);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: inherit;
 }
-.ds-rail__item:hover .ds-rail__label,
-.ds-rail__item:focus-visible .ds-rail__label { opacity: 1; }
-
-/* The rail's two overlays. A flash and the demo banner float over the
-   screen rather than sitting in it: anything in flow would change the
-   one-screen budget depending on whether you had just saved something. */
 
 .ds-rail__badge {
-  position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px;
-  padding: 0 4px; border-radius: 999px;
+  margin-left: auto; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: 999px;
   background: var(--color-danger); color: #fff;
-  font-family: var(--font-mono); font-size: 10px; font-weight: 600; line-height: 16px; text-align: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 20px; text-align: center;
 }
 
 .ds-rail__item.onb-help span[aria-hidden="true"]:first-child {
+  width: 20px; flex: none; text-align: center;
   font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1;
 }
+
+/* The two overlays. A flash and the demo banner float over the screen
+   rather than sitting in it: anything in flow would change the one-screen
+   budget depending on whether you had just saved something. */
 
 .ds-flash {
   position: fixed; right: var(--space-5); bottom: var(--space-5);
@@ -874,6 +884,7 @@ a.ds-kpi:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 
    and `.ds-screen`'s head row becomes `auto`, so the extra line is real
    space rather than something to overflow into. */
 @media (max-width: 1100px) {
+  :root { --rail-width: 208px; }
   .ds-screen { grid-template-rows: auto minmax(0, 1fr); }
   .ds-screen__head {
     display: grid; grid-template-columns: minmax(0, 1fr);
@@ -908,11 +919,13 @@ a.ds-kpi:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 
     flex-direction: row; justify-content: space-around;
     padding: 0 var(--space-2) env(safe-area-inset-bottom); gap: 0;
   }
-  .ds-rail__brand, .ds-rail__label, .ds-rail__item--desk { display: none; }
-  .ds-rail__nav { flex-direction: row; justify-content: space-around; }
-  .ds-rail__spacer { margin-top: 0; }
-  .ds-rail__item { width: 48px; height: 48px; }
+  .ds-rail { border-right: 0; overflow: visible; }
+  .ds-rail__brand, .ds-rail__label, .ds-rail__item--desk, .ds-rail__group { display: none; }
+  .ds-rail__nav { flex-direction: row; justify-content: space-around; width: auto; flex: 1 1 auto; }
+  .ds-rail__spacer { margin-top: 0; flex: 0 0 auto; }
+  .ds-rail__item { width: 48px; height: 48px; min-height: 48px; padding: 0; justify-content: center; }
   .ds-rail__item.is-active::before { left: 10px; right: 10px; top: -8px; bottom: auto; width: auto; height: 3px; }
+  .ds-rail__badge { position: absolute; top: 5px; right: 5px; margin: 0; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; }
   /* ── An explicit mobile record header ───────────────────────────────
      Audit P0-02: the head was one flex line, so a long title ellipsised
      to "Coffee Meet…" while the lifecycle chip and the Edit/Report
@@ -1047,13 +1060,14 @@ a.ds-kpi:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 
 /* ── Role and scope in the desktop rail ────────────────────────────────
    Same fact, same words, in the place a desktop reader looks for identity. */
 .ds-rail__scope {
-  width: 100%; padding: var(--space-2) 6px; margin-bottom: var(--space-1);
+  width: 100%; padding: var(--space-3) var(--space-3) var(--space-2); margin: 0 0 var(--space-1);
   border-top: 1px solid rgb(255 255 255 / 14%);
-  color: rgb(255 255 255 / 76%);
-  font-family: var(--font-display); font-size: 10px; line-height: 13px;
-  letter-spacing: .06em; text-transform: uppercase; text-align: center;
+  color: rgb(255 255 255 / 80%);
+  font-family: var(--font-display); font-size: 12px; line-height: 16px;
+  text-align: left;
   overflow-wrap: anywhere;
 }
+.ds-rail__scope b { display: block; color: #fff; font-size: 13px; }
 
 /* ── Error pages ───────────────────────────────────────────────────────
    Audit P0-01: a 429 threw away the shell and every route out of it. */

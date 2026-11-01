@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ tile.name }} campus{% endblock %}
+{% block screen_title %}{{ campus.name }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.overview') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ tile.name }}</span>{% endblock %}
+{% block back_url %}{{ url_for('dashboard.overview') }}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+
+{#- Level two: a campus's programs, ICC events beside IGP programmes. Each
+    card opens the program's actions and who owns them. -#}
+{% block content %}
+<div class="ov-page">
+  <ul class="ov-stats" aria-label="{{ tile.name }} campus">
+    <li class="ov-stat"><span class="ov-stat__value">{{ totals.programs }}</span><span class="ov-stat__label">programs on this campus</span></li>
+    <li class="ov-stat"><span class="ov-stat__value">{{ totals.open }}</span><span class="ov-stat__label">actions still open</span></li>
+    <li class="ov-stat{% if totals.late %} ov-stat--late{% endif %}"><span class="ov-stat__value">{{ totals.late }}</span><span class="ov-stat__label">actions late</span></li>
+  </ul>
+
+  <div class="ov-divisions">
+    {% for division in divisions %}
+    <section aria-labelledby="division-{{ division.code }}">
+      <div class="ov-division__head">
+        <span class="ov-division__dot ov-division__dot--{{ division.accent }}" aria-hidden="true"></span>
+        <h2 class="ov-division__title" id="division-{{ division.code }}">{{ division.code }} · {{ division.name }}</h2>
+        <span class="ov-division__count">{{ division.rows|length }}</span>
+      </div>
+      {% if division.rows %}
+      <ul class="ov-programs">
+        {% for row in division.rows %}
+        <li>
+          <a class="ov-program ov-program--{{ division.accent }}" href="{{ url_for('dashboard.overview_program', public_id=row.project.public_id) }}">
+            <h3 class="ov-program__title">{{ row.project.title }}</h3>
+            <span class="ds-chip ds-chip--{{ row.tone }}"><i class="ds-chip__pip" aria-hidden="true"></i>{{ row.stage_label }}</span>
+            <p class="ov-program__meta">
+              {{ row.project.start_date|localdate('%d %b') }}{% if row.project.end_date != row.project.start_date %} – {{ row.project.end_date|localdate('%d %b %Y') }}{% else %} {{ row.project.start_date|localdate('%Y') }}{% endif %}
+              {%- if row.lead %} · Lead <b>{{ row.lead }}</b>{% endif %}
+              {%- if row.project.venue %} · {{ row.project.venue }}{% endif %}
+            </p>
+            <div class="ov-program__foot">
+              <div class="ov-meter">
+                <span class="ov-meter__bar"><span class="ov-meter__fill" style="width: {{ row.percent }}%"></span></span>
+                <span class="ov-meter__text">{% if row.total %}{{ row.done }} of {{ row.total }} actions done{% else %}No actions yet{% endif %}</span>
+              </div>
+              {% if row.late %}<span class="ov-program__late"><i class="ph ph-warning" aria-hidden="true"></i> {{ row.late }} late</span>{% endif %}
+            </div>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ov-empty">No {{ division.noun }} on this campus yet.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

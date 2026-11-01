@@ -290,6 +290,16 @@ def register_cli(app):
         click.echo(", ".join(f"{key}={value}" for key, value in summary.items()))
         click.echo(f"All {summary['users']} beta accounts share the password: {BETA_PASSWORD}")
 
+    @app.cli.command("seed-campus-demo")
+    def seed_campus_demo_command():
+        """Add the other three campuses and demo programs for the campus
+        overview. Additive and safe to rerun; deletes nothing."""
+        _require_seed_environment("seed-campus-demo", "CAMPUS_DEMO")
+        from app.services.campus_demo import seed_campus_demo
+
+        added = seed_campus_demo()
+        click.echo(", ".join(f"{key}={value}" for key, value in added.items()))
+
     @app.cli.command("provision-uat")
     @click.option("--output", type=click.Path(dir_okay=False, path_type=Path), default=Path("instance/UAT_CREDENTIALS.txt"))
     def provision_uat(output):

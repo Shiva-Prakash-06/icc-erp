@@ -39,9 +39,16 @@
     <p class="ds-demo-banner" role="status">Demo environment—data may be reset; do not enter sensitive or personal data.</p>
     {% endif %}
     <nav class="ds-rail" aria-label="Sections">
-      <a class="ds-rail__brand" href="{{ url_for('dashboard.index') }}" aria-label="My work"><span aria-hidden="true">ICC</span></a>
+      {%- set landing = primary_nav|selectattr('key', 'equalto', 'overview')|first -%}
+      <a class="ds-rail__brand" href="{{ url_for(landing.endpoint if landing else 'dashboard.index') }}">
+        <span class="ds-rail__mark" aria-hidden="true">ICC</span>
+        <span class="ds-rail__wordmark"><b>ICC ERP</b><small>{{ ORGANISATION }}</small></span>
+      </a>
       <div class="ds-rail__nav" data-tour="nav">
+        {% set rail = namespace(group=None) %}
         {% for item in primary_nav if item.rail and not item.foot %}
+        {% if rail.group and item.group != rail.group %}<p class="ds-rail__group ds-rail__item--desk" aria-hidden="true">{{ item.group }}</p>{% endif %}
+        {% set rail.group = item.group %}
         {#- A destination without `bottom_nav` leaves the bar on a phone:
             eleven 48px targets do not fit 375px. Each one is reachable from
             the Account screen, which lists them. -#}
@@ -57,7 +64,7 @@
         {#- Audit P1-10: an Events Head, a Media Head and the USC saw
             near-identical screens with nothing to say why. This is the
             answer, and it is the same answer the phone drawer gives. -#}
-        <p class="ds-rail__scope ds-rail__item--desk" title="{{ role_context[0].title }} · {{ role_context[0].scope }}">{{ role_context[0].short }}{% if role_context|length > 1 %} +{{ role_context|length - 1 }}{% endif %}<span class="visually-hidden">. Signed in as {{ role_context[0].title }}. You can see {{ role_context[0].scope }}.</span></p>
+        <p class="ds-rail__scope ds-rail__item--desk" title="{{ role_context[0].title }} · {{ role_context[0].scope }}"><b>{{ g.user.person.display_name if g.user.person else g.user.username }}</b>{{ role_context[0].title }}{% if role_context|length > 1 %} +{{ role_context|length - 1 }}{% endif %}<span class="visually-hidden">. You can see {{ role_context[0].scope }}.</span></p>
         {% endif %}
         <button class="ds-rail__item ds-rail__item--desk" type="button" data-command-open data-tour="search" aria-label="Search or jump to">
           <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
@@ -69,8 +76,8 @@
         {% for item in primary_nav if item.rail and item.foot %}
         <a href="{{ url_for(item.endpoint) }}" class="ds-rail__item ds-rail__item--desk{% if item.active %} is-active{% endif %}"{% if item.active %} aria-current="page"{% endif %}>
           <i class="ph {{ item.icon }}" aria-hidden="true"></i>
-          {% if item.key == 'notifications' and shell_unread_count %}<span class="ds-rail__badge" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
           <span class="ds-rail__label" aria-hidden="true">{{ item.label }}</span>
+          {% if item.key == 'notifications' and shell_unread_count %}<span class="ds-rail__badge" aria-hidden="true">{{ shell_unread_count if shell_unread_count < 100 else '99+' }}</span>{% endif %}
           <span class="visually-hidden">{{ item.label }}{% if item.key == 'notifications' and shell_unread_count %}, {{ shell_unread_count }} unread{% endif %}</span>
         </a>
         {% endfor %}

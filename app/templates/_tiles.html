@@ -1,6 +1,45 @@
 {#- Shared macros: the state chip and the one file picker. Defined once so
     the screens that use them cannot drift apart. -#}
 
+{%- macro tile_art(accent) -%}
+{#- Two to four blocks cut from the tile's own accent, bleeding off the
+    bottom-right. White at 12-26% on a filled tile, ink at 4-7% on a locked
+    one. Geometry comes from the radius scale; it is never an image and
+    never an illustration. -#}
+{%- if accent == 'brass' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="6" y="46" width="52" height="66" rx="10" fill="#ffffff" opacity=".16"/>
+  <rect x="64" y="14" width="44" height="98" rx="10" fill="#ffffff" opacity=".26"/>
+  <rect x="114" y="58" width="44" height="54" rx="10" fill="#ffffff" opacity=".13"/>
+  <circle cx="86" cy="42" r="13" fill="#ffffff" opacity=".2"/>
+</svg>
+{%- elif accent == 'indigo' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="10" y="62" width="40" height="50" rx="10" fill="#ffffff" opacity=".14"/>
+  <rect x="58" y="34" width="40" height="78" rx="10" fill="#ffffff" opacity=".24"/>
+  <rect x="106" y="6" width="40" height="106" rx="10" fill="#ffffff" opacity=".12"/>
+</svg>
+{%- elif accent == 'plum' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <circle cx="34" cy="86" r="30" fill="#ffffff" opacity=".14"/>
+  <rect x="70" y="40" width="36" height="72" rx="18" fill="#ffffff" opacity=".24"/>
+  <rect x="112" y="18" width="34" height="94" rx="10" fill="#ffffff" opacity=".12"/>
+</svg>
+{%- elif accent == 'pine' -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="8" y="30" width="56" height="82" rx="16" fill="#ffffff" opacity=".2"/>
+  <rect x="72" y="66" width="34" height="46" rx="16" fill="#ffffff" opacity=".13"/>
+  <circle cx="122" cy="88" r="24" fill="#ffffff" opacity=".22"/>
+</svg>
+{%- else -%}
+<svg class="ds-tile__art" viewBox="0 0 148 112" aria-hidden="true" focusable="false">
+  <rect x="6" y="46" width="52" height="66" rx="10" fill="#1d1f20" opacity=".05"/>
+  <rect x="64" y="14" width="44" height="98" rx="10" fill="#1d1f20" opacity=".07"/>
+  <rect x="114" y="58" width="44" height="54" rx="10" fill="#1d1f20" opacity=".04"/>
+</svg>
+{%- endif -%}
+{%- endmacro -%}
+
 {%- macro state_chip(state, label, dimension='Status') -%}
 {#- Colour and the word, always together. Complete takes a check and Overdue
     a triangle because those are the two people scan for; the other two take

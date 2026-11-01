@@ -1160,9 +1160,14 @@ def seed_beta(*, reset: bool = True) -> dict[str, object]:
     _match_the_simplified_workflow(users)
     db.session.commit()
 
+    # The other three campuses and their programs, for the campus overview.
+    from app.services.campus_demo import seed_campus_demo
+
+    campus_demo = seed_campus_demo()
+
     summary.update({
         "users": len(users),
-        "projects": 2,
+        "projects": 2 + campus_demo["programs"],
         "people": Person.query.count(),
         "sessions": ProjectSession.query.count(),
         "team_assignments": TeamAssignment.query.count(),

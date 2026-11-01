@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block screen_title %}{{ project.title }}{% endblock %}
+{% block crumb %}<a href="{{ url_for('dashboard.overview') }}">Campuses</a><span class="ds-crumb__sep" aria-hidden="true">/</span><a href="{{ url_for('dashboard.overview_campus', public_id=campus.public_id) }}">{{ tile.name }}</a><span class="ds-crumb__sep" aria-hidden="true">/</span><span class="ds-crumb__here" aria-current="page">{{ division }}</span>{% endblock %}
+{% block back_url %}{{ url_for('dashboard.overview_campus', public_id=campus.public_id) }}{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+{% block tools %}{% if can_open %}<a class="cv-btn cv-btn--primary" href="{{ url_for('erp.project_detail', public_id=project.public_id) }}">Open the event page <i class="ph ph-arrow-right" aria-hidden="true"></i></a>{% endif %}{% endblock %}
+
+{#- Level three: every action on one program, with its owner. Read-only;
+    the event page (one press away for anyone who can open it) is where
+    things get ticked. -#}
+{% block content %}
+<div class="ov-page">
+  <dl class="ov-facts">
+    <div><dt>Where it is</dt><dd><span class="ds-chip ds-chip--{{ tone }}"><i class="ds-chip__pip" aria-hidden="true"></i>{{ stage_label }}</span></dd></div>
+    <div><dt>When</dt><dd>{{ project.start_date|localdate('%d %b %Y') }}{% if project.end_date != project.start_date %} – {{ project.end_date|localdate('%d %b %Y') }}{% endif %}</dd></div>
+    <div><dt>Campus</dt><dd>{{ campus.name }}</dd></div>
+    <div><dt>Program</dt><dd>{{ division }} · {{ division_name }}</dd></div>
+    {% if lead %}<div><dt>Lead</dt><dd>{{ lead }}</dd></div>{% endif %}
+    {% if project.venue %}<div><dt>Venue</dt><dd>{{ project.venue }}</dd></div>{% endif %}
+  </dl>
+
+  <ul class="ov-stats" aria-label="Actions on this program">
+    <li class="ov-stat"><span class="ov-stat__value">{{ total }}</span><span class="ov-stat__label">actions in all</span></li>
+    <li class="ov-stat ov-stat--done"><span class="ov-stat__value">{{ done }}</span><span class="ov-stat__label">done</span></li>
+    <li class="ov-stat"><span class="ov-stat__value">{{ open }}</span><span class="ov-stat__label">still open</span></li>
+    <li class="ov-stat{% if late %} ov-stat--late{% endif %}"><span class="ov-stat__value">{{ late }}</span><span class="ov-stat__label">late</span></li>
+  </ul>
+
+  {% if by_owner %}
+  <h2 class="ov-section-title">Who has what</h2>
+  <ul class="ov-owners">
+    {% for owner in by_owner %}
+    <li class="ov-owner">{{ owner.name }}
+      <span class="ov-owner__count">{{ owner.open }} open</span>
+      {% if owner.late %}<span class="ov-owner__count ov-owner__count--late">{{ owner.late }} late</span>{% endif %}
+      {% if owner.done %}<span class="ov-owner__count">{{ owner.done }} done</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2 class="ov-section-title">Actions</h2>
+  {% if actions %}
+  <table class="ov-actions">
+    <thead><tr><th class="ov-actions__num" scope="col">#</th><th scope="col">Action</th><th scope="col">Owner</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+      {% for row in actions %}
+      {% set late_row = row.tone == 'overdue' %}
+      <tr{% if row.item.done %} class="is-done"{% endif %}>
+        <td class="ov-actions__num">{{ loop.index }}</td>
+        <td class="ov-actions__title">{{ row.title }}</td>
+        <td class="ov-actions__ownercell">
+          <span class="ov-actions__owner">
+            {% if not row.owner_set %}
+            <span class="ov-actions__avatar ov-actions__avatar--none" aria-hidden="true">?</span>
+            <span class="ov-actions__nobody">{{ row.owner }}</span>
+            {% else %}
+            <span class="ov-actions__avatar{% if row.item.owner is none %} ov-actions__avatar--team{% endif %}" aria-hidden="true">{{ row.owner.split()|map('first')|join('')|upper|truncate(2, True, '') }}</span>
+            <span class="ov-actions__who">{{ row.owner }}{% if row.owner_team %}<small>{{ row.owner_team }}</small>{% endif %}</span>
+            {% endif %}
+          </span>
+        </td>
+        <td class="ov-actions__due{% if late_row %} ov-actions__due--late{% endif %}">{% if row.due %}{{ row.due|localdate('%d %b %Y') }}{% else %}No date{% endif %}</td>
+        <td class="ov-actions__state"><span class="ds-chip ds-chip--{{ row.tone }}">{% if row.tone == 'complete' %}<i class="ph ph-check" aria-hidden="true"></i>{% elif row.tone == 'overdue' %}<i class="ph ph-warning" aria-hidden="true"></i>{% else %}<i class="ds-chip__pip" aria-hidden="true"></i>{% endif %}{{ row.state }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="ov-empty">No actions on this program yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

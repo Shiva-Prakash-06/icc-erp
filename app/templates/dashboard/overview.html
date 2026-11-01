@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_tiles.html" import tile_art %}
+{% block title %}Campuses{% endblock %}
+{% block screen_title %}Campuses{% endblock %}
+{% block body_class %}cv-body{% endblock %}
+{% block tools %}<a class="cv-btn" href="{{ url_for('dashboard.index') }}"><i class="ph ph-check-square" aria-hidden="true"></i>My work</a>{% endblock %}
+
+{#- The landing page for Faculty, the USC and the heads: one tile per
+    campus, each opening that campus's programs. Nothing to tick here --
+    see app/services/overview.py. -#}
+{% block content %}
+<div class="ov-page">
+  <p class="ov-lede">Pick a campus to see its programs, then a program to see every action on it and <strong>who owns it</strong>.</p>
+
+  <ul class="ov-stats" aria-label="All campuses">
+    <li class="ov-stat"><span class="ov-stat__value">{{ totals.programs }}</span><span class="ov-stat__label">programs running or planned</span></li>
+    <li class="ov-stat"><span class="ov-stat__value">{{ totals.open }}</span><span class="ov-stat__label">actions still open</span></li>
+    <li class="ov-stat{% if totals.late %} ov-stat--late{% endif %}"><span class="ov-stat__value">{{ totals.late }}</span><span class="ov-stat__label">actions late</span></li>
+  </ul>
+
+  <div class="ov-campuses">
+    {% for tile in tiles %}
+    {% if tile.campus %}
+    <a class="ds-tile ds-tile--{{ tile.accent }}" href="{{ url_for('dashboard.overview_campus', public_id=tile.campus.public_id) }}">
+      <span class="ds-tile__code">{{ tile.code }}</span>
+      <h2 class="ds-tile__title">{{ tile.name }}</h2>
+      <p class="ds-tile__note">{{ tile.full_name }}</p>
+      <ul class="ov-tile__facts">
+        <li class="ov-tile__fact">{{ tile.programs }} {{ 'program' if tile.programs == 1 else 'programs' }}</li>
+        <li class="ov-tile__fact">ICC {{ tile.divisions.ICC }}</li>
+        <li class="ov-tile__fact">IGP {{ tile.divisions.IGP }}</li>
+        {% if tile.actions_late %}<li class="ov-tile__fact ov-tile__fact--late">{{ tile.actions_late }} late</li>{% endif %}
+      </ul>
+      <div class="ov-meter ov-tile__meter">
+        <span class="ov-meter__bar"><span class="ov-meter__fill" style="width: {{ tile.actions_percent }}%"></span></span>
+        <span class="ov-meter__text">{% if tile.actions_total %}{{ tile.actions_done }} of {{ tile.actions_total }} actions done{% else %}No actions yet{% endif %}</span>
+      </div>
+      <span class="ds-tile__go">See programs <i class="ph ph-arrow-right" aria-hidden="true"></i></span>
+      {{ tile_art(tile.accent) }}
+    </a>
+    {% else %}
+    <div class="ds-tile ds-tile--locked">
+      <span class="ds-tile__flag"><i class="ph ph-lock-key" aria-hidden="true"></i>Not set up yet</span>
+      <h2 class="ds-tile__title">{{ tile.name }}</h2>
+      <p class="ds-tile__note">{{ tile.full_name }}</p>
+      <span class="ds-tile__go">{{ tile.code }}</span>
+      {{ tile_art(None) }}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

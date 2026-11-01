@@ -1,14 +1,15 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, g, abort
 from app.database import db
 from app.models.user import User
-from app.models.project import Campus
+from app.models.project import Campus, Project
 from app.models.erp import Person, RoleAssignment
 from app.services.audit import record_audit
 from app.services.account import build_account_activity
-from app.services.authorization import has_permission, invalidate_assignment_cache
+from app.services.authorization import can_view_project, has_permission, invalidate_assignment_cache
 from app.services.action_queue import build_action_queue
 from app.services.home import build_my_activities, build_my_work, is_faculty, is_view_only
 from app.services.navigation import REPORT_TEAMS
+from app.services.overview import build_campus_programs, build_campus_tiles, build_program_actions
 from app.services.roles import ASSIGNABLE_ROLES, replace_scoped_assignment, role_context
 from app.services.scope import approvable_projects
 from app.services.teams import user_teams
@@ -33,6 +34,48 @@ def index():
         return render_template('dashboard/activities.html', **build_my_activities(g.user))
     show = (request.args.get('show') or '').strip() or None
     return render_template('dashboard/home.html', **build_my_work(g.user, show=show))
+
+
+def landing_endpoint(user):
+    """Where someone lands after signing in. Faculty, the USC and the heads
+    open on the campus overview; a volunteer opens on their own events."""
+    return 'dashboard.index' if is_view_only(user) else 'dashboard.overview'
+
+
+def _overview_allowed():
+    if is_view_only(g.user):
+        abort(403)
+
+
+@dashboard_bp.route('/overview')
+@login_required
+def overview():
+    """The landing page: the four campuses, each a tile. Information only --
+    see app/services/overview.py."""
+    _overview_allowed()
+    return render_template('dashboard/overview.html', **build_campus_tiles())
+
+
+@dashboard_bp.route('/overview/campus/<string:public_id>')
+@login_required
+def overview_campus(public_id):
+    """One campus: its ICC events and IGP programmes."""
+    _overview_allowed()
+    campus = Campus.query.filter_by(public_id=public_id).first_or_404()
+    return render_template('dashboard/overview_campus.html', **build_campus_programs(campus))
+
+
+@dashboard_bp.route('/overview/program/<string:public_id>')
+@login_required
+def overview_program(public_id):
+    """One program: every action on it and who owns it."""
+    _overview_allowed()
+    project = Project.query.filter_by(public_id=public_id).first_or_404()
+    return render_template(
+        'dashboard/overview_program.html',
+        can_open=can_view_project(g.user, project),
+        **build_program_actions(project),
+    )
 
 
 @dashboard_bp.route('/queue')

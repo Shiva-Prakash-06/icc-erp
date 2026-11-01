@@ -153,10 +153,12 @@
   --tile-indigo-tint: #e8edf2;
   --tile-brass: #7a5a24;
   --tile-brass-tint: #f2ece1;
+  --tile-plum: #5e3a6b;
+  --tile-plum-tint: #efe8f2;
 
   /* Geometry. These are tokens because the one-screen rule is a contract:
      a screen body is 100dvh minus the fixed tracks below it. */
-  --rail-width: 72px;
+  --rail-width: 236px;
   --screen-head: 64px;
   --tab-height: 44px;
   --filter-height: 36px;
