@@ -7,9 +7,10 @@ Exchange Program" (IGP).
 
 Why this exists alongside ``seed-acceptance`` and ``provision-uat``: those
 build throwaway fixtures for automated browser tests and for a one-off
-acceptance pass, with random one-time passwords and first-login resets. Beta
-testers need stable, memorable credentials and data that hangs together well
-enough to explore, so the two cannot share an implementation.
+acceptance pass. Beta testers need data that hangs together well enough to
+explore, so the two cannot share an implementation. The accounts still get
+random one-time passwords: the beta runs on a public URL, so a shared,
+guessable password would let anyone sign in as Faculty.
 
 Every foreign key points at a row this module also creates. Nothing here
 invents a reference that the reader cannot follow: a session's owner is on the
@@ -21,6 +22,7 @@ recorded participant.
 
 from __future__ import annotations
 
+import secrets
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import inspect as sa_inspect
@@ -68,8 +70,6 @@ from app.models.user import User
 from app.services.imports import _reference_data, seed_icc_checklist_template
 from app.services.operations import instantiate_checklist
 from app.services.timeutil import to_utc
-
-BETA_PASSWORD = "123"
 
 # Wall-clock reference points. Coffee Meet & Greet has already been delivered
 # and is in closure; Summer School ran over the mid-year break and is also in
@@ -153,10 +153,14 @@ def _person(first, last, person_type, campus_id, *, email=None, **extra) -> Pers
     return person
 
 
-def _create_accounts(year, campus, icc, igp, wings) -> dict[str, User]:
-    """Create the fourteen beta accounts, each with a linked Person and one
-    active, correctly scoped RoleAssignment."""
+def _create_accounts(year, campus, icc, igp, wings) -> tuple[dict[str, User], list[tuple[str, str]]]:
+    """Create the fourteen beta accounts, each with a linked Person, one
+    active, correctly scoped RoleAssignment and its own one-time password.
+
+    Returns the accounts and the (username, password) pairs; the passwords are
+    not stored anywhere else."""
     users: dict[str, User] = {}
+    credentials: list[tuple[str, str]] = []
     for username, first, last, label, code, scope, person_type in USER_ROSTER:
         person = _person(first, last, person_type, campus.id,
                          email=f"{username}@christuniversity.in")
@@ -169,12 +173,12 @@ def _create_accounts(year, campus, icc, igp, wings) -> dict[str, User]:
             status="Approved",
             campus_id=campus.id,
             person_id=person.id,
-            # Beta testers share a known password on purpose; forcing a reset
-            # would immediately push them into the 12-character policy.
-            needs_password_reset=False,
+            needs_password_reset=True,
             password_changed_at=datetime.now(timezone.utc),
         )
-        user.set_password(BETA_PASSWORD)
+        password = secrets.token_urlsafe(18)
+        user.set_password(password)
+        credentials.append((username, password))
         db.session.add(user)
         db.session.flush()
 
@@ -214,7 +218,7 @@ def _create_accounts(year, campus, icc, igp, wings) -> dict[str, User]:
         ))
         users[username] = user
     db.session.flush()
-    return users
+    return users, credentials
 
 
 # --------------------------------------------------------------------------
@@ -1139,7 +1143,7 @@ def seed_beta(*, reset: bool = True) -> dict[str, object]:
     }
     db.session.flush()
 
-    users = _create_accounts(year, campus, icc, igp, wings)
+    users, credentials = _create_accounts(year, campus, icc, igp, wings)
     _governance(year, icc, igp, users)
 
     coffee, components, coffee_sessions = _seed_coffee_meet(year, campus, icc_type, icc, wings, users)
@@ -1167,6 +1171,7 @@ def seed_beta(*, reset: bool = True) -> dict[str, object]:
 
     summary.update({
         "users": len(users),
+        "credentials": credentials,
         "projects": 2 + campus_demo["programs"],
         "people": Person.query.count(),
         "sessions": ProjectSession.query.count(),

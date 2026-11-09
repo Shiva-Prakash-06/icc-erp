@@ -72,3 +72,30 @@ def test_uat_provisioning_writes_only_private_one_time_credentials(tmp_path, mon
         assert all(len(pw) >= 20 for pw in passwords)
         db.session.remove()
         db.drop_all()
+
+
+def test_beta_seed_gives_every_account_its_own_one_time_password(tmp_path, monkeypatch):
+    """The beta runs on a public URL. A shared literal password let anyone sign
+    in as Faculty, so each account now gets a random password it must change."""
+    monkeypatch.setenv("BETA_SEED", "1")
+    app = create_app()
+    output = tmp_path / "BETA_CREDENTIALS.txt"
+    with app.app_context():
+        db.create_all()
+        result = app.test_cli_runner().invoke(args=["seed-beta", "--output", str(output)])
+        assert result.exit_code == 0, result.output
+        assert "credentials=" not in result.output
+        assert stat.S_IMODE(output.stat().st_mode) == 0o600
+        rows = [line.split("\t") for line in output.read_text().strip().splitlines() if "\t" in line and not line.startswith("Username")]
+        assert len(rows) == User.query.count() == 14
+        passwords = [password for _username, password in rows]
+        assert len(set(passwords)) == 14
+        assert all(len(password) >= 20 for password in passwords)
+        for username, password in rows:
+            user = User.query.filter_by(username=username).one()
+            assert user.needs_password_reset is True
+            assert user.check_password(password)
+            assert not user.check_password("123")
+            assert password not in result.output
+        db.session.remove()
+        db.drop_all()

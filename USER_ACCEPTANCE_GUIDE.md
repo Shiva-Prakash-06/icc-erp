@@ -4,69 +4,114 @@ This guide is for people testing the app before it goes live. The test site
 has made-up records. Do not type in real student, staff, money, health or
 private details.
 
-Each role has one short journey below. Every journey starts on **My work**,
-the page you see after signing in. If anything takes more presses than the
-journey says, or a word on screen is hard to understand, write it down — that
-is a finding.
+Each role has one short journey below. If anything takes more presses than
+the journey says, or a word on screen is hard to understand, write it down —
+that is a finding.
 
-## Start the test site on this computer
+The first part is for the **coordinator** who sets the site up. Testers can
+skip to [Before you begin](#before-you-begin).
 
-Open Terminal and run these commands from the project folder:
+## For the coordinator: set up the test site
+
+Faculty, the wing heads and the USC test on the hosted site, so they need
+nothing installed. The local site is for the coordinator's own checks.
+
+Both use the same command, `flask seed-beta`. It **empties the database it
+points at** and fills it with the beta accounts and records, then writes each
+account's one-time password to `instance/BETA_CREDENTIALS.txt`, which only you
+can read. The passwords are not printed and are stored nowhere else; running
+the command again replaces all of them.
+
+### Hosted site
+
+Do these in order. Each one is checked before the next.
+
+1. The site loads. Every line below must print 200:
+
+   ```bash
+   for p in /healthz /readyz /login; do curl -s -o /dev/null -w "$p %{http_code}\n" https://icc-platform-2.vercel.app$p; done
+   ```
+
+   If not, read the function logs in Vercel (`vercel login`, then
+   `vercel logs icc-platform-2.vercel.app`) and fix the cause first.
+2. The version under test is on `main` and Vercel has finished deploying it.
+3. The credentials exposed in September have been changed (see
+   `docs/VERCEL_DEPLOYMENT.md`, "Rotating credentials").
+4. File upload works: the Drive settings in
+   `docs/beta-audit-2026-09-08/RELEASE-RUNBOOK.md` §1 are set. Without them
+   the Media and Culturals heads cannot add files.
+5. Seed the hosted database from your own computer, pointed at the hosted
+   database. This deletes everything in it:
+
+   ```bash
+   cd /Users/Shiva_1/Desktop/icc-platform-2
+   export APP_ENV=production MIGRATION_ONLY=true BETA_SEED=1
+   export SECRET_KEY="seed-only"   # needed to start; not the site's key
+   export DATABASE_URL="<the hosted database's pooler URL from Vercel>"
+   .venv/bin/flask --app run.py db upgrade
+   .venv/bin/flask --app run.py seed-beta
+   ```
+
+6. Send each tester their username and one-time password privately, one
+   person at a time — never in a group chat or a shared document.
+
+### Local site
 
 ```bash
-cd "/Users/Shiva_1/Desktop/ICC ERP/icc-platform-2"
-export DATABASE_URL="sqlite:////Users/Shiva_1/Desktop/ICC ERP/icc-platform-2/instance/uat_acceptance.db"
-export DEMONSTRATOR=true
-export APP_ENV=testing
-export TESTING=true
-export SECRET_KEY="local-uat-only-change-me"
+cd /Users/Shiva_1/Desktop/icc-platform-2
+export DATABASE_URL="sqlite:////Users/Shiva_1/Desktop/icc-platform-2/instance/beta_local.db"
+export APP_ENV=testing TESTING=true SECRET_KEY="local-uat-only-change-me"
+.venv/bin/flask --app run.py db upgrade
+BETA_SEED=1 .venv/bin/flask --app run.py seed-beta
 .venv/bin/flask --app run.py run --host 127.0.0.1 --port 5010
 ```
 
 Then open [http://127.0.0.1:5010/login](http://127.0.0.1:5010/login). Keep
-Terminal open while you test. To stop the site, go back to Terminal and press
-**Control+C**. Do not reset or delete this test database; ask the coordinator
-if the sample records need putting back.
+Terminal open while you test; press **Control+C** to stop. Run only the last
+command next time — the first two reset everything. On the local site an
+added file ticks its item, but the file itself is not kept and cannot be
+opened again.
+
+### Test accounts
+
+| Usernames | Role | What they do |
+|---|---|---|
+| `faculty1` – `faculty4` | Faculty | Say yes to money, finished events and the website. Make people heads. |
+| `usc`, `secretary` | USC | Type in event details for any ICC event. Approve nothing. |
+| `events1`, `events2` | ICC Events head | Run ICC events. |
+| `media1`, `media2` | ICC Media head | Do the Media team's work on any ICC or IGP event. |
+| `cultural1`, `cultural2` | ICC Culturals head | Do the Culturals team's work on any ICC or IGP event. |
+| `igp1`, `igp2` | IGP head | Run IGP programmes. |
+
+There is no volunteer account. To test as a volunteer, sign up as someone new
+(below).
 
 ## Before you begin
 
-1. Get your username and one-time password from the private sheet the
-   coordinator gives you. Every account has its own password.
+1. Get your username and one-time password from the coordinator. Every
+   account has its own password. Do not share it.
 2. Use a current Chrome, Firefox, Safari or Edge. Try at least one journey on
    a phone as well — event-day work is done on phones.
 
 ## Sign in
 
-1. Type your username and the one-time password.
-2. Press **Sign in**.
-3. Pick your own new password when asked.
-4. You land on **My work** (volunteers land on **My activities**). Check that
-   the badge at the bottom of the left rail says your role.
-
-## Test accounts
-
-| Username | Role | What they do |
-|---|---|---|
-| `uat_faculty_admin` | Faculty | Says yes to money, finished events and the website. Makes people heads. |
-| `uat_usc` | USC | Types in event details for any ICC event. Approves nothing. |
-| `uat_icc_events_head` | ICC Events head | Runs ICC events. |
-| `uat_igp_head` | IGP head | Runs IGP programmes. |
-| `uat_media_head` | ICC Media head | Does the Media team's work on any ICC or IGP event. |
-| `uat_culturals_head` | ICC Culturals head | Does the Culturals team's work on any ICC or IGP event. |
-| `uat_volunteer` | Volunteer | Only looks at the events they are on. |
-
-Accounts are made by an operator with `DEMONSTRATOR=true` and
-`PROVISION_UAT=1` (`flask provision-uat`); the passwords are written to
-`instance/UAT_CREDENTIALS.txt`, readable only by that operator. The command
-refuses to run anywhere else, so it cannot make test accounts on the real
-site.
+1. Open the link the coordinator gave you.
+2. Type your username and the one-time password, and press **Sign in**.
+3. Pick your own new password when asked. It must be at least 12 characters.
+   Press **Go to My work**. My work is where you do things, and where every
+   journey below starts.
+4. Check that the bottom of the sidebar shows your name and role.
+5. Press **Campuses** in the sidebar: four campus tiles. Press one to see its
+   ICC events and IGP programmes, and press a programme to see its actions.
+   These pages are for looking only — nothing is ticked there. From your next
+   sign-in on, this is the page you land on; press **My work** to get back to
+   your list.
 
 ## ICC Events head
 
-1. Sign in as `uat_icc_events_head`. My work says how many things you have
-   to do today.
-2. Press **+ New event**. Type a name. Leave the date as today, or pick one.
-   Press **Create event**. *(2 presses.)*
+1. Sign in as `events1`. My work says how many things you have to do today.
+2. Press **New event** (in the sidebar, or the Menu on a phone). Type a name.
+   Leave the date as today, or pick one. Press **Create event**.
 3. You are on the new event. Its to-do list is already filled in. Press the
    circle next to one item. It is ticked. *(1 press.)*
 4. In **What needs doing?** type "Order T-shirts", pick **Who? → Media
@@ -81,12 +126,13 @@ site.
 8. Remove a to-do, then press **Undo** in the message that appears.
 
 You should see: nothing asks for the same thing twice, every save brings you
-back to the same card, and nothing is lost by Remove.
+back to the same card, nothing is lost by Remove, and there is no way to
+approve money or finish an event.
 
 ## Media head (and Culturals head)
 
-1. Sign in as `uat_media_head`. My work lists your team's items from every
-   event — both ICC and IGP — and nobody else's.
+1. Sign in as `media1`. My work lists your team's items from every event —
+   both ICC and IGP — and nobody else's.
 2. Find "Order T-shirts" from the Events head's journey. Press its circle.
    *(1 press.)*
 3. Find an item about a poster or photos. Press **Add file** and pick any
@@ -94,23 +140,22 @@ back to the same card, and nothing is lost by Remove.
 4. Open an event from **Your events**. You see only your team's to-dos and
    the files you added. You do not see People, Money or Schedule.
 
-Repeat with `uat_culturals_head`: you see only Culturals items.
+Repeat with `cultural1`: you see only Culturals items.
 
 ## Faculty
 
-1. Sign in as `uat_faculty_admin`. **Needs your OK** is at the top.
+1. Sign in as `faculty1` and open My work. **Needs your OK** is at the top.
 2. Press **Approve** on the Snacks money request. It disappears and you stay
    on My work. *(1 press.)*
 3. Press **Not now** on another item. It opens the event; write a short
    reason and send it back.
 4. If an event is waiting to be finished, press **Sign off**.
-5. Open **People** (in the rail, or the Menu on a phone). Find the volunteer,
-   press **Change**, make them a Culturals head and save. Make them a
-   volunteer again afterwards.
+5. Open **People** (in the sidebar, or the Menu on a phone). Find someone,
+   press **Change**, make them a Culturals head and save. Change them back
+   afterwards.
 6. Open **Reports**. Check this year's five numbers and that finished events
    have a **Report (PDF)**.
-7. Open **Who changed what** from the Menu. Your approval is there as a
-   sentence.
+7. Open **Who changed what**. Your approval is there as a sentence.
 
 You should see: only money, finishing an event and the website ever need
 your OK, and you are never asked to approve something you asked for
@@ -118,18 +163,18 @@ yourself.
 
 ## USC
 
-1. Sign in as `uat_usc`. My work shows items handed to the USC and today's
+1. Sign in as `usc`. My work shows items handed to the USC and today's
    event, if there is one.
 2. Open **Events**, pick an ICC event, open **Event details** and fix a
    spelling. Save. You come back to the same card.
-3. Open **Upload a sheet** from the Menu. Download the empty People sheet,
-   add two rows, and upload it. It is checked, and it says it is waiting for
-   Faculty to save it.
+3. Open **Upload a sheet**. Download the empty People sheet, add two rows,
+   and upload it. It is checked, and it says it is waiting for Faculty to
+   save it.
 4. Try to approve anything — there is no button for it.
 
 ## IGP head
 
-1. Sign in as `uat_igp_head`. You see IGP programmes only.
+1. Sign in as `igp1`. Under Events and My work you see IGP programmes only.
 2. Make a new event from an itinerary file, or open an IGP programme.
 3. Open **Buddies** and pair a buddy with a student.
 4. Open **Feedback** and press **Make feedback link**. Open the link in a
@@ -138,22 +183,19 @@ yourself.
 5. When the programme's last day has passed, press **Finish event**, tick
    "Also show on the public website", and send it to Faculty.
 
-## Volunteer
-
-1. Sign in as `uat_volunteer`. You see **My activities**: each event you are
-   on, its time and place, your job and your buddy.
-2. Open an event. You see when and where, your job and your buddy — nothing
-   about anyone else, and nothing to fill in.
-3. The rail has only My activities and Account (and the Menu).
-4. Open **Account**, open **Your details**, add a phone number and your
-   register number, and press **Save**. It says "Saved ✓" and the numbers
-   show on the folded card.
-
-## Sign up as someone new
+## Sign up as someone new (Volunteer)
 
 1. Sign out. Press **New here? Sign up**.
-2. Use a `@christuniversity.in` email. You go straight in as a volunteer.
+2. Use a `@christuniversity.in` email. You go straight in as a volunteer and
+   land on **My activities**.
 3. An email from any other domain is refused.
+4. You see only the events you are on, with when and where, your job and
+   your buddy — nothing about anyone else. Ask Faculty to add you to an event
+   if the list is empty.
+5. The sidebar has only My activities and Account (and the Menu). Opening
+   Campuses is refused.
+6. Open **Account**, open **Your details**, add a phone number and your
+   register number, and press **Save**. It says "Saved ✓".
 
 ## Public website check
 
@@ -165,7 +207,10 @@ yourself.
 ## If something goes wrong
 
 - Too many wrong passwords locks the account for a few minutes. Wait, or ask
-  the coordinator. Do not keep trying.
+  the coordinator. Do not keep trying. Password-reset emails are not sent
+  during testing, so a forgotten password also goes to the coordinator, who
+  can run `seed-beta` again only if everyone is told first — it resets the
+  whole site.
 - If a save seems to work but the value is gone after you reload, stop and
   report the event, the card, the field and the time.
 - If you can see something you think you should not, tell the coordinator

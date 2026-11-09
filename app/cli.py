@@ -44,6 +44,25 @@ def _one_time_password() -> str:
     return secrets.token_urlsafe(18)
 
 
+def _write_credential_sheet(output: Path, heading: str, rows: list[tuple[str, str]]) -> Path:
+    """Write username/password pairs to a file only its owner can read.
+
+    Created 0600 from the start, so the passwords are never briefly readable
+    by other local users between creation and chmod.
+    """
+    output = output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(f"{heading}\n")
+        handle.write(f"Generated: {datetime.now(timezone.utc).isoformat()}\n")
+        handle.write("Rotate or delete immediately after testing.\n\n")
+        handle.write("Username\tOne-time password\n")
+        handle.write("\n".join(f"{username}\t{password}" for username, password in rows) + "\n")
+    os.chmod(output, 0o600)
+    return output
+
+
 def register_cli(app):
     @app.cli.command("seed-test-users")
     def seed_test_users():
@@ -272,7 +291,9 @@ def register_cli(app):
     @app.cli.command("seed-beta")
     @click.option("--reset/--no-reset", default=True,
                   help="Delete every existing application row first (default).")
-    def seed_beta_command(reset):
+    @click.option("--output", type=click.Path(dir_okay=False, path_type=Path), default=Path("instance/BETA_CREDENTIALS.txt"),
+                  help="Private sheet the one-time passwords are written to.")
+    def seed_beta_command(reset, output):
         """Reset the database and seed the beta-testing roster and projects.
 
         Destructive by design: `--reset` empties every application table. Gated
@@ -284,11 +305,14 @@ def register_cli(app):
             raise click.ClickException(
                 "seed-beta is destructive and runs only with BETA_SEED=1 set explicitly."
             )
-        from app.services.beta_seed import BETA_PASSWORD, seed_beta
+        from app.services.beta_seed import seed_beta
 
         summary = seed_beta(reset=reset)
+        credentials = summary.pop("credentials")
         click.echo(", ".join(f"{key}={value}" for key, value in summary.items()))
-        click.echo(f"All {summary['users']} beta accounts share the password: {BETA_PASSWORD}")
+        sheet = _write_credential_sheet(output, "ICC ERP beta one-time credentials", credentials)
+        click.echo(f"Each of the {summary['users']} beta accounts has its own one-time password, "
+                   f"changed at first sign-in. Private credentials: {sheet}")
 
     @app.cli.command("seed-campus-demo")
     def seed_campus_demo_command():
@@ -348,18 +372,9 @@ def register_cli(app):
                 assignment_reason="User acceptance testing",
                 can_view_sensitive_links=sensitive,
             ))
-            credentials.append(f"{username}\t{password}")
+            credentials.append((username, password))
         db.session.commit()
-        output = output.resolve()
-        output.parent.mkdir(parents=True, exist_ok=True)
-        descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write("ICC ERP UAT one-time credentials\n")
-            handle.write(f"Generated: {datetime.now(timezone.utc).isoformat()}\n")
-            handle.write("Rotate or delete immediately after acceptance.\n\n")
-            handle.write("Username\tOne-time password\n")
-            handle.write("\n".join(credentials) + "\n")
-        os.chmod(output, 0o600)
+        output = _write_credential_sheet(output, "ICC ERP UAT one-time credentials", credentials)
         click.echo(f"Provisioned {len(rows)} UAT accounts. Private credentials: {output}")
 
     @app.cli.command("demo-import-supplied")
