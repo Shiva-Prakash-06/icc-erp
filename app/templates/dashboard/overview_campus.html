@@ -37,7 +37,7 @@
             </p>
             <div class="ov-program__foot">
               <div class="ov-meter">
-                <span class="ov-meter__bar"><span class="ov-meter__fill" style="width: {{ row.percent }}%"></span></span>
+                <svg class="ov-meter__bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="ov-meter__fill" width="{{ row.percent }}" height="8"/></svg>
                 <span class="ov-meter__text">{% if row.total %}{{ row.done }} of {{ row.total }} actions done{% else %}No actions yet{% endif %}</span>
               </div>
               {% if row.late %}<span class="ov-program__late"><i class="ph ph-warning" aria-hidden="true"></i> {{ row.late }} late</span>{% endif %}

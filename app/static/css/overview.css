@@ -34,7 +34,7 @@
 .ov-tile__fact--late { background: rgb(255 255 255 / 92%); color: var(--color-danger); }
 .ov-tile__meter { width: min(320px, 70%); margin: var(--space-4) 0 var(--space-4); }
 .ov-tile__meter .ov-meter__bar { background: rgb(255 255 255 / 22%); }
-.ov-tile__meter .ov-meter__fill { background: #fff; }
+.ov-tile__meter .ov-meter__fill { fill: #fff; }
 .ov-tile__meter .ov-meter__text { color: var(--on-accent-muted); }
 
 .ds-tile--plum { background: var(--tile-plum); border-color: var(--tile-plum); color: var(--on-accent); }
@@ -44,8 +44,9 @@
 
 /* ── A progress meter ─────────────────────────────────────────────────── */
 .ov-meter { display: flex; flex-direction: column; gap: 6px; }
-.ov-meter__bar { height: 8px; border-radius: 999px; background: var(--color-surface-3); overflow: hidden; }
-.ov-meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--color-success); }
+/* An SVG, so the fill's width is an attribute rather than an inline style. */
+.ov-meter__bar { display: block; width: 100%; height: 8px; border-radius: 999px; background: var(--color-surface-3); overflow: hidden; }
+.ov-meter__fill { fill: var(--color-success); }
 .ov-meter__text { font-size: 13px; color: var(--color-text-tertiary); }
 
 /* ── Level 2: the programs in a campus ────────────────────────────────── */

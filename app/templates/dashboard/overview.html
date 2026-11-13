@@ -32,7 +32,7 @@
         {% if tile.actions_late %}<li class="ov-tile__fact ov-tile__fact--late">{{ tile.actions_late }} late</li>{% endif %}
       </ul>
       <div class="ov-meter ov-tile__meter">
-        <span class="ov-meter__bar"><span class="ov-meter__fill" style="width: {{ tile.actions_percent }}%"></span></span>
+        <svg class="ov-meter__bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect class="ov-meter__fill" width="{{ tile.actions_percent }}" height="8"/></svg>
         <span class="ov-meter__text">{% if tile.actions_total %}{{ tile.actions_done }} of {{ tile.actions_total }} actions done{% else %}No actions yet{% endif %}</span>
       </div>
       <span class="ds-tile__go">See programs <i class="ph ph-arrow-right" aria-hidden="true"></i></span>

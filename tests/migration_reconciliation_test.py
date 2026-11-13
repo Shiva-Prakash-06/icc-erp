@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from datetime import date, datetime
 
 import sqlalchemy as sa
@@ -14,7 +15,7 @@ def _upgrade(database_url: str, target: str) -> None:
     environment = os.environ.copy()
     environment.update({"DATABASE_URL": database_url, "FLASK_APP": "run.py", "APP_ENV": "development"})
     result = subprocess.run(
-        [os.path.join(ROOT, ".venv", "bin", "flask"), "db", "upgrade", target],
+        [sys.executable, "-m", "flask", "db", "upgrade", target],
         cwd=ROOT, env=environment, capture_output=True, text=True,
     )
     if result.returncode:

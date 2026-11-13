@@ -26,21 +26,38 @@ the command again replaces all of them.
 
 Do these in order. Each one is checked before the next.
 
-1. The site loads. Every line below must print 200:
+1. A Redis store exists. The one the site used
+   (`informed-starfish-174568.upstash.io`) has been deleted. Create a new
+   Upstash Redis database (Vercel → Storage, or console.upstash.com, region
+   Tokyo to match the app) and set its `rediss://…` URL as both
+   `RATELIMIT_STORAGE_URI` and `UPLOAD_SESSION_STORAGE_URI` in Vercel →
+   Settings → Environment Variables → Production. Without it the site
+   loads, but every file upload fails.
+2. Drive is set up, so the Media and Culturals heads can add files. The
+   test folder is **ICC Test Drive**,
+   `18ae3pJi2NiEC3yL-R9aVmocZXewC6ENH`.
+   - The folder must sit inside a **Shared Drive**, not someone's My Drive:
+     a service account has no storage of its own, so uploads to a My Drive
+     folder fail. If it is in My Drive, make a Shared Drive and move it in.
+   - In Google Cloud, create a service account, add a JSON key, and add the
+     service account's email to the Shared Drive as **Content manager**.
+   - Set in Vercel (Production): `DRIVE_VALIDATION_MODE=live`,
+     `GOOGLE_DRIVE_REPOSITORY_ROOT_ID=18ae3pJi2NiEC3yL-R9aVmocZXewC6ENH`,
+     and `GOOGLE_SERVICE_ACCOUNT_JSON` = the whole key file. Keep
+     `DISABLE_EXTERNAL_INTEGRATIONS=true`.
+   - The folder is currently viewable by anyone with its link, and files
+     uploaded into it inherit that. That is fine for made-up beta records;
+     set it to **Restricted** before any real document goes in.
+3. The version under test is on `main`, and Vercel has finished deploying
+   it (Vercel → Deployments shows it **Ready**). Then every line below must
+   print 200:
 
    ```bash
    for p in /healthz /readyz /login; do curl -s -o /dev/null -w "$p %{http_code}\n" https://icc-platform-2.vercel.app$p; done
    ```
 
-   If not, read the function logs in Vercel (`vercel login`, then
-   `vercel logs icc-platform-2.vercel.app`) and fix the cause first.
-2. The version under test is on `main` and Vercel has finished deploying it.
-3. The credentials exposed in September have been changed (see
-   `docs/VERCEL_DEPLOYMENT.md`, "Rotating credentials").
-4. File upload works: the Drive settings in
-   `docs/beta-audit-2026-09-08/RELEASE-RUNBOOK.md` §1 are set. Without them
-   the Media and Culturals heads cannot add files.
-5. Seed the hosted database from your own computer, pointed at the hosted
+   If not, open the failed request in Vercel → Logs and fix the cause first.
+4. Seed the hosted database from your own computer, pointed at the hosted
    database. This deletes everything in it:
 
    ```bash
@@ -52,7 +69,7 @@ Do these in order. Each one is checked before the next.
    .venv/bin/flask --app run.py seed-beta
    ```
 
-6. Send each tester their username and one-time password privately, one
+5. Send each tester their username and one-time password privately, one
    person at a time — never in a group chat or a shared document.
 
 ### Local site

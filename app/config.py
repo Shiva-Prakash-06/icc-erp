@@ -101,6 +101,12 @@ class BaseConfig:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    # If the shared limiter store is unreachable, count in this process
+    # instead of failing the request. The hosted Redis was once deleted
+    # from under the app, and every page, /healthz included, returned 500.
+    # Sign-in lockout is counted in the database, so it is unaffected.
+    RATELIMIT_SWALLOW_ERRORS = True
+    RATELIMIT_IN_MEMORY_FALLBACK_ENABLED = True
     # Blanket per-caller ceiling, shared across every endpoint. Keyed by
     # account for signed-in traffic (see app.database.rate_limit_key), so a
     # shared campus NAT no longer pools one allowance. Audit P0-01.
