@@ -12,6 +12,7 @@ from flask import Flask, g, jsonify, make_response, redirect, render_template, r
 from flask_wtf.csrf import CSRFError
 from markupsafe import Markup
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import select_config
@@ -34,7 +35,12 @@ def create_app(config_object=None):
         # deployments. SQLite has no equivalent connection option.
         engine_options = dict(app.config.get("SQLALCHEMY_ENGINE_OPTIONS") or {})
         connect_args = dict(engine_options.get("connect_args") or {})
-        existing_options = connect_args.get("options", "")
+        # Keep any `options` given in DATABASE_URL itself: a connect_args
+        # value replaces the URL's, so merge rather than drop them.
+        url_options = make_url(database_uri).query.get("options", "")
+        if isinstance(url_options, tuple):
+            url_options = " ".join(url_options)
+        existing_options = f"{url_options} {connect_args.get('options', '')}".strip()
         connect_args["options"] = f"{existing_options} -c timezone=UTC".strip()
         engine_options["connect_args"] = connect_args
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options

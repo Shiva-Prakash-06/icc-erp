@@ -57,18 +57,21 @@ Do these in order. Each one is checked before the next.
    ```
 
    If not, open the failed request in Vercel → Logs and fix the cause first.
-4. Seed the hosted database from your own computer, pointed at the hosted
-   database. This deletes everything in it:
+4. Seed the hosted database from your own computer. This deletes
+   everything in it. Vercel will not show `DATABASE_URL` again, so use the
+   Supabase CLI's short-lived login for the linked `icc-erp` project
+   (`supabase login` once, then `supabase link`):
 
    ```bash
    cd /Users/Shiva_1/Desktop/icc-platform-2
    export APP_ENV=production MIGRATION_ONLY=true BETA_SEED=1
    export SECRET_KEY="seed-only"   # needed to start; not the site's key
-   export DATABASE_URL="<the hosted database's pooler URL from Vercel>"
+   export DATABASE_URL="$(python3 scripts/supabase_db_url.py)"
    .venv/bin/flask --app run.py db upgrade
    .venv/bin/flask --app run.py seed-beta
    ```
 
+   Last seeded: 14 November 2026.
 5. Send each tester their username and one-time password privately, one
    person at a time — never in a group chat or a shared document.
 
