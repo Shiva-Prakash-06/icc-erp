@@ -58,6 +58,8 @@ function row(page: Page, text: string) {
 }
 
 test("0 clicks: every role signs in to Campuses, and My work is one press away", async ({ page }) => {
+  // Nine sign-ins in one test; at 200% zoom on CI that runs past 30s.
+  test.setTimeout(90_000);
   const landing: [string, RegExp][] = [
     ["e2e_faculty", /needs your ok|to do|caught up/i],
     ["e2e_usc", /to do|today's event|your events|caught up/i],
