@@ -1,40 +1,4 @@
 {
-  "app/static/fonts/barlow-400.woff2": {
-    "file": "assets/barlow-400-qiz4-Cze.woff2",
-    "src": "app/static/fonts/barlow-400.woff2"
-  },
-  "app/static/fonts/barlow-500.woff2": {
-    "file": "assets/barlow-500-BPAOfeC8.woff2",
-    "src": "app/static/fonts/barlow-500.woff2"
-  },
-  "app/static/fonts/barlow-600.woff2": {
-    "file": "assets/barlow-600-DILqtrty.woff2",
-    "src": "app/static/fonts/barlow-600.woff2"
-  },
-  "app/static/fonts/barlow-condensed-500.woff2": {
-    "file": "assets/barlow-condensed-500-BgYH2mbd.woff2",
-    "src": "app/static/fonts/barlow-condensed-500.woff2"
-  },
-  "app/static/fonts/barlow-condensed-600.woff2": {
-    "file": "assets/barlow-condensed-600-DepVgxBB.woff2",
-    "src": "app/static/fonts/barlow-condensed-600.woff2"
-  },
-  "app/static/fonts/barlow-condensed-700.woff2": {
-    "file": "assets/barlow-condensed-700-v1xN8_Wq.woff2",
-    "src": "app/static/fonts/barlow-condensed-700.woff2"
-  },
-  "app/static/fonts/ibm-plex-mono-400.woff2": {
-    "file": "assets/ibm-plex-mono-400-DMJ8VG8y.woff2",
-    "src": "app/static/fonts/ibm-plex-mono-400.woff2"
-  },
-  "app/static/fonts/ibm-plex-mono-600.woff2": {
-    "file": "assets/ibm-plex-mono-600-BgSNZQsw.woff2",
-    "src": "app/static/fonts/ibm-plex-mono-600.woff2"
-  },
-  "app/static/icons/activity.svg": {
-    "file": "assets/activity-B50wuuWZ.svg",
-    "src": "app/static/icons/activity.svg"
-  },
   "app/static/icons/arrow-left.svg": {
     "file": "assets/arrow-left-Cifcqwuv.svg",
     "src": "app/static/icons/arrow-left.svg"
@@ -47,45 +11,17 @@
     "file": "assets/arrow-up-right-CnNsH9hZ.svg",
     "src": "app/static/icons/arrow-up-right.svg"
   },
-  "app/static/icons/award.svg": {
-    "file": "assets/award-CCyhx8Gw.svg",
-    "src": "app/static/icons/award.svg"
-  },
-  "app/static/icons/badge.svg": {
-    "file": "assets/badge-jzIjtnC2.svg",
-    "src": "app/static/icons/badge.svg"
-  },
   "app/static/icons/bell.svg": {
     "file": "assets/bell-CRYWSwE7.svg",
     "src": "app/static/icons/bell.svg"
-  },
-  "app/static/icons/bookmark.svg": {
-    "file": "assets/bookmark-ChwjOMQi.svg",
-    "src": "app/static/icons/bookmark.svg"
   },
   "app/static/icons/building-2.svg": {
     "file": "assets/building-2-DApz11on.svg",
     "src": "app/static/icons/building-2.svg"
   },
-  "app/static/icons/building.svg": {
-    "file": "assets/building-DCF29qKM.svg",
-    "src": "app/static/icons/building.svg"
-  },
-  "app/static/icons/calendar-check-2.svg": {
-    "file": "assets/calendar-check-2-C9zHARpX.svg",
-    "src": "app/static/icons/calendar-check-2.svg"
-  },
-  "app/static/icons/calendar-clock.svg": {
-    "file": "assets/calendar-clock-D3VtfOEe.svg",
-    "src": "app/static/icons/calendar-clock.svg"
-  },
   "app/static/icons/calendar-days.svg": {
     "file": "assets/calendar-days-0KQreHDW.svg",
     "src": "app/static/icons/calendar-days.svg"
-  },
-  "app/static/icons/calendar-x.svg": {
-    "file": "assets/calendar-x-CHD-j3Ki.svg",
-    "src": "app/static/icons/calendar-x.svg"
   },
   "app/static/icons/calendar.svg": {
     "file": "assets/calendar-BNVmUqGe.svg",
@@ -95,29 +31,9 @@
     "file": "assets/chart-column-big-CHJZSWpK.svg",
     "src": "app/static/icons/chart-column-big.svg"
   },
-  "app/static/icons/chart-pie.svg": {
-    "file": "assets/chart-pie-PVDXgDaX.svg",
-    "src": "app/static/icons/chart-pie.svg"
-  },
-  "app/static/icons/check-check.svg": {
-    "file": "assets/check-check--9kTvK1L.svg",
-    "src": "app/static/icons/check-check.svg"
-  },
   "app/static/icons/check.svg": {
     "file": "assets/check-C2tN36xL.svg",
     "src": "app/static/icons/check.svg"
-  },
-  "app/static/icons/chevron-left.svg": {
-    "file": "assets/chevron-left-BJWUOf3q.svg",
-    "src": "app/static/icons/chevron-left.svg"
-  },
-  "app/static/icons/chevron-right.svg": {
-    "file": "assets/chevron-right-BfvWZFn0.svg",
-    "src": "app/static/icons/chevron-right.svg"
-  },
-  "app/static/icons/chevrons-up-down.svg": {
-    "file": "assets/chevrons-up-down-SIcBg8GC.svg",
-    "src": "app/static/icons/chevrons-up-down.svg"
   },
   "app/static/icons/circle-alert.svg": {
     "file": "assets/circle-alert-D3Ua740a.svg",
@@ -155,30 +71,6 @@
     "file": "assets/database-DYsced7h.svg",
     "src": "app/static/icons/database.svg"
   },
-  "app/static/icons/download.svg": {
-    "file": "assets/download-DzXYrrPz.svg",
-    "src": "app/static/icons/download.svg"
-  },
-  "app/static/icons/earth.svg": {
-    "file": "assets/earth-Cm42n7Cl.svg",
-    "src": "app/static/icons/earth.svg"
-  },
-  "app/static/icons/ellipsis.svg": {
-    "file": "assets/ellipsis-IqK265ql.svg",
-    "src": "app/static/icons/ellipsis.svg"
-  },
-  "app/static/icons/external-link.svg": {
-    "file": "assets/external-link-ClhGXIYb.svg",
-    "src": "app/static/icons/external-link.svg"
-  },
-  "app/static/icons/file-plus.svg": {
-    "file": "assets/file-plus-BaKxD67S.svg",
-    "src": "app/static/icons/file-plus.svg"
-  },
-  "app/static/icons/file-text.svg": {
-    "file": "assets/file-text-DyJGYwLA.svg",
-    "src": "app/static/icons/file-text.svg"
-  },
   "app/static/icons/file-up.svg": {
     "file": "assets/file-up-tq5ULWJI.svg",
     "src": "app/static/icons/file-up.svg"
@@ -187,42 +79,6 @@
     "file": "assets/file-C0khycg1.svg",
     "src": "app/static/icons/file.svg"
   },
-  "app/static/icons/flag.svg": {
-    "file": "assets/flag-DnryBnHd.svg",
-    "src": "app/static/icons/flag.svg"
-  },
-  "app/static/icons/folder-open.svg": {
-    "file": "assets/folder-open-BXtCDeEh.svg",
-    "src": "app/static/icons/folder-open.svg"
-  },
-  "app/static/icons/folder.svg": {
-    "file": "assets/folder-UkSXRlpN.svg",
-    "src": "app/static/icons/folder.svg"
-  },
-  "app/static/icons/funnel.svg": {
-    "file": "assets/funnel-B-L9tOmr.svg",
-    "src": "app/static/icons/funnel.svg"
-  },
-  "app/static/icons/gauge.svg": {
-    "file": "assets/gauge-MhZ8eYco.svg",
-    "src": "app/static/icons/gauge.svg"
-  },
-  "app/static/icons/globe-2.svg": {
-    "file": "assets/globe-2-CpcwZggE.svg",
-    "src": "app/static/icons/globe-2.svg"
-  },
-  "app/static/icons/grid-2x2.svg": {
-    "file": "assets/grid-2x2-BPQuUJ-K.svg",
-    "src": "app/static/icons/grid-2x2.svg"
-  },
-  "app/static/icons/heart-handshake.svg": {
-    "file": "assets/heart-handshake-CB8ejTxc.svg",
-    "src": "app/static/icons/heart-handshake.svg"
-  },
-  "app/static/icons/heart-pulse.svg": {
-    "file": "assets/heart-pulse-DbDuNnm8.svg",
-    "src": "app/static/icons/heart-pulse.svg"
-  },
   "app/static/icons/history.svg": {
     "file": "assets/history-2G2PGc8o.svg",
     "src": "app/static/icons/history.svg"
@@ -230,22 +86,6 @@
   "app/static/icons/image.svg": {
     "file": "assets/image-Cgur-tj8.svg",
     "src": "app/static/icons/image.svg"
-  },
-  "app/static/icons/kanban.svg": {
-    "file": "assets/kanban-a8-9uqPW.svg",
-    "src": "app/static/icons/kanban.svg"
-  },
-  "app/static/icons/key-round.svg": {
-    "file": "assets/key-round-B4_Z5Y94.svg",
-    "src": "app/static/icons/key-round.svg"
-  },
-  "app/static/icons/link.svg": {
-    "file": "assets/link-D2K9w-KJ.svg",
-    "src": "app/static/icons/link.svg"
-  },
-  "app/static/icons/list-checks.svg": {
-    "file": "assets/list-checks-DlR0ffuz.svg",
-    "src": "app/static/icons/list-checks.svg"
   },
   "app/static/icons/list.svg": {
     "file": "assets/list-DFAhupL8.svg",
@@ -263,124 +103,36 @@
     "file": "assets/mail-open-BDAguctH.svg",
     "src": "app/static/icons/mail-open.svg"
   },
-  "app/static/icons/mail.svg": {
-    "file": "assets/mail-DN5GQiyt.svg",
-    "src": "app/static/icons/mail.svg"
-  },
-  "app/static/icons/message-circle-heart.svg": {
-    "file": "assets/message-circle-heart-yDGzROTT.svg",
-    "src": "app/static/icons/message-circle-heart.svg"
-  },
-  "app/static/icons/message-circle.svg": {
-    "file": "assets/message-circle-C41zSFR5.svg",
-    "src": "app/static/icons/message-circle.svg"
-  },
-  "app/static/icons/network.svg": {
-    "file": "assets/network-VBgukYKP.svg",
-    "src": "app/static/icons/network.svg"
-  },
   "app/static/icons/notebook.svg": {
     "file": "assets/notebook-DL65SKgL.svg",
     "src": "app/static/icons/notebook.svg"
-  },
-  "app/static/icons/octagon-alert.svg": {
-    "file": "assets/octagon-alert-FtaeGBCU.svg",
-    "src": "app/static/icons/octagon-alert.svg"
-  },
-  "app/static/icons/pen-line.svg": {
-    "file": "assets/pen-line-CAWJDZlg.svg",
-    "src": "app/static/icons/pen-line.svg"
-  },
-  "app/static/icons/plane.svg": {
-    "file": "assets/plane-dVH5V_M9.svg",
-    "src": "app/static/icons/plane.svg"
-  },
-  "app/static/icons/plus.svg": {
-    "file": "assets/plus-C6Y3wTca.svg",
-    "src": "app/static/icons/plus.svg"
   },
   "app/static/icons/power.svg": {
     "file": "assets/power-BREdLRDW.svg",
     "src": "app/static/icons/power.svg"
   },
-  "app/static/icons/quote.svg": {
-    "file": "assets/quote-D9dw1nX8.svg",
-    "src": "app/static/icons/quote.svg"
-  },
-  "app/static/icons/radio-tower.svg": {
-    "file": "assets/radio-tower-q2aD7B7V.svg",
-    "src": "app/static/icons/radio-tower.svg"
-  },
-  "app/static/icons/receipt-text.svg": {
-    "file": "assets/receipt-text-DC52tj7b.svg",
-    "src": "app/static/icons/receipt-text.svg"
-  },
   "app/static/icons/search.svg": {
     "file": "assets/search-B6JsRoiY.svg",
     "src": "app/static/icons/search.svg"
-  },
-  "app/static/icons/sheet.svg": {
-    "file": "assets/sheet-Bnv4XV3H.svg",
-    "src": "app/static/icons/sheet.svg"
-  },
-  "app/static/icons/shield-check.svg": {
-    "file": "assets/shield-check-Ba2XaMkI.svg",
-    "src": "app/static/icons/shield-check.svg"
   },
   "app/static/icons/square-check-big.svg": {
     "file": "assets/square-check-big-BrAolcJ7.svg",
     "src": "app/static/icons/square-check-big.svg"
   },
-  "app/static/icons/square.svg": {
-    "file": "assets/square-CQUWPFZu.svg",
-    "src": "app/static/icons/square.svg"
-  },
-  "app/static/icons/star-half.svg": {
-    "file": "assets/star-half-ReK6fdfe.svg",
-    "src": "app/static/icons/star-half.svg"
-  },
-  "app/static/icons/star.svg": {
-    "file": "assets/star-CXlKeyri.svg",
-    "src": "app/static/icons/star.svg"
-  },
   "app/static/icons/triangle-alert.svg": {
     "file": "assets/triangle-alert-tNOmBVmb.svg",
     "src": "app/static/icons/triangle-alert.svg"
   },
-  "app/static/icons/user-check.svg": {
-    "file": "assets/user-check-B9uPS1Un.svg",
-    "src": "app/static/icons/user-check.svg"
-  },
-  "app/static/icons/user-round-plus.svg": {
-    "file": "assets/user-round-plus-BbPzz4qh.svg",
-    "src": "app/static/icons/user-round-plus.svg"
-  },
-  "app/static/icons/user-round-x.svg": {
-    "file": "assets/user-round-x-gKyCICJp.svg",
-    "src": "app/static/icons/user-round-x.svg"
-  },
-  "app/static/icons/user-round.svg": {
-    "file": "assets/user-round-BD9W7fG-.svg",
-    "src": "app/static/icons/user-round.svg"
-  },
-  "app/static/icons/users-round.svg": {
-    "file": "assets/users-round-DTa8Aszs.svg",
-    "src": "app/static/icons/users-round.svg"
-  },
   "app/static/icons/users.svg": {
     "file": "assets/users-GdE8dVU6.svg",
     "src": "app/static/icons/users.svg"
-  },
-  "app/static/icons/wrench.svg": {
-    "file": "assets/wrench-bZySuzkN.svg",
-    "src": "app/static/icons/wrench.svg"
   },
   "app/static/icons/x.svg": {
     "file": "assets/x-VdoQB4qP.svg",
     "src": "app/static/icons/x.svg"
   },
   "frontend/src/entries/aurora.tsx": {
-    "file": "assets/aurora-GadYSOt_.js",
+    "file": "assets/aurora-BTwQ7wUz.js",
     "name": "aurora",
     "src": "frontend/src/entries/aurora.tsx",
     "isEntry": true,
@@ -441,7 +193,7 @@
     ]
   },
   "frontend/src/islands/command-palette.ts": {
-    "file": "assets/command-palette-DJwMtwz_.js",
+    "file": "assets/command-palette-CU6aQ_2x.js",
     "name": "command-palette",
     "src": "frontend/src/islands/command-palette.ts",
     "isDynamicEntry": true
