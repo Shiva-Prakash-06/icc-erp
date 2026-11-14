@@ -2,7 +2,7 @@ import { expect, Page } from "@playwright/test";
 
 export const acceptancePassword = "123";
 
-export async function signIn(page: Page, username: string) {
+export async function signIn(page: Page, username: string, { stayOnLanding = false } = {}) {
   // Each call represents a new authentication boundary, including the
   // maker/checker hand-off inside a single test. Clearing the isolated test
   // context's cookies avoids browser back/forward/session restoration from
@@ -28,7 +28,16 @@ export async function signIn(page: Page, username: string) {
     ]).then(([ok]) => ok);
     if (landed) break;
   }
-  await expect(page.locator("body")).toContainText(username);
+  // Working roles open on Campuses. The journeys start from My work, which
+  // is one press away, so go there unless the test is about the landing.
+  if (!stayOnLanding && new URL(page.url()).pathname === "/overview") {
+    await page.goto("/");
+  }
+  // The sidebar shows the person's name, not their username, so ask the
+  // server who is signed in.
+  const me = await page.request.get("/api/v1/me");
+  expect(me.status()).toBe(200);
+  expect((await me.json()).data.user.username).toBe(username);
 }
 
 // The event page is one to-do list and folded cards. Older specs name the

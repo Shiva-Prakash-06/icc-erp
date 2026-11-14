@@ -3,10 +3,13 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 database_path="$repo_root/instance/e2e-acceptance.db"
+# CI installs into the runner's Python; locally the project has a .venv.
+python="$repo_root/.venv/bin/python"
+[[ -x "$python" ]] || python="$(command -v python3 || command -v python)"
 if [[ -n "${E2E_DATABASE_URL:-}" ]]; then
   export DATABASE_URL="$E2E_DATABASE_URL"
   if [[ "${ACCEPTANCE_RESET_POSTGRES:-0}" == "1" ]]; then
-    .venv/bin/python - <<'PY'
+    "$python" - <<'PY'
 import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -36,6 +39,6 @@ export SECRET_KEY="acceptance-test-secret-key-only"
 export PASSWORD_RESET_MIN_RESPONSE_MS=20
 
 cd "$repo_root"
-.venv/bin/flask db upgrade
-.venv/bin/flask seed-acceptance
-exec .venv/bin/flask run --host 127.0.0.1 --port 5010 --no-debugger --no-reload
+"$python" -m flask db upgrade
+"$python" -m flask seed-acceptance
+exec "$python" -m flask run --host 127.0.0.1 --port 5010 --no-debugger --no-reload

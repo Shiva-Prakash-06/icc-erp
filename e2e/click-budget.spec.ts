@@ -57,7 +57,7 @@ function row(page: Page, text: string) {
   return page.locator("li.cv-item").filter({ hasText: text });
 }
 
-test("0 clicks: every role signs in to its own work", async ({ page }) => {
+test("0 clicks: every role signs in to Campuses, and My work is one press away", async ({ page }) => {
   const landing: [string, RegExp][] = [
     ["e2e_faculty", /needs your ok|to do|caught up/i],
     ["e2e_usc", /to do|today's event|your events|caught up/i],
@@ -67,7 +67,9 @@ test("0 clicks: every role signs in to its own work", async ({ page }) => {
     ["e2e_culturals", /to do/i],
   ];
   for (const [user, heading] of landing) {
-    await signIn(page, user);
+    await signIn(page, user, { stayOnLanding: true });
+    await expect(page, user).toHaveURL(/\/overview$/);
+    await page.getByRole("link", { name: "My work" }).filter({ visible: true }).first().click();
     await expect(page, user).toHaveURL(/\/$/);
     await expect(page.locator("h1"), user).toHaveText("My work");
     await expect(page.locator(".cv-section__title").first(), user).toHaveText(heading);

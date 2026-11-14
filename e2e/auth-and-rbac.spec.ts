@@ -11,7 +11,8 @@ test("authentication handles invalid login, valid login, logout, and session pur
   await page.getByLabel(/username or email/i).fill("e2e_faculty");
   await page.getByLabel(/^password/i).fill(acceptancePassword);
   await page.getByRole("button", { name: /^sign in$/i }).click();
-  await expect(page).toHaveURL("http://127.0.0.1:5010/");
+  // Working roles open on Campuses after signing in.
+  await expect(page).toHaveURL("http://127.0.0.1:5010/overview");
   // The phone bar carries four destinations plus Menu (audit P0-05), so
   // below 860px sign-out lives in the Menu drawer rather than as a ninth
   // icon on the bar. Opening it is part of what this test proves: every
