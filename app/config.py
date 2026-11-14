@@ -18,6 +18,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INSTANCE_DIR = BASE_DIR / "instance"
 
 
+def shared_redis_uri(name: str) -> str:
+    """The shared Redis for the limiter and upload sessions.
+
+    BETA_REDIS_URL is written by the Vercel Upstash integration, so it is
+    replaced automatically whenever the store is. It wins over the older
+    hand-set RATELIMIT_STORAGE_URI and UPLOAD_SESSION_STORAGE_URI, which
+    still name a store that has been deleted.
+    """
+    return os.getenv("BETA_REDIS_URL") or os.getenv(name, "memory://")
+
+
 def _persisted_dev_secret_key() -> str | None:
     """Return a SECRET_KEY that stays stable across process restarts/workers
     when no SECRET_KEY env var is set (dev/staging only -- production always
@@ -100,7 +111,7 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = "Lax"
-    RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_STORAGE_URI = shared_redis_uri("RATELIMIT_STORAGE_URI")
     # If the shared limiter store is unreachable, count in this process
     # instead of failing the request. The hosted Redis was once deleted
     # from under the app, and every page, /healthz included, returned 500.
@@ -172,7 +183,7 @@ class BaseConfig:
         for domain in os.getenv("SIGNUP_EMAIL_DOMAINS", "christuniversity.in").split(",")
         if domain.strip()
     ]
-    UPLOAD_SESSION_STORAGE_URI = os.getenv("UPLOAD_SESSION_STORAGE_URI", "memory://")
+    UPLOAD_SESSION_STORAGE_URI = shared_redis_uri("UPLOAD_SESSION_STORAGE_URI")
     UPLOAD_CHUNK_SIZE_BYTES = int(os.getenv("UPLOAD_CHUNK_SIZE_BYTES", str(8 * 1024 * 1024)))
     UPLOAD_MAX_TOTAL_BYTES = int(os.getenv("UPLOAD_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)))
 
@@ -235,7 +246,7 @@ class ProductionConfig(BaseConfig):
         # it silently stops enforcing anything once Cloud Run scales past one
         # instance. Production must use a shared store (managed Redis).
         # See PLAN.md "Additional release blockers" finding.
-        if not migration_only and os.getenv("RATELIMIT_STORAGE_URI", "memory://").startswith("memory://"):
+        if not migration_only and shared_redis_uri("RATELIMIT_STORAGE_URI").startswith("memory://"):
             missing.append("RATELIMIT_STORAGE_URI (must not be memory:// in production)")
         if not migration_only and not os.getenv("DISABLE_EXTERNAL_INTEGRATIONS", "false").lower() == "true":
             if os.getenv("DRIVE_VALIDATION_MODE", "live") != "live":

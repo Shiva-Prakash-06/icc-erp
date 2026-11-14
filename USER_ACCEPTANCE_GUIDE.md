@@ -26,13 +26,13 @@ the command again replaces all of them.
 
 Do these in order. Each one is checked before the next.
 
-1. A Redis store exists. The one the site used
-   (`informed-starfish-174568.upstash.io`) has been deleted. Create a new
-   Upstash Redis database (Vercel → Storage, or console.upstash.com, region
-   Tokyo to match the app) and set its `rediss://…` URL as both
-   `RATELIMIT_STORAGE_URI` and `UPLOAD_SESSION_STORAGE_URI` in Vercel →
-   Settings → Environment Variables → Production. Without it the site
-   loads, but every file upload fails.
+1. A Redis store exists. It is **icc-beta-redis** (Upstash, Tokyo), made
+   from Vercel → Storage and connected to the project, which gives it the
+   `BETA_REDIS_URL` variable. The app uses that ahead of the older
+   `RATELIMIT_STORAGE_URI` and `UPLOAD_SESSION_STORAGE_URI`, which name a
+   deleted store and can be removed. If the store is ever replaced, connect
+   the new one with the prefix `BETA`. Without a store the site loads, but
+   every file upload fails.
 2. Drive is set up, so the Media and Culturals heads can add files. The
    test folder is **ICC Test Drive**,
    `18ae3pJi2NiEC3yL-R9aVmocZXewC6ENH`.
